@@ -117,7 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data, error } = await supabase.auth.verifyOtp({
         phone,
         token,
-        type: 'sms',
+        type: 'phone_change',
       });
       
       if (error) {

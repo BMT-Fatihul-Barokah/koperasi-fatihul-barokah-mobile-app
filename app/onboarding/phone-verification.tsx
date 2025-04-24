@@ -1,11 +1,19 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
 export default function PhoneVerificationScreen() {
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [verificationMethod, setVerificationMethod] = useState<'whatsapp' | 'sms' | null>(null);
+
+  // Format phone to international string
+  const formatPhoneNumber = (input: string) => {
+    let cleaned = input.replace(/\D/g, '');
+    if (cleaned.startsWith('0')) cleaned = cleaned.slice(1);
+    if (cleaned.startsWith('62')) return `+${cleaned}`;
+    return `+62${cleaned}`;
+  };
 
   const handleContinue = () => {
     if (!phoneNumber.trim()) {
@@ -13,16 +21,12 @@ export default function PhoneVerificationScreen() {
       return;
     }
 
-    if (!verificationMethod) {
-      Alert.alert('Error', 'Mohon pilih metode verifikasi');
-      return;
-    }
-
-    // In a real app, we would send the verification code here
-    // For now, we'll just navigate to the verification code screen
+    // Use WhatsApp-only
+    const internationalNumber = formatPhoneNumber(phoneNumber);
+    // TODO: trigger WhatsApp OTP via Supabase
     router.push({
       pathname: '/onboarding/verification-code',
-      params: { phoneNumber, method: verificationMethod }
+      params: { phoneNumber: internationalNumber, method: 'whatsapp' }
     });
   };
 
@@ -43,52 +47,16 @@ export default function PhoneVerificationScreen() {
           Kami akan mengirimkan kode verifikasi untuk mengkonfirmasi identitas Anda
         </Text>
         
-        <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>Nomor Telepon</Text>
+        {/* Phone input with static country code */}
+        <View style={styles.phoneInputContainer}>
+          <Text style={styles.countryCode}>+62</Text>
           <TextInput
-            style={styles.input}
-            placeholder="contoh: 08123456789"
+            style={[styles.input, { flex: 1 }]}
+            placeholder="8xxxxxxxxxx"
             keyboardType="phone-pad"
             value={phoneNumber}
             onChangeText={setPhoneNumber}
           />
-        </View>
-        
-        <Text style={styles.methodLabel}>Pilih metode verifikasi:</Text>
-        <View style={styles.methodContainer}>
-          <TouchableOpacity 
-            style={[
-              styles.methodButton, 
-              verificationMethod === 'whatsapp' && styles.methodButtonSelected
-            ]}
-            onPress={() => setVerificationMethod('whatsapp')}
-          >
-            <Text 
-              style={[
-                styles.methodButtonText,
-                verificationMethod === 'whatsapp' && styles.methodButtonTextSelected
-              ]}
-            >
-              WhatsApp
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[
-              styles.methodButton, 
-              verificationMethod === 'sms' && styles.methodButtonSelected
-            ]}
-            onPress={() => setVerificationMethod('sms')}
-          >
-            <Text 
-              style={[
-                styles.methodButtonText,
-                verificationMethod === 'sms' && styles.methodButtonTextSelected
-              ]}
-            >
-              SMS
-            </Text>
-          </TouchableOpacity>
         </View>
       </View>
       
@@ -135,14 +103,6 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 30,
   },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  inputLabel: {
-    fontSize: 16,
-    marginBottom: 8,
-    color: '#333',
-  },
   input: {
     borderWidth: 1,
     borderColor: '#ddd',
@@ -150,35 +110,14 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
   },
-  methodLabel: {
-    fontSize: 16,
-    marginBottom: 8,
-    color: '#333',
-  },
-  methodContainer: {
+  phoneInputContainer: {
     flexDirection: 'row',
-    marginBottom: 30,
-  },
-  methodButton: {
-    flex: 1,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    marginRight: 10,
     alignItems: 'center',
+    marginBottom: 20,
   },
-  methodButtonSelected: {
-    borderColor: '#007BFF',
-    backgroundColor: 'rgba(0, 123, 255, 0.1)',
-  },
-  methodButtonText: {
+  countryCode: {
     fontSize: 16,
-    color: '#333',
-  },
-  methodButtonTextSelected: {
-    color: '#007BFF',
-    fontWeight: 'bold',
+    marginRight: 8,
   },
   continueButton: {
     backgroundColor: '#007BFF',
