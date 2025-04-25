@@ -1,11 +1,13 @@
 import React from 'react';
 import { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as SecureStore from 'expo-secure-store';
 
 export default function PhoneVerificationScreen() {
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   // Format phone to international string
   const formatPhoneNumber = (input: string) => {
@@ -15,19 +17,31 @@ export default function PhoneVerificationScreen() {
     return `+62${cleaned}`;
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!phoneNumber.trim()) {
       Alert.alert('Error', 'Mohon masukkan nomor telepon Anda');
       return;
     }
 
-    // Use WhatsApp-only
-    const internationalNumber = formatPhoneNumber(phoneNumber);
-    // TODO: trigger WhatsApp OTP via Supabase
-    router.push({
-      pathname: '/onboarding/verification-code',
-      params: { phoneNumber: internationalNumber, method: 'whatsapp' }
-    });
+    setIsLoading(true);
+    
+    try {
+      // Format phone number but skip OTP verification
+      const internationalNumber = formatPhoneNumber(phoneNumber);
+      
+      // Store phone number in secure storage for later use
+      await SecureStore.setItemAsync('temp_phone_number', internationalNumber);
+      
+      // Skip OTP verification and go directly to account validation
+      // Note: In production, we would implement proper phone verification
+      console.log('Bypassing phone verification for:', internationalNumber);
+      router.push('/onboarding/account-validation');
+    } catch (error) {
+      console.error('Error storing phone number:', error);
+      Alert.alert('Error', 'Terjadi kesalahan. Silakan coba lagi.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -61,10 +75,15 @@ export default function PhoneVerificationScreen() {
       </View>
       
       <TouchableOpacity 
-        style={styles.continueButton}
+        style={[styles.continueButton, isLoading && styles.disabledButton]}
         onPress={handleContinue}
+        disabled={isLoading}
       >
-        <Text style={styles.continueButtonText}>Lanjutkan</Text>
+        {isLoading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.continueButtonText}>Lanjutkan</Text>
+        )}
       </TouchableOpacity>
     </View>
   );
@@ -75,6 +94,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
     padding: 20,
+  },
+  disabledButton: {
+    backgroundColor: '#ccc',
   },
   header: {
     flexDirection: 'row',

@@ -1,13 +1,39 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ScrollView, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as SecureStore from 'expo-secure-store';
+import { DatabaseService } from '../../lib/database.service';
 
 export default function AccountValidationScreen() {
   const [fullName, setFullName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
 
-  const handleValidate = () => {
+  // Load phone number from secure storage
+  useEffect(() => {
+    const loadPhoneNumber = async () => {
+      try {
+        const storedPhoneNumber = await SecureStore.getItemAsync('temp_phone_number');
+        if (storedPhoneNumber) {
+          setPhoneNumber(storedPhoneNumber);
+        } else {
+          // If no phone number is found, go back to phone verification
+          Alert.alert('Error', 'Nomor telepon tidak ditemukan. Silakan coba lagi.');
+          router.replace('/onboarding/phone-verification');
+        }
+      } catch (error) {
+        console.error('Error loading phone number:', error);
+        Alert.alert('Error', 'Terjadi kesalahan. Silakan coba lagi.');
+      }
+    };
+
+    loadPhoneNumber();
+  }, []);
+
+  const handleValidate = async () => {
     if (!fullName.trim()) {
       Alert.alert('Error', 'Mohon masukkan nama lengkap Anda');
       return;
@@ -18,9 +44,43 @@ export default function AccountValidationScreen() {
       return;
     }
 
-    // In a real app, we would validate against the main system data here
-    // For now, we'll just navigate to the security setup screen
-    router.push('/onboarding/security-setup');
+    setIsValidating(true);
+
+    try {
+      // Validate account against database
+      const anggota = await DatabaseService.validateAccount(fullName, accountNumber);
+      
+      if (!anggota) {
+        Alert.alert('Error', 'Akun tidak ditemukan. Pastikan nama lengkap dan nomor rekening benar.');
+        setIsValidating(false);
+        return;
+      }
+
+      // Create or update account with phone number
+      const account = await DatabaseService.createOrUpdateAccount(anggota.id, phoneNumber);
+      
+      if (!account) {
+        Alert.alert('Error', 'Gagal membuat akun. Silakan coba lagi.');
+        setIsValidating(false);
+        return;
+      }
+
+      // Check if PIN exists
+      if (account.pin) {
+        // PIN already exists, go to dashboard
+        await SecureStore.setItemAsync('koperasi_auth_account_id', account.id);
+        router.replace('/(tabs)');
+      } else {
+        // Store account ID for PIN setup
+        await SecureStore.setItemAsync('temp_account_id', account.id);
+        router.push('/onboarding/security-setup');
+      }
+    } catch (error) {
+      console.error('Error validating account:', error);
+      Alert.alert('Error', 'Terjadi kesalahan. Silakan coba lagi.');
+    } finally {
+      setIsValidating(false);
+    }
   };
 
   const handleNewAccount = () => {
@@ -75,10 +135,15 @@ export default function AccountValidationScreen() {
       
       <View style={styles.buttonContainer}>
         <TouchableOpacity 
-          style={styles.validateButton}
+          style={[styles.validateButton, isValidating && styles.disabledButton]}
           onPress={handleValidate}
+          disabled={isValidating}
         >
-          <Text style={styles.validateButtonText}>Validasi Akun</Text>
+          {isValidating ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.validateButtonText}>Validasi Akun</Text>
+          )}
         </TouchableOpacity>
         
         <TouchableOpacity 
@@ -96,6 +161,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+  },
+  disabledButton: {
+    backgroundColor: '#ccc',
   },
   contentContainer: {
     padding: 20,

@@ -1,7 +1,9 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
+import { useAuth } from '../../context/auth-context';
+import { format } from 'date-fns';
 
 interface TransactionItem {
   id: string;
@@ -12,9 +14,20 @@ interface TransactionItem {
 }
 
 export default function DashboardScreen() {
-  // Mock data for demonstration
-  const accountBalance = 5250000;
+  const { isLoading, isAuthenticated, member, balance, refreshUserData } = useAuth();
+  
+  // Loan balance is still mock data for now
   const loanBalance = 2000000;
+  
+  // Refresh user data when dashboard loads
+  useEffect(() => {
+    if (isAuthenticated) {
+      refreshUserData();
+    } else {
+      // If not authenticated, redirect to login
+      router.replace('/');
+    }
+  }, [isAuthenticated]);
   
   const recentTransactions: TransactionItem[] = [
     {
@@ -64,17 +77,29 @@ export default function DashboardScreen() {
     }).format(amount);
   };
   
+  // Format current date for last updated
+  const currentDate = format(new Date(), 'dd/MM/yyyy HH:mm');
+  
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007BFF" />
+        <Text style={styles.loadingText}>Memuat data...</Text>
+      </View>
+    );
+  }
+  
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
       
       <View style={styles.header}>
         <Text style={styles.greeting}>Assalamu'alaikum</Text>
-        <Text style={styles.userName}>Abdullah</Text>
+        <Text style={styles.userName}>{member?.nama_lengkap || 'Anggota'}</Text>
         
         <View style={styles.lastUpdateContainer}>
           <Text style={styles.lastUpdateText}>
-            Terakhir diperbarui: 12/04/2025 15:00
+            Terakhir diperbarui: {currentDate}
           </Text>
         </View>
       </View>
@@ -83,7 +108,7 @@ export default function DashboardScreen() {
         <View style={styles.balanceSection}>
           <View style={styles.balanceCard}>
             <Text style={styles.balanceLabel}>Saldo Tabungan</Text>
-            <Text style={styles.balanceAmount}>{formatCurrency(accountBalance)}</Text>
+            <Text style={styles.balanceAmount}>{formatCurrency(balance || 0)}</Text>
             <TouchableOpacity style={styles.viewDetailsButton}>
               <Text style={styles.viewDetailsText}>Lihat Detail</Text>
             </TouchableOpacity>
@@ -196,7 +221,10 @@ export default function DashboardScreen() {
           <Text style={styles.navText}>Notifikasi</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.navItem}>
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => router.push('/profile')}
+        >
           <Text style={styles.navIcon}>👤</Text>
           <Text style={styles.navText}>Profil</Text>
         </TouchableOpacity>
@@ -210,6 +238,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f8f8',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8f8f8',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+  },
   header: {
     backgroundColor: '#007BFF',
     paddingTop: 60,
@@ -221,6 +260,7 @@ const styles = StyleSheet.create({
   greeting: {
     fontSize: 16,
     color: 'rgba(255, 255, 255, 0.8)',
+    marginBottom: 5,
   },
   userName: {
     fontSize: 24,
@@ -232,7 +272,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     paddingVertical: 5,
     paddingHorizontal: 10,
-    borderRadius: 15,
+    borderRadius: 20,
     alignSelf: 'flex-start',
   },
   lastUpdateText: {
@@ -262,7 +302,7 @@ const styles = StyleSheet.create({
   balanceLabel: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 5,
+    marginBottom: 8,
   },
   balanceAmount: {
     fontSize: 18,
@@ -272,23 +312,30 @@ const styles = StyleSheet.create({
   },
   viewDetailsButton: {
     backgroundColor: '#f0f0f0',
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 5,
-    alignItems: 'center',
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    alignSelf: 'flex-start',
   },
   viewDetailsText: {
     fontSize: 12,
-    color: '#007BFF',
+    color: '#666',
   },
   quickActionsSection: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 15,
     marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 15,
-    color: '#333',
   },
   quickActionsGrid: {
     flexDirection: 'row',
@@ -296,17 +343,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   quickActionItem: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 15,
-    width: '48%',
+    width: '23%',
     alignItems: 'center',
     marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
   quickActionIcon: {
     width: 50,
@@ -315,14 +354,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   quickActionIconText: {
-    fontSize: 24,
+    fontSize: 20,
   },
   quickActionText: {
-    fontSize: 14,
-    color: '#333',
+    fontSize: 12,
+    textAlign: 'center',
+    color: '#666',
   },
   transactionsSection: {
     backgroundColor: '#fff',
@@ -358,8 +398,8 @@ const styles = StyleSheet.create({
   },
   transactionDate: {
     fontSize: 12,
-    color: '#666',
-    marginBottom: 5,
+    color: '#999',
+    marginBottom: 4,
   },
   transactionDescription: {
     fontSize: 14,
@@ -370,56 +410,57 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   creditAmount: {
-    color: '#4CAF50',
+    color: '#28a745',
   },
   debitAmount: {
-    color: '#F44336',
+    color: '#dc3545',
   },
   announcementsSection: {
-    marginBottom: 20,
-  },
-  announcementCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 15,
-    marginBottom: 15,
+    marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
+  announcementCard: {
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 10,
+  },
   announcementTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 5,
   },
   announcementDate: {
     fontSize: 12,
-    color: '#666',
-    marginBottom: 10,
+    color: '#999',
+    marginBottom: 8,
   },
   announcementContent: {
-    fontSize: 14,
-    color: '#333',
-    lineHeight: 20,
+    fontSize: 13,
+    color: '#666',
+    lineHeight: 18,
   },
   navbar: {
     flexDirection: 'row',
+    justifyContent: 'space-around',
     backgroundColor: '#fff',
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: '#eee',
   },
   navItem: {
-    flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
   },
   navIcon: {
     fontSize: 24,
-    marginBottom: 5,
+    marginBottom: 4,
     color: '#999',
   },
   activeNavIcon: {
@@ -431,5 +472,5 @@ const styles = StyleSheet.create({
   },
   activeNavText: {
     color: '#007BFF',
-  },
+  }
 });

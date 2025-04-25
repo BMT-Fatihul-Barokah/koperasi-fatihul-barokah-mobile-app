@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as SecureStore from 'expo-secure-store';
+import { DatabaseService } from '../../lib/database.service';
 
 interface PinKeypadProps {
   onKeyPress: (key: string) => void;
@@ -37,6 +39,8 @@ export default function SecuritySetupScreen() {
   const [pin, setPin] = useState<string>('');
   const [confirmPin, setConfirmPin] = useState<string>('');
   const [step, setStep] = useState<'create' | 'confirm'>('create');
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [accountId, setAccountId] = useState<string>('');
   
   const handleKeyPress = (key: string) => {
     if (step === 'create') {
@@ -63,14 +67,33 @@ export default function SecuritySetupScreen() {
     }
   }, [pin, step]);
   
+  // Load account ID from secure storage
+  useEffect(() => {
+    const loadAccountId = async () => {
+      try {
+        const storedAccountId = await SecureStore.getItemAsync('temp_account_id');
+        if (storedAccountId) {
+          setAccountId(storedAccountId);
+        } else {
+          // If no account ID is found, go back to account validation
+          Alert.alert('Error', 'Data akun tidak ditemukan. Silakan coba lagi.');
+          router.replace('/onboarding/account-validation');
+        }
+      } catch (error) {
+        console.error('Error loading account ID:', error);
+        Alert.alert('Error', 'Terjadi kesalahan. Silakan coba lagi.');
+      }
+    };
+
+    loadAccountId();
+  }, []);
+
   useEffect(() => {
     if (confirmPin.length === 6 && step === 'confirm') {
       // Verify PIN match
       if (pin === confirmPin) {
-        // In a real app, we would save the PIN securely here
-        setTimeout(() => {
-          router.push('/onboarding/registration-complete');
-        }, 300);
+        // Save PIN to database
+        savePinToDatabase(pin);
       } else {
         Alert.alert(
           'PIN Tidak Cocok',
@@ -89,6 +112,40 @@ export default function SecuritySetupScreen() {
       }
     }
   }, [confirmPin, pin, step]);
+
+  const savePinToDatabase = async (pinToSave: string) => {
+    if (!accountId) {
+      Alert.alert('Error', 'Data akun tidak ditemukan. Silakan coba lagi.');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      // Save PIN to database
+      const success = await DatabaseService.setAccountPin(accountId, pinToSave);
+      
+      if (!success) {
+        Alert.alert('Error', 'Gagal menyimpan PIN. Silakan coba lagi.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Clean up temporary storage
+      await SecureStore.deleteItemAsync('temp_phone_number');
+      await SecureStore.deleteItemAsync('temp_account_id');
+      
+      // Store account ID for authentication
+      await SecureStore.setItemAsync('koperasi_auth_account_id', accountId);
+      
+      // Navigate to dashboard
+      router.replace('/(tabs)');
+    } catch (error) {
+      console.error('Error saving PIN:', error);
+      Alert.alert('Error', 'Terjadi kesalahan. Silakan coba lagi.');
+      setIsLoading(false);
+    }
+  };
   
   return (
     <View style={styles.container}>
@@ -102,15 +159,22 @@ export default function SecuritySetupScreen() {
       </View>
       
       <View style={styles.content}>
-        <Text style={styles.title}>
-          {step === 'create' ? 'Buat PIN Anda' : 'Konfirmasi PIN Anda'}
-        </Text>
-        <Text style={styles.subtitle}>
-          {step === 'create' 
-            ? 'Buat PIN 6 digit untuk mengamankan akun Anda'
-            : 'Silakan masukkan kembali PIN Anda untuk konfirmasi'
-          }
-        </Text>
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#007BFF" />
+            <Text style={styles.loadingText}>Menyimpan PIN Anda...</Text>
+          </View>
+        ) : (
+          <>
+            <Text style={styles.title}>
+              {step === 'create' ? 'Buat PIN Anda' : 'Konfirmasi PIN Anda'}
+            </Text>
+            <Text style={styles.subtitle}>
+              {step === 'create' 
+                ? 'Buat PIN 6 digit untuk mengamankan akun Anda'
+                : 'Silakan masukkan kembali PIN Anda untuk konfirmasi'
+              }
+            </Text>
         
         <View style={styles.pinContainer}>
           {Array(6).fill(0).map((_, index) => {
@@ -136,6 +200,8 @@ export default function SecuritySetupScreen() {
             PIN Anda akan digunakan untuk mengamankan akun dan mengotorisasi transaksi.
           </Text>
         </View>
+        </>
+        )}
       </View>
     </View>
   );
@@ -146,6 +212,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
     padding: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 20,
+    fontSize: 16,
+    color: '#666',
   },
   header: {
     flexDirection: 'row',

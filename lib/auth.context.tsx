@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Akun, Anggota } from '../lib/database.types';
-import { DatabaseService } from '../lib/database.service';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { Akun, Anggota } from './database.types';
+import { DatabaseService } from './database.service';
 import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 
@@ -10,33 +10,26 @@ interface AuthState {
   account: Akun | null;
   member: Anggota | null;
   balance: number;
-  error: Error | null;
 }
 
 interface AuthContextType extends AuthState {
   login: (accountId: string) => Promise<boolean>;
-  logout: () => Promise<void>;
+  logout: () => void;
   refreshUserData: () => Promise<void>;
 }
 
-// Initial auth state
-const initialState: AuthState = {
-  isLoading: true,
-  isAuthenticated: false,
-  account: null,
-  member: null,
-  balance: 0,
-  error: null,
-};
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const AUTH_STORAGE_KEY = 'koperasi_auth_account_id';
 
-// Create auth context
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-// Auth provider component
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<AuthState>(initialState);
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [state, setState] = useState<AuthState>({
+    isLoading: true,
+    isAuthenticated: false,
+    account: null,
+    member: null,
+    balance: 0,
+  });
 
   // Check for existing session on app start
   useEffect(() => {
@@ -52,7 +45,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (error) {
         console.error('Error loading auth session:', error);
-        setState(prev => ({ ...prev, error: error as Error }));
       } finally {
         setState(prev => ({ ...prev, isLoading: false }));
       }
@@ -62,7 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = async (accountId: string): Promise<boolean> => {
-    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    setState(prev => ({ ...prev, isLoading: true }));
     
     try {
       const accountDetails = await DatabaseService.getAccountDetails(accountId);
@@ -71,8 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setState(prev => ({ 
           ...prev, 
           isLoading: false,
-          isAuthenticated: false,
-          error: new Error('Account not found')
+          isAuthenticated: false 
         }));
         return false;
       }
@@ -85,24 +76,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAuthenticated: true,
         account: accountDetails.account,
         member: accountDetails.member,
-        balance: accountDetails.balance,
-        error: null
+        balance: accountDetails.balance
       });
       
       return true;
     } catch (error) {
       console.error('Error during login:', error);
-      setState(prev => ({ 
-        ...prev, 
-        isLoading: false, 
-        error: error as Error 
-      }));
+      setState(prev => ({ ...prev, isLoading: false }));
       return false;
     }
   };
 
   const logout = async () => {
-    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    setState(prev => ({ ...prev, isLoading: true }));
     
     try {
       await SecureStore.deleteItemAsync(AUTH_STORAGE_KEY);
@@ -112,35 +98,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAuthenticated: false,
         account: null,
         member: null,
-        balance: 0,
-        error: null
+        balance: 0
       });
       
       router.replace('/');
     } catch (error) {
       console.error('Error during logout:', error);
-      setState(prev => ({ 
-        ...prev, 
-        isLoading: false, 
-        error: error as Error 
-      }));
+      setState(prev => ({ ...prev, isLoading: false }));
     }
   };
 
   const refreshUserData = async () => {
     if (!state.account?.id) return;
     
-    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    setState(prev => ({ ...prev, isLoading: true }));
     
     try {
       const accountDetails = await DatabaseService.getAccountDetails(state.account.id);
       
       if (!accountDetails) {
-        setState(prev => ({ 
-          ...prev, 
-          isLoading: false,
-          error: new Error('Failed to refresh account data')
-        }));
+        setState(prev => ({ ...prev, isLoading: false }));
         return;
       }
       
@@ -149,31 +126,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading: false,
         account: accountDetails.account,
         member: accountDetails.member,
-        balance: accountDetails.balance,
-        error: null
+        balance: accountDetails.balance
       }));
     } catch (error) {
       console.error('Error refreshing user data:', error);
-      setState(prev => ({ 
-        ...prev, 
-        isLoading: false, 
-        error: error as Error 
-      }));
+      setState(prev => ({ ...prev, isLoading: false }));
     }
   };
 
-  // Auth context value
-  const value = {
-    ...state,
-    login,
-    logout,
-    refreshUserData,
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider
+      value={{
+        ...state,
+        login,
+        logout,
+        refreshUserData
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
-// Custom hook to use auth context
 export function useAuth() {
   const context = useContext(AuthContext);
   
