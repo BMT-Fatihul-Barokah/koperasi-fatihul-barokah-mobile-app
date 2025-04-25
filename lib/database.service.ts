@@ -142,18 +142,32 @@ export const DatabaseService = {
    * Get account balance
    */
   async getAccountBalance(anggotaId: string): Promise<number> {
-    const { data, error } = await supabase
-      .from('saldo')
-      .select('jumlah')
-      .eq('anggota_id', anggotaId)
-      .single();
-    
-    if (error) {
-      console.error('Error getting balance:', error);
+    try {
+      console.log(`Fetching balance for anggota ID: ${anggotaId}`);
+      
+      // Get balance directly from the anggota table
+      const { data, error } = await supabase
+        .from('anggota')
+        .select('saldo')
+        .eq('id', anggotaId)
+        .single();
+      
+      if (error) {
+        console.error('Error getting balance:', error);
+        return 0;
+      }
+      
+      if (!data) {
+        console.error('No data found for anggota ID:', anggotaId);
+        return 0;
+      }
+      
+      console.log(`Balance found: ${data.saldo}`);
+      return data.saldo;
+    } catch (error) {
+      console.error('Error in getAccountBalance:', error);
       return 0;
     }
-    
-    return (data as Saldo).jumlah;
   },
 
   /**

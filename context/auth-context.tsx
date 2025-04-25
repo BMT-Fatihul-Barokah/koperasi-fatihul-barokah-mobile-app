@@ -128,14 +128,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const refreshUserData = async () => {
-    if (!state.account?.id) return;
+    if (!state.account?.id) {
+      console.log('Auth: Cannot refresh user data - no account ID');
+      return;
+    }
     
+    console.log(`Auth: Refreshing user data for account ID: ${state.account.id}`);
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     
     try {
       const accountDetails = await DatabaseService.getAccountDetails(state.account.id);
       
       if (!accountDetails) {
+        console.error('Auth: Failed to get account details');
         setState(prev => ({ 
           ...prev, 
           isLoading: false,
@@ -143,6 +148,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }));
         return;
       }
+      
+      console.log('Auth: Account details retrieved successfully:', {
+        accountId: accountDetails.account.id,
+        memberId: accountDetails.member.id,
+        memberName: accountDetails.member.nama,
+        balance: accountDetails.balance
+      });
       
       setState(prev => ({
         ...prev,
@@ -153,7 +165,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         error: null
       }));
     } catch (error) {
-      console.error('Error refreshing user data:', error);
+      console.error('Auth: Error refreshing user data:', error);
       setState(prev => ({ 
         ...prev, 
         isLoading: false, 

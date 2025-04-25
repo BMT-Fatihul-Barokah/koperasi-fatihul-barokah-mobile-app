@@ -22,12 +22,27 @@ export default function DashboardScreen() {
   // Refresh user data when dashboard loads
   useEffect(() => {
     if (isAuthenticated) {
+      console.log('Dashboard: User is authenticated, refreshing user data');
       refreshUserData();
     } else {
+      console.log('Dashboard: User is not authenticated, redirecting to login');
       // If not authenticated, redirect to login
       router.replace('/');
     }
   }, [isAuthenticated]);
+  
+  // Log member data for debugging
+  useEffect(() => {
+    if (member) {
+      console.log('Dashboard: Member data loaded:', {
+        id: member.id,
+        nama: member.nama,
+        saldo: member.saldo,
+        nomor_rekening: member.nomor_rekening
+      });
+      console.log('Dashboard: Balance:', balance);
+    }
+  }, [member, balance]);
   
   const recentTransactions: TransactionItem[] = [
     {
