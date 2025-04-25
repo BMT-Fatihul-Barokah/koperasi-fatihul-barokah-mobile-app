@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ScrollView, ActivityIndicator, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import * as SecureStore from 'expo-secure-store';
+import NetInfo from '@react-native-community/netinfo';
 import { DatabaseService } from '../../lib/database.service';
+import { checkSupabaseConnection } from '../../lib/supabase';
+import { storage } from '../../lib/storage';
 
 export default function AccountValidationScreen() {
   const [fullName, setFullName] = useState('');
@@ -16,7 +18,7 @@ export default function AccountValidationScreen() {
   useEffect(() => {
     const loadPhoneNumber = async () => {
       try {
-        const storedPhoneNumber = await SecureStore.getItemAsync('temp_phone_number');
+        const storedPhoneNumber = await storage.getItem('temp_phone_number');
         if (storedPhoneNumber) {
           setPhoneNumber(storedPhoneNumber);
         } else {
@@ -47,6 +49,34 @@ export default function AccountValidationScreen() {
     setIsValidating(true);
 
     try {
+      // Check network connectivity first
+      const netInfo = await NetInfo.fetch();
+      if (!netInfo.isConnected || !netInfo.isInternetReachable) {
+        Alert.alert(
+          'Kesalahan Jaringan',
+          'Tidak ada koneksi internet. Silakan periksa koneksi Anda dan coba lagi.'
+        );
+        setIsValidating(false);
+        return;
+      }
+
+      // Check Supabase connection with detailed error reporting
+      const connectionCheck = await checkSupabaseConnection();
+      if (!connectionCheck.success) {
+        console.error('Connection check failed:', connectionCheck.message);
+        Alert.alert(
+          'Kesalahan Server',
+          `Tidak dapat terhubung ke server: ${connectionCheck.message}. Silakan coba lagi nanti.`
+        );
+        setIsValidating(false);
+        return;
+      }
+      
+      console.log('Connection check passed:', connectionCheck.message);
+      
+      // Log validation attempt for debugging
+      console.log(`Attempting to validate account: ${fullName} with rekening: ${accountNumber}`);
+      
       // Validate account against database
       const anggota = await DatabaseService.validateAccount(fullName, accountNumber);
       
@@ -55,29 +85,47 @@ export default function AccountValidationScreen() {
         setIsValidating(false);
         return;
       }
+      
+      console.log('Account validated successfully:', anggota.id);
 
       // Create or update account with phone number
-      const account = await DatabaseService.createOrUpdateAccount(anggota.id, phoneNumber);
-      
-      if (!account) {
-        Alert.alert('Error', 'Gagal membuat akun. Silakan coba lagi.');
-        setIsValidating(false);
-        return;
-      }
+      try {
+        const account = await DatabaseService.createOrUpdateAccount(anggota.id, phoneNumber);
+        
+        if (!account) {
+          Alert.alert('Error', 'Gagal membuat akun. Silakan coba lagi.');
+          setIsValidating(false);
+          return;
+        }
+        
+        console.log('Account created/updated successfully:', account.id);
 
-      // Check if PIN exists
-      if (account.pin) {
-        // PIN already exists, go to dashboard
-        await SecureStore.setItemAsync('koperasi_auth_account_id', account.id);
-        router.replace('/(tabs)');
-      } else {
-        // Store account ID for PIN setup
-        await SecureStore.setItemAsync('temp_account_id', account.id);
-        router.push('/onboarding/security-setup');
+        // Check if PIN exists
+        if (account.pin) {
+          // PIN already exists, go to dashboard
+          await storage.setItem('koperasi_auth_account_id', account.id);
+          console.log('Navigating to dashboard...');
+          router.replace('/dashboard');
+        } else {
+          // Store account ID for PIN setup
+          await storage.setItem('temp_account_id', account.id);
+          console.log('Navigating to security setup...');
+          router.push('/onboarding/security-setup');
+        }
+      } catch (accountError) {
+        console.error('Error creating/updating account:', accountError);
+        Alert.alert('Error', 'Gagal membuat atau memperbarui akun. Silakan coba lagi.');
       }
     } catch (error) {
       console.error('Error validating account:', error);
-      Alert.alert('Error', 'Terjadi kesalahan. Silakan coba lagi.');
+      if (error instanceof Error && error.message === 'Network request failed') {
+        Alert.alert(
+          'Kesalahan Jaringan', 
+          'Tidak dapat terhubung ke server. Periksa koneksi internet Anda dan coba lagi.'
+        );
+      } else {
+        Alert.alert('Error', 'Terjadi kesalahan. Silakan coba lagi.');
+      }
     } finally {
       setIsValidating(false);
     }
@@ -112,6 +160,7 @@ export default function AccountValidationScreen() {
             placeholder="Masukkan nama lengkap Anda"
             value={fullName}
             onChangeText={setFullName}
+            autoCapitalize="words"
           />
         </View>
         

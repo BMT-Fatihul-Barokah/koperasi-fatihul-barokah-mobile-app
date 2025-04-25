@@ -95,7 +95,7 @@ export default function DashboardScreen() {
       
       <View style={styles.header}>
         <Text style={styles.greeting}>Assalamu'alaikum</Text>
-        <Text style={styles.userName}>{member?.nama_lengkap || 'Anggota'}</Text>
+        <Text style={styles.userName}>{member?.nama || 'Anggota'}</Text>
         
         <View style={styles.lastUpdateContainer}>
           <Text style={styles.lastUpdateText}>

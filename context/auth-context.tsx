@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Akun, Anggota } from '../lib/database.types';
 import { DatabaseService } from '../lib/database.service';
 import { router } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
+import { storage } from '../lib/storage';
 
 interface AuthState {
   isLoading: boolean;
@@ -42,12 +42,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const loadSession = async () => {
       try {
-        const accountId = await SecureStore.getItemAsync(AUTH_STORAGE_KEY);
+        const accountId = await storage.getItem(AUTH_STORAGE_KEY);
         
         if (accountId) {
           const success = await login(accountId);
           if (!success) {
-            await SecureStore.deleteItemAsync(AUTH_STORAGE_KEY);
+            await storage.removeItem(AUTH_STORAGE_KEY);
           }
         }
       } catch (error) {
@@ -78,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       
       // Store account ID in secure storage
-      await SecureStore.setItemAsync(AUTH_STORAGE_KEY, accountId);
+      await storage.setItem(AUTH_STORAGE_KEY, accountId);
       
       setState({
         isLoading: false,
@@ -105,7 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     
     try {
-      await SecureStore.deleteItemAsync(AUTH_STORAGE_KEY);
+      await storage.removeItem(AUTH_STORAGE_KEY);
       
       setState({
         isLoading: false,

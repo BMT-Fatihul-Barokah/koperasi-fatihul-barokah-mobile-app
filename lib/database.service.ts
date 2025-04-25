@@ -9,66 +9,115 @@ export const DatabaseService = {
    * Check if an account exists with the given name and account number
    */
   async validateAccount(namaLengkap: string, nomorRekening: string): Promise<Anggota | null> {
-    const { data, error } = await supabase
-      .from('anggota')
-      .select('*')
-      .eq('nama_lengkap', namaLengkap)
-      .eq('nomor_rekening', nomorRekening)
-      .single();
-    
-    if (error) {
+    try {
+      console.log(`Validating account with nama: ${namaLengkap}, nomor_rekening: ${nomorRekening}`);
+      
+      // First try exact match
+      const { data, error } = await supabase
+        .from('anggota')
+        .select('*')
+        .eq('nama', namaLengkap) // Changed from nama_lengkap to nama
+        .eq('nomor_rekening', nomorRekening)
+        .single();
+      
+      if (!error && data) {
+        console.log('Found exact match:', data);
+        return data as Anggota;
+      }
+      
+      console.log('No exact match found, trying case-insensitive search');
+      
+      // If exact match fails, try case-insensitive search
+      const { data: allAnggota, error: listError } = await supabase
+        .from('anggota')
+        .select('*')
+        .eq('is_active', true); // Only get active accounts
+      
+      if (listError) {
+        console.error('Error fetching all anggota:', listError);
+        throw new Error('Network request failed');
+      }
+      
+      console.log(`Found ${allAnggota.length} total anggota records`);
+      
+      // Manual case-insensitive matching
+      const matchedAnggota = allAnggota.find(
+        (anggota) => 
+          anggota.nama.toLowerCase() === namaLengkap.toLowerCase() && // Changed from nama_lengkap to nama
+          anggota.nomor_rekening === nomorRekening
+      );
+      
+      if (matchedAnggota) {
+        console.log('Found case-insensitive match:', matchedAnggota);
+      } else {
+        console.log('No matching account found');
+      }
+      
+      return matchedAnggota || null;
+    } catch (error) {
       console.error('Error validating account:', error);
-      return null;
+      throw new Error('Network request failed');
     }
-    
-    return data as Anggota;
   },
 
   /**
    * Create or update an account with phone number
    */
   async createOrUpdateAccount(anggotaId: string, nomorTelepon: string): Promise<Akun | null> {
-    // First check if account already exists
-    const { data: existingAccount, error: fetchError } = await supabase
-      .from('akun')
-      .select('*')
-      .eq('anggota_id', anggotaId)
-      .single();
-    
-    if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
-      console.error('Error fetching account:', fetchError);
-      return null;
-    }
-    
-    if (existingAccount) {
-      // Update existing account with new phone number
-      const { data, error } = await supabase
+    try {
+      console.log(`Creating/updating account for anggota ID: ${anggotaId} with phone: ${nomorTelepon}`);
+      
+      // First check if account already exists
+      const { data: existingAccount, error: fetchError } = await supabase
         .from('akun')
-        .update({ nomor_telepon: nomorTelepon, updated_at: new Date().toISOString() })
-        .eq('id', existingAccount.id)
-        .select()
+        .select('*')
+        .eq('anggota_id', anggotaId)
         .single();
       
-      if (error) {
-        console.error('Error updating account:', error);
-        return null;
+      if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
+        console.error('Error fetching account:', fetchError);
+        throw new Error('Failed to fetch account');
       }
       
-      return data as Akun;
-    } else {
-      // Create new account
-      const { data, error } = await supabase
-        .from('akun')
-        .insert({ anggota_id: anggotaId, nomor_telepon: nomorTelepon })
-        .select()
-        .single();
-      
-      if (error) {
-        console.error('Error creating account:', error);
-        return null;
+      if (existingAccount) {
+        console.log('Found existing account, updating...', existingAccount.id);
+        // Update existing account with new phone number
+        const { data, error } = await supabase
+          .from('akun')
+          .update({ nomor_telepon: nomorTelepon, updated_at: new Date().toISOString() })
+          .eq('id', existingAccount.id)
+          .select()
+          .single();
+        
+        if (error) {
+          console.error('Error updating account:', error);
+          throw new Error('Failed to update account');
+        }
+        
+        return data as Akun;
+      } else {
+        console.log('No existing account found, creating new account...');
+        // Create new account
+        const { data, error } = await supabase
+          .from('akun')
+          .insert({ 
+            anggota_id: anggotaId, 
+            nomor_telepon: nomorTelepon,
+            created_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+        
+        if (error) {
+          console.error('Error creating account:', error);
+          throw new Error('Failed to create account');
+        }
+        
+        return data as Akun;
       }
-      
-      return data as Akun;
+    } catch (error) {
+      console.error('Error in createOrUpdateAccount:', error);
+      throw error;
     }
   },
 

@@ -1,10 +1,19 @@
 export interface Anggota {
   id: string;
-  nama_lengkap: string;
+  nama: string; // Changed from nama_lengkap to match database schema
   nomor_rekening: string;
+  saldo: number;
   alamat?: string;
+  kota?: string;
+  tempat_lahir?: string;
+  tanggal_lahir?: string;
+  pekerjaan?: string;
+  jenis_identitas?: string;
+  nomor_identitas?: string;
   created_at: string;
   updated_at?: string;
+  closed_at?: string;
+  is_active: boolean;
 }
 
 export interface Akun {

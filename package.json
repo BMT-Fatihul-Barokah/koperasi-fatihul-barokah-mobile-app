@@ -9,6 +9,7 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@react-native-community/netinfo": "^11.4.1",
     "@supabase/supabase-js": "^2.49.4",
     "date-fns": "^4.1.0",
     "expo": "^52.0.16",
