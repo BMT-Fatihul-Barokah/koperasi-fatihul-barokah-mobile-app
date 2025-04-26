@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { router } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { BackHeader } from '../../../components/header/back-header';
 
 export default function PersonalInformationScreen() {
   const [fullName, setFullName] = useState('');
@@ -23,15 +24,9 @@ export default function PersonalInformationScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      <StatusBar style="auto" />
-      
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.backButton}>← Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Personal Information</Text>
-      </View>
+    <SafeAreaProvider>
+      <BackHeader title="Personal Information" />
+      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       
       <View style={styles.progressContainer}>
         <View style={styles.progressBar}>
@@ -126,6 +121,7 @@ export default function PersonalInformationScreen() {
         </TouchableOpacity>
       </View>
     </ScrollView>
+    </SafeAreaProvider>
   );
 }
 
@@ -133,24 +129,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+    padding: 20,
   },
   contentContainer: {
-    padding: 20,
     flexGrow: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  backButton: {
-    fontSize: 16,
-    color: '#007BFF',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginLeft: 20,
   },
   progressContainer: {
     marginBottom: 25,

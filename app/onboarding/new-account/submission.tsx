@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { router } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 export default function SubmissionConfirmationScreen() {
   // Generate a random submission ID
@@ -13,8 +13,8 @@ export default function SubmissionConfirmationScreen() {
   };
   
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      <StatusBar style="auto" />
+    <SafeAreaProvider>
+      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       
       <View style={styles.content}>
         <View style={styles.successIconContainer}>
@@ -64,6 +64,7 @@ export default function SubmissionConfirmationScreen() {
         <Text style={styles.doneButtonText}>Return to Home</Text>
       </TouchableOpacity>
     </ScrollView>
+    </SafeAreaProvider>
   );
 }
 

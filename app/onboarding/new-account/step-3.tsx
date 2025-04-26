@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { router } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { BackHeader } from '../../../components/header/back-header';
 
 interface AccountType {
   id: string;
@@ -60,15 +61,9 @@ export default function AccountSelectionScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      <StatusBar style="auto" />
-      
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.backButton}>← Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Account Selection</Text>
-      </View>
+    <SafeAreaProvider>
+      <BackHeader title="Account Selection" />
+      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       
       <View style={styles.progressContainer}>
         <View style={styles.progressBar}>
@@ -134,6 +129,7 @@ export default function AccountSelectionScreen() {
         </TouchableOpacity>
       </View>
     </ScrollView>
+    </SafeAreaProvider>
   );
 }
 
@@ -141,24 +137,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+    padding: 20,
   },
   contentContainer: {
-    padding: 20,
     flexGrow: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  backButton: {
-    fontSize: 16,
-    color: '#007BFF',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginLeft: 20,
   },
   progressContainer: {
     marginBottom: 25,
