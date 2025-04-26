@@ -5,9 +5,11 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 import { storage } from '../../lib/storage';
 import { BackHeader } from '../../components/header/back-header';
+import { useAuth } from '../../context/auth-context';
 
 export default function VerificationCodeScreen() {
   const params = useLocalSearchParams<{ phoneNumber: string; method: string }>();
+  const { login } = useAuth();
   
   const [phoneNumber, setPhoneNumber] = useState(params.phoneNumber || '');
   const method = params.method || 'sms';
@@ -161,11 +163,16 @@ export default function VerificationCodeScreen() {
           // Store the new account ID in secure storage for authentication
           await storage.setItem('koperasi_auth_account_id', accountId);
           
-          // Small delay to ensure storage is updated before navigation
-          setTimeout(() => {
-            // Navigate to dashboard
+          // Use the login function from auth context to properly load the user data
+          const loginSuccess = await login(accountId);
+          
+          if (loginSuccess) {
+            // Navigate directly to dashboard with the updated user data
             router.replace('/dashboard');
-          }, 100);
+          } else {
+            console.error('Failed to login with the new account ID');
+            Alert.alert('Error', 'Gagal memuat data pengguna. Silakan coba lagi.');
+          }
         } catch (storageError) {
           console.error('Error updating auth storage:', storageError);
           Alert.alert('Error', 'Terjadi kesalahan saat menyimpan sesi. Silakan coba lagi.');
