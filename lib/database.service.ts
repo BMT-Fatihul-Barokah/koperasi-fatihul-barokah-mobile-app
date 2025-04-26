@@ -62,30 +62,56 @@ export const DatabaseService = {
 
   /**
    * Create or update an account with phone number
+   * Returns null if the anggota is already linked to another phone number
    */
   async createOrUpdateAccount(anggotaId: string, nomorTelepon: string): Promise<Akun | null> {
     try {
       console.log(`Creating/updating account for anggota ID: ${anggotaId} with phone: ${nomorTelepon}`);
       
-      // First check if account already exists
-      const { data: existingAccount, error: fetchError } = await supabase
+      // First check if account already exists for this anggota
+      const { data: existingAccountForAnggota, error: fetchAnggotaError } = await supabase
         .from('akun')
         .select('*')
         .eq('anggota_id', anggotaId)
         .single();
       
-      if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
-        console.error('Error fetching account:', fetchError);
+      if (fetchAnggotaError && fetchAnggotaError.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
+        console.error('Error fetching account for anggota:', fetchAnggotaError);
         throw new Error('Failed to fetch account');
       }
       
-      if (existingAccount) {
-        console.log('Found existing account, updating...', existingAccount.id);
+      // If anggota already has an account with a different phone number, return null
+      if (existingAccountForAnggota && existingAccountForAnggota.nomor_telepon !== nomorTelepon) {
+        console.log(`Anggota ${anggotaId} already linked to another phone number: ${existingAccountForAnggota.nomor_telepon}`);
+        return null;
+      }
+      
+      // Check if phone number is already linked to another anggota
+      const { data: existingAccountForPhone, error: fetchPhoneError } = await supabase
+        .from('akun')
+        .select('*')
+        .eq('nomor_telepon', nomorTelepon)
+        .single();
+      
+      if (fetchPhoneError && fetchPhoneError.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
+        console.error('Error fetching account for phone:', fetchPhoneError);
+        throw new Error('Failed to fetch account');
+      }
+      
+      // If phone number is already linked to another anggota, return null
+      if (existingAccountForPhone && existingAccountForPhone.anggota_id !== anggotaId) {
+        console.log(`Phone number ${nomorTelepon} already linked to another anggota: ${existingAccountForPhone.anggota_id}`);
+        return null;
+      }
+      
+      // If anggota already has an account with this phone number, update it
+      if (existingAccountForAnggota) {
+        console.log('Found existing account, updating...', existingAccountForAnggota.id);
         // Update existing account with new phone number
         const { data, error } = await supabase
           .from('akun')
           .update({ nomor_telepon: nomorTelepon, updated_at: new Date().toISOString() })
-          .eq('id', existingAccount.id)
+          .eq('id', existingAccountForAnggota.id)
           .select()
           .single();
         

@@ -51,6 +51,22 @@ export default function PhoneVerificationScreen() {
       if (existingAccount) {
         console.log('Existing account found:', existingAccount);
         
+        // Get anggota details to ensure we're loading the correct user data
+        const { data: anggota, error: anggotaError } = await supabase
+          .from('anggota')
+          .select('id, nama, nomor_rekening')
+          .eq('id', existingAccount.anggota_id)
+          .single();
+        
+        if (anggotaError) {
+          console.error('Error fetching anggota details:', anggotaError);
+          Alert.alert('Error', 'Terjadi kesalahan saat memuat data anggota. Silakan coba lagi.');
+          setIsLoading(false);
+          return;
+        }
+        
+        console.log('Anggota details:', anggota);
+        
         // Store account ID for later use
         await storage.setItem('temp_account_id', existingAccount.id);
         

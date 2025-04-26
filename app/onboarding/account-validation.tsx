@@ -93,7 +93,12 @@ export default function AccountValidationScreen() {
         const account = await DatabaseService.createOrUpdateAccount(anggota.id, phoneNumber);
         
         if (!account) {
-          Alert.alert('Error', 'Gagal membuat akun. Silakan coba lagi.');
+          // This means the anggota is already linked to another phone number
+          // or the phone number is already linked to another anggota
+          Alert.alert(
+            'Akun Sudah Terdaftar', 
+            'Anggota ini sudah terhubung dengan nomor telepon lain. Silakan gunakan nomor telepon yang terdaftar sebelumnya atau hubungi admin koperasi untuk bantuan.'
+          );
           setIsValidating(false);
           return;
         }
