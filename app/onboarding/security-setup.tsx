@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { storage } from '../../lib/storage';
 import { DatabaseService } from '../../lib/database.service';
 import { useAuth } from '../../context/auth-context';
-import { Ionicons } from '@expo/vector-icons';
+import { BackHeader } from '../../components/header/back-header';
 
 interface PinKeypadProps {
   onKeyPress: (key: string) => void;
@@ -162,18 +162,8 @@ export default function SecuritySetupScreen() {
   };
   
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="auto" />
-      
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton} 
-          onPress={() => router.back()}
-        >
-          <Ionicons name="chevron-back" size={24} color="#000" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Pengaturan Keamanan</Text>
-      </View>
+    <SafeAreaProvider style={styles.container}>
+      <BackHeader title="Pengaturan Keamanan" />
       
       <View style={styles.content}>
         {isLoading ? (
@@ -220,7 +210,7 @@ export default function SecuritySetupScreen() {
         </>
         )}
       </View>
-    </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 
@@ -238,23 +228,6 @@ const styles = StyleSheet.create({
     marginTop: 20,
     fontSize: 16,
     color: '#666',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-    marginBottom: 20,
-  },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginLeft: 16,
   },
   content: {
     flex: 1,

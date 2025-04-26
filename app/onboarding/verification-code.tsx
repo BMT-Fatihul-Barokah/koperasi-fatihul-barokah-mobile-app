@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 import { storage } from '../../lib/storage';
+import { BackHeader } from '../../components/header/back-header';
 
 export default function VerificationCodeScreen() {
   const params = useLocalSearchParams<{ phoneNumber: string; method: string }>();
@@ -182,15 +183,8 @@ export default function VerificationCodeScreen() {
   };
   
   return (
-    <View style={styles.container}>
-      <StatusBar style="auto" />
-      
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.backButton}>← Kembali</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Kode Verifikasi</Text>
-      </View>
+    <SafeAreaProvider style={styles.container}>
+      <BackHeader title="Kode Verifikasi" />
       
       <View style={styles.content}>
         <Text style={styles.title}>Masukkan PIN Anda</Text>
@@ -240,7 +234,7 @@ export default function VerificationCodeScreen() {
           <Text style={styles.verifyButtonText}>Verifikasi PIN</Text>
         )}
       </TouchableOpacity>
-    </View>
+    </SafeAreaProvider>
   );
 }
 
@@ -248,7 +242,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-    padding: 20,
   },
   disabledButton: {
     backgroundColor: '#ccc',
@@ -269,6 +262,8 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 20,
   },
   title: {
     fontSize: 24,

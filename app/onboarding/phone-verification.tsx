@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ActivityIndicator, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { storage } from '../../lib/storage';
 import { supabase } from '../../lib/supabase';
-import { Ionicons } from '@expo/vector-icons';
+import { BackHeader } from '../../components/header/back-header';
 
 export default function PhoneVerificationScreen() {
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -93,18 +93,8 @@ export default function PhoneVerificationScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="auto" />
-      
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton} 
-          onPress={() => router.back()}
-        >
-          <Ionicons name="chevron-back" size={24} color="#000" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Verifikasi Nomor Telepon</Text>
-      </View>
+    <SafeAreaProvider style={styles.container}>
+      <BackHeader title="Verifikasi Nomor Telepon" />
       
       <View style={styles.content}>
         <Text style={styles.title}>Verifikasi Nomor Telepon</Text>
@@ -141,7 +131,7 @@ export default function PhoneVerificationScreen() {
           <Text style={styles.continueButtonText}>Lanjutkan</Text>
         )}
       </TouchableOpacity>
-    </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 
@@ -152,22 +142,6 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     backgroundColor: '#ccc',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginLeft: 16,
   },
   content: {
     flex: 1,

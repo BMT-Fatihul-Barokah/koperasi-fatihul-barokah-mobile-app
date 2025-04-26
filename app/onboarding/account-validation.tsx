@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ScrollView, ActivityIndicator, Platform } from 'react-native';
 import { router } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import NetInfo from '@react-native-community/netinfo';
 import { DatabaseService } from '../../lib/database.service';
 import { checkSupabaseConnection } from '../../lib/supabase';
 import { storage } from '../../lib/storage';
+import { BackHeader } from '../../components/header/back-header';
 
 export default function AccountValidationScreen() {
   const [fullName, setFullName] = useState('');
@@ -142,18 +143,9 @@ export default function AccountValidationScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      <StatusBar style="auto" />
-      
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButtonContainer} 
-          onPress={() => router.back()}
-        >
-          <Text style={styles.backButtonIcon}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Validasi Akun</Text>
-      </View>
+    <SafeAreaProvider>
+      <BackHeader title="Validasi Akun" />
+      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       
       <View style={styles.content}>
         <Text style={styles.title}>Validasi akun Anda</Text>
@@ -211,6 +203,7 @@ export default function AccountValidationScreen() {
         </TouchableOpacity>
       </View>
     </ScrollView>
+    </SafeAreaProvider>
   );
 }
 

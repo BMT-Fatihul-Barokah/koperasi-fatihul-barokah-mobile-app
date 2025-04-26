@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { router } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function RegistrationCompleteScreen() {
   const handleGoToDashboard = () => {
@@ -10,8 +10,7 @@ export default function RegistrationCompleteScreen() {
   };
   
   return (
-    <View style={styles.container}>
-      <StatusBar style="auto" />
+    <SafeAreaProvider style={styles.container}>
       
       <View style={styles.content}>
         <View style={styles.successIconContainer}>
@@ -43,7 +42,7 @@ export default function RegistrationCompleteScreen() {
       >
         <Text style={styles.dashboardButtonText}>Ke Dashboard</Text>
       </TouchableOpacity>
-    </View>
+    </SafeAreaProvider>
   );
 }
 
