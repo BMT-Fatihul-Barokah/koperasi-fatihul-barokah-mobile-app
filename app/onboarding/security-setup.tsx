@@ -6,6 +6,7 @@ import { storage } from '../../lib/storage';
 import { DatabaseService } from '../../lib/database.service';
 import { useAuth } from '../../context/auth-context';
 import { BackHeader } from '../../components/header/back-header';
+import Toast from 'react-native-toast-message';
 
 interface PinKeypadProps {
   onKeyPress: (key: string) => void;
@@ -50,25 +51,47 @@ export default function SecuritySetupScreen() {
       if (key === 'del') {
         setPin(prev => prev.slice(0, -1));
       } else if (pin.length < 6) {
-        setPin(prev => prev + key);
+        const newPin = pin + key;
+        setPin(newPin);
+        
+        // Auto-advance to confirm step when PIN is complete
+        if (newPin.length === 6) {
+          setTimeout(() => {
+            setStep('confirm');
+          }, 300);
+        }
       }
     } else {
       if (key === 'del') {
         setConfirmPin(prev => prev.slice(0, -1));
       } else if (confirmPin.length < 6) {
-        setConfirmPin(prev => prev + key);
+        const newConfirmPin = confirmPin + key;
+        setConfirmPin(newConfirmPin);
+        
+        // Auto-verify when confirm PIN is complete
+        if (newConfirmPin.length === 6) {
+          setTimeout(() => {
+            // Verify PIN match
+            if (pin === newConfirmPin) {
+              // Save PIN to database
+              savePinToDatabase(pin);
+            } else {
+              Toast.show({
+                type: 'error',
+                text1: 'PIN Tidak Cocok',
+                text2: 'PIN yang Anda masukkan tidak cocok. Silakan coba lagi.',
+                position: 'bottom'
+              });
+              // Reset inputs
+              setPin('');
+              setConfirmPin('');
+              setStep('create');
+            }
+          }, 300);
+        }
       }
     }
   };
-  
-  useEffect(() => {
-    if (pin.length === 6 && step === 'create') {
-      // Automatically move to confirm step when PIN is complete
-      setTimeout(() => {
-        setStep('confirm');
-      }, 300);
-    }
-  }, [pin, step]);
   
   // Load account ID from secure storage
   useEffect(() => {
@@ -79,46 +102,36 @@ export default function SecuritySetupScreen() {
           setAccountId(storedAccountId);
         } else {
           // If no account ID is found, go back to account validation
-          Alert.alert('Error', 'Data akun tidak ditemukan. Silakan coba lagi.');
+          Toast.show({
+            type: 'error',
+            text1: 'Error',
+            text2: 'Data akun tidak ditemukan. Silakan coba lagi.',
+            position: 'bottom'
+          });
           router.replace('/onboarding/account-validation');
         }
       } catch (error) {
         console.error('Error loading account ID:', error);
-        Alert.alert('Error', 'Terjadi kesalahan. Silakan coba lagi.');
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'Terjadi kesalahan. Silakan coba lagi.',
+          position: 'bottom'
+        });
       }
     };
 
     loadAccountId();
   }, []);
 
-  useEffect(() => {
-    if (confirmPin.length === 6 && step === 'confirm') {
-      // Verify PIN match
-      if (pin === confirmPin) {
-        // Save PIN to database
-        savePinToDatabase(pin);
-      } else {
-        Alert.alert(
-          'PIN Tidak Cocok',
-          'PIN yang Anda masukkan tidak cocok. Silakan coba lagi.',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                setPin('');
-                setConfirmPin('');
-                setStep('create');
-              },
-            },
-          ]
-        );
-      }
-    }
-  }, [confirmPin, pin, step]);
-
   const savePinToDatabase = async (pinToSave: string) => {
     if (!accountId) {
-      Alert.alert('Error', 'Data akun tidak ditemukan. Silakan coba lagi.');
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Data akun tidak ditemukan. Silakan coba lagi.',
+        position: 'bottom'
+      });
       return;
     }
 
@@ -129,7 +142,12 @@ export default function SecuritySetupScreen() {
       const success = await DatabaseService.setAccountPin(accountId, pinToSave);
       
       if (!success) {
-        Alert.alert('Error', 'Gagal menyimpan PIN. Silakan coba lagi.');
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'Gagal menyimpan PIN. Silakan coba lagi.',
+          position: 'bottom'
+        });
         setIsLoading(false);
         return;
       }
@@ -146,7 +164,12 @@ export default function SecuritySetupScreen() {
       
       if (!loginSuccess) {
         console.error('Failed to login after PIN setup');
-        Alert.alert('Error', 'Gagal masuk ke akun. Silakan coba lagi.');
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'Gagal masuk ke akun. Silakan coba lagi.',
+          position: 'bottom'
+        });
         setIsLoading(false);
         return;
       }
@@ -156,7 +179,12 @@ export default function SecuritySetupScreen() {
       router.replace('/dashboard');
     } catch (error) {
       console.error('Error saving PIN:', error);
-      Alert.alert('Error', 'Terjadi kesalahan. Silakan coba lagi.');
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Terjadi kesalahan. Silakan coba lagi.',
+        position: 'bottom'
+      });
       setIsLoading(false);
     }
   };
@@ -174,12 +202,12 @@ export default function SecuritySetupScreen() {
         ) : (
           <>
             <Text style={styles.title}>
-              {step === 'create' ? 'Buat PIN Anda' : 'Konfirmasi PIN Anda'}
+              {step === 'create' ? 'Masukkan PIN' : 'Konfirmasi PIN'}
             </Text>
             <Text style={styles.subtitle}>
               {step === 'create' 
-                ? 'Buat PIN 6 digit untuk mengamankan akun Anda'
-                : 'Silakan masukkan kembali PIN Anda untuk konfirmasi'
+                ? 'Masukkan 6 digit PIN kamu'
+                : 'Masukkan kembali PIN kamu untuk konfirmasi'
               }
             </Text>
         
@@ -210,6 +238,8 @@ export default function SecuritySetupScreen() {
         </>
         )}
       </View>
+      
+      <Toast />
     </SafeAreaProvider>
   );
 }
@@ -232,6 +262,7 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 24,
+    alignItems: 'center',
   },
   title: {
     fontSize: 24,
@@ -251,44 +282,43 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   pinDot: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     backgroundColor: '#f0f0f0',
     margin: 10,
-    borderWidth: 1,
-    borderColor: '#ddd',
   },
   pinDotFilled: {
-    backgroundColor: '#007BFF',
-    borderColor: '#007BFF',
+    backgroundColor: '#4CD2C8',
   },
   keypadContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
     width: '100%',
-    maxWidth: 300,
+    maxWidth: 340,
+    marginTop: 30,
+    paddingHorizontal: 10,
   },
   keyButton: {
-    width: '30%',
-    aspectRatio: 1.5,
+    width: '28%',
+    aspectRatio: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    margin: '1.5%',
+    margin: '2.5%',
+    borderRadius: 50,
     backgroundColor: '#f8f8f8',
-    borderRadius: 8,
   },
   emptyButton: {
     backgroundColor: 'transparent',
   },
   keyButtonText: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#333',
   },
   deleteButtonText: {
-    fontSize: 24,
+    fontSize: 28,
     color: '#666',
   },
   infoContainer: {

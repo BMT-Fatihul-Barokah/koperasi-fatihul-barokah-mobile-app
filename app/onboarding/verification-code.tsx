@@ -1,11 +1,42 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 import { storage } from '../../lib/storage';
 import { BackHeader } from '../../components/header/back-header';
 import { useAuth } from '../../context/auth-context';
+import Toast from 'react-native-toast-message';
+
+interface PinKeypadProps {
+  onKeyPress: (key: string) => void;
+}
+
+const PinKeypad = ({ onKeyPress }: PinKeypadProps) => {
+  const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'];
+  
+  return (
+    <View style={styles.keypadContainer}>
+      {keys.map((key, index) => (
+        <TouchableOpacity
+          key={index}
+          style={[
+            styles.keyButton,
+            key === '' && styles.emptyButton,
+          ]}
+          onPress={() => key && onKeyPress(key)}
+          disabled={key === ''}
+        >
+          {key === 'del' ? (
+            <Text style={styles.deleteButtonText}>⌫</Text>
+          ) : (
+            <Text style={styles.keyButtonText}>{key}</Text>
+          )}
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+};
 
 export default function VerificationCodeScreen() {
   const params = useLocalSearchParams<{ phoneNumber: string; method: string }>();
@@ -14,13 +45,11 @@ export default function VerificationCodeScreen() {
   const [phoneNumber, setPhoneNumber] = useState(params.phoneNumber || '');
   const method = params.method || 'sms';
   
-  const [code, setCode] = useState(['', '', '', '', '', '']);
+  const [pin, setPin] = useState('');
   const [timeLeft, setTimeLeft] = useState(60);
   const [canResend, setCanResend] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [accountId, setAccountId] = useState<string | null>(null);
-  
-  const inputRefs = useRef<Array<TextInput | null>>([]);
   
   // Load phone number and account ID from storage
   useEffect(() => {
@@ -66,25 +95,25 @@ export default function VerificationCodeScreen() {
     return () => clearInterval(timer);
   }, []);
   
-  const handleCodeChange = (text: string, index: number) => {
-    if (text.length > 1) {
-      text = text[0];
-    }
-    
-    const newCode = [...code];
-    newCode[index] = text;
-    setCode(newCode);
-    
-    // Auto-advance to next input
-    if (text !== '' && index < 5) {
-      inputRefs.current[index + 1]?.focus();
-    }
-  };
-  
-  const handleKeyPress = (e: any, index: number) => {
-    // Go back to previous input on backspace if current input is empty
-    if (e.nativeEvent.key === 'Backspace' && code[index] === '' && index > 0) {
-      inputRefs.current[index - 1]?.focus();
+  const handleKeyPress = (key: string) => {
+    if (key === 'del') {
+      // Delete the last digit
+      if (pin.length > 0) {
+        setPin(pin.slice(0, -1));
+      }
+    } else {
+      // Add digit if we have less than 6 digits
+      if (pin.length < 6) {
+        const newPin = pin + key;
+        setPin(newPin);
+        
+        // Auto-verify when PIN is complete
+        if (newPin.length === 6) {
+          setTimeout(() => {
+            handleVerify(newPin);
+          }, 300);
+        }
+      }
     }
   };
   
@@ -113,16 +142,24 @@ export default function VerificationCodeScreen() {
     );
   };
   
-  const handleVerify = async () => {
-    const fullCode = code.join('');
-    
-    if (fullCode.length !== 6) {
-      Alert.alert('Error', 'Mohon masukkan kode 6 digit lengkap');
+  const handleVerify = async (inputPin: string = pin) => {
+    if (inputPin.length !== 6) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Mohon masukkan kode 6 digit lengkap',
+        position: 'bottom'
+      });
       return;
     }
     
     if (!accountId) {
-      Alert.alert('Error', 'Tidak dapat menemukan data akun. Silakan coba lagi.');
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Tidak dapat menemukan data akun. Silakan coba lagi.',
+        position: 'bottom'
+      });
       return;
     }
     
@@ -140,20 +177,30 @@ export default function VerificationCodeScreen() {
       
       if (error) {
         console.error('Error fetching account for PIN verification:', error);
-        Alert.alert('Error', 'Terjadi kesalahan saat verifikasi PIN. Silakan coba lagi.');
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'Terjadi kesalahan saat verifikasi PIN. Silakan coba lagi.',
+          position: 'bottom'
+        });
         setIsVerifying(false);
         return;
       }
       
       if (!account || !account.pin) {
         console.error('Account has no PIN set');
-        Alert.alert('Error', 'Akun belum memiliki PIN. Silakan buat PIN baru.');
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'Akun belum memiliki PIN. Silakan buat PIN baru.',
+          position: 'bottom'
+        });
         router.push('/onboarding/security-setup');
         return;
       }
       
       // Verify PIN
-      if (account.pin === fullCode) {
+      if (account.pin === inputPin) {
         console.log('PIN verification successful');
         
         try {
@@ -171,19 +218,41 @@ export default function VerificationCodeScreen() {
             router.replace('/dashboard');
           } else {
             console.error('Failed to login with the new account ID');
-            Alert.alert('Error', 'Gagal memuat data pengguna. Silakan coba lagi.');
+            Toast.show({
+              type: 'error',
+              text1: 'Error',
+              text2: 'Gagal memuat data pengguna. Silakan coba lagi.',
+              position: 'bottom'
+            });
           }
         } catch (storageError) {
           console.error('Error updating auth storage:', storageError);
-          Alert.alert('Error', 'Terjadi kesalahan saat menyimpan sesi. Silakan coba lagi.');
+          Toast.show({
+            type: 'error',
+            text1: 'Error',
+            text2: 'Terjadi kesalahan saat menyimpan sesi. Silakan coba lagi.',
+            position: 'bottom'
+          });
         }
       } else {
         console.error('Incorrect PIN');
-        Alert.alert('Error', 'PIN yang Anda masukkan salah. Silakan coba lagi.');
+        Toast.show({
+          type: 'error',
+          text1: 'PIN Salah',
+          text2: 'PIN yang Anda masukkan salah. Silakan coba lagi.',
+          position: 'bottom'
+        });
+        // Reset PIN input when incorrect
+        setPin('');
       }
     } catch (error) {
       console.error('Error during PIN verification:', error);
-      Alert.alert('Error', 'Terjadi kesalahan saat verifikasi PIN. Silakan coba lagi.');
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Terjadi kesalahan saat verifikasi PIN. Silakan coba lagi.',
+        position: 'bottom'
+      });
     } finally {
       setIsVerifying(false);
     }
@@ -191,56 +260,40 @@ export default function VerificationCodeScreen() {
   
   return (
     <SafeAreaProvider style={styles.container}>
-      <BackHeader title="Kode Verifikasi" />
+      <BackHeader title="Masukkan PIN" />
       
       <View style={styles.content}>
-        <Text style={styles.title}>Masukkan PIN Anda</Text>
+        <Text style={styles.title}>Masukkan PIN</Text>
         <Text style={styles.subtitle}>
-          Masukkan 6 digit PIN untuk akun dengan nomor telepon {phoneNumber}
+          Masukkan 6 digit PIN kamu
         </Text>
         
-        <View style={styles.codeContainer}>
-          {code.map((digit, index) => (
-            <TextInput
-              key={index}
-              ref={(ref) => (inputRefs.current[index] = ref)}
-              style={styles.codeInput}
-              value={digit}
-              onChangeText={(text) => handleCodeChange(text, index)}
-              onKeyPress={(e) => handleKeyPress(e, index)}
-              keyboardType="number-pad"
-              maxLength={1}
-              selectTextOnFocus
+        <View style={styles.pinContainer}>
+          {Array(6).fill(0).map((_, index) => (
+            <View 
+              key={index} 
+              style={[
+                styles.pinDot,
+                index < pin.length && styles.pinDotFilled
+              ]}
             />
           ))}
         </View>
         
-        <View style={styles.resendContainer}>
-          <Text style={styles.resendText}>
-            {canResend 
-              ? "Lupa PIN Anda?" 
-              : `Lupa PIN? Tunggu ${timeLeft}d`
-            }
-          </Text>
-          {canResend && (
-            <TouchableOpacity onPress={handleResendCode}>
-              <Text style={styles.resendButton}>Reset PIN</Text>
-            </TouchableOpacity>
-          )}
+        <PinKeypad onKeyPress={handleKeyPress} />
+        
+        <View style={styles.optionsContainer}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Text style={styles.optionButton}>Gunakan Akun Lain</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity onPress={handleResendCode}>
+            <Text style={styles.optionButton}>Gunakan Password</Text>
+          </TouchableOpacity>
         </View>
       </View>
       
-      <TouchableOpacity 
-        style={[styles.verifyButton, isVerifying && styles.disabledButton]}
-        onPress={handleVerify}
-        disabled={isVerifying}
-      >
-        {isVerifying ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.verifyButtonText}>Verifikasi PIN</Text>
-        )}
-      </TouchableOpacity>
+      <Toast />
     </SafeAreaProvider>
   );
 }
@@ -250,78 +303,80 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
-  disabledButton: {
-    backgroundColor: '#ccc',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-  backButton: {
-    fontSize: 16,
-    color: '#007BFF',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginLeft: 20,
-  },
   content: {
     flex: 1,
     paddingHorizontal: 24,
     paddingTop: 20,
+    alignItems: 'center',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 10,
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
     color: '#666',
-    marginBottom: 30,
-  },
-  codeContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 30,
-  },
-  codeInput: {
-    width: 45,
-    height: 55,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
+    marginBottom: 40,
     textAlign: 'center',
-    fontSize: 20,
-    fontWeight: 'bold',
   },
-  resendContainer: {
+  pinContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 40,
   },
-  resendText: {
-    fontSize: 14,
+  pinDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
+    margin: 10,
+  },
+  pinDotFilled: {
+    backgroundColor: '#4CD2C8',
+  },
+  keypadContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    width: '100%',
+    maxWidth: 340,
+    marginTop: 30,
+    paddingHorizontal: 10,
+  },
+  keyButton: {
+    width: '28%',
+    aspectRatio: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    margin: '2.5%',
+    borderRadius: 50,
+    backgroundColor: '#f8f8f8',
+  },
+  emptyButton: {
+    backgroundColor: 'transparent',
+  },
+  keyButtonText: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  deleteButtonText: {
+    fontSize: 28,
     color: '#666',
   },
-  resendButton: {
+  optionsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginTop: 40,
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  optionButton: {
     fontSize: 14,
     color: '#007BFF',
     fontWeight: 'bold',
-    marginLeft: 5,
-  },
-  verifyButton: {
-    backgroundColor: '#007BFF',
-    paddingVertical: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 'auto',
-  },
-  verifyButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+  }
 });
