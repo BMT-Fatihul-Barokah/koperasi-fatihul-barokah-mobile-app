@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import * as SecureStore from 'expo-secure-store';
+import { storage } from '../../lib/storage';
 import { DatabaseService } from '../../lib/database.service';
+import { useAuth } from '../../context/auth-context';
 
 interface PinKeypadProps {
   onKeyPress: (key: string) => void;
@@ -41,6 +42,7 @@ export default function SecuritySetupScreen() {
   const [step, setStep] = useState<'create' | 'confirm'>('create');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [accountId, setAccountId] = useState<string>('');
+  const { login } = useAuth();
   
   const handleKeyPress = (key: string) => {
     if (step === 'create') {
@@ -71,7 +73,7 @@ export default function SecuritySetupScreen() {
   useEffect(() => {
     const loadAccountId = async () => {
       try {
-        const storedAccountId = await SecureStore.getItemAsync('temp_account_id');
+        const storedAccountId = await storage.getItem('temp_account_id');
         if (storedAccountId) {
           setAccountId(storedAccountId);
         } else {
@@ -132,14 +134,25 @@ export default function SecuritySetupScreen() {
       }
 
       // Clean up temporary storage
-      await SecureStore.deleteItemAsync('temp_phone_number');
-      await SecureStore.deleteItemAsync('temp_account_id');
+      await storage.removeItem('temp_phone_number');
+      await storage.removeItem('temp_account_id');
       
       // Store account ID for authentication
-      await SecureStore.setItemAsync('koperasi_auth_account_id', accountId);
+      await storage.setItem('koperasi_auth_account_id', accountId);
+      
+      // Log in the user with the new account ID
+      const loginSuccess = await login(accountId);
+      
+      if (!loginSuccess) {
+        console.error('Failed to login after PIN setup');
+        Alert.alert('Error', 'Gagal masuk ke akun. Silakan coba lagi.');
+        setIsLoading(false);
+        return;
+      }
       
       // Navigate to dashboard
-      router.replace('/(tabs)');
+      console.log('PIN setup complete, navigating to dashboard');
+      router.replace('/dashboard');
     } catch (error) {
       console.error('Error saving PIN:', error);
       Alert.alert('Error', 'Terjadi kesalahan. Silakan coba lagi.');
