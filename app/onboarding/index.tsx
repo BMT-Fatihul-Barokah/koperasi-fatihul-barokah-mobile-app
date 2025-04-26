@@ -9,11 +9,10 @@ export default function OnboardingScreen() {
       <StatusBar style="auto" />
       
       <View style={styles.imageContainer}>
-        <Image 
-          source={require('../../assets/logo.png')} 
-          style={styles.logo} 
-          resizeMode="contain"
-        />
+        {/* Placeholder for illustration - replace with actual image */}
+        <View style={styles.imagePlaceholder}>
+          <Text style={styles.imagePlaceholderText}>Logo Aplikasi</Text>
+        </View>
       </View>
       
       <View style={styles.contentContainer}>
@@ -44,10 +43,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  logo: {
-    width: 300,
-    height: 300,
-    marginTop: 30,
+  imagePlaceholder: {
+    width: 200,
+    height: 200,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 100,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imagePlaceholderText: {
+    fontSize: 18,
+    color: '#888',
   },
   contentContainer: {
     flex: 1,

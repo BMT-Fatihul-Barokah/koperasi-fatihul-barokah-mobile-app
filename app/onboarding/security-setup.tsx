@@ -6,7 +6,6 @@ import { storage } from '../../lib/storage';
 import { DatabaseService } from '../../lib/database.service';
 import { useAuth } from '../../context/auth-context';
 import { BackHeader } from '../../components/header/back-header';
-import Toast from 'react-native-toast-message';
 
 interface PinKeypadProps {
   onKeyPress: (key: string) => void;
@@ -44,6 +43,7 @@ export default function SecuritySetupScreen() {
   const [step, setStep] = useState<'create' | 'confirm'>('create');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [accountId, setAccountId] = useState<string>('');
+  const [errorMessage, setErrorMessage] = useState<string>('');
   const { login } = useAuth();
   
   const handleKeyPress = (key: string) => {
@@ -76,12 +76,7 @@ export default function SecuritySetupScreen() {
               // Save PIN to database
               savePinToDatabase(pin);
             } else {
-              Toast.show({
-                type: 'error',
-                text1: 'PIN Tidak Cocok',
-                text2: 'PIN yang Anda masukkan tidak cocok. Silakan coba lagi.',
-                position: 'bottom'
-              });
+              setErrorMessage('PIN yang Anda masukkan tidak cocok. Silakan coba lagi.');
               // Reset inputs
               setPin('');
               setConfirmPin('');
@@ -102,36 +97,32 @@ export default function SecuritySetupScreen() {
           setAccountId(storedAccountId);
         } else {
           // If no account ID is found, go back to account validation
-          Toast.show({
-            type: 'error',
-            text1: 'Error',
-            text2: 'Data akun tidak ditemukan. Silakan coba lagi.',
-            position: 'bottom'
-          });
+          setErrorMessage('Data akun tidak ditemukan. Silakan coba lagi.');
           router.replace('/onboarding/account-validation');
         }
       } catch (error) {
-        console.error('Error loading account ID:', error);
-        Toast.show({
-          type: 'error',
-          text1: 'Error',
-          text2: 'Terjadi kesalahan. Silakan coba lagi.',
-          position: 'bottom'
-        });
+        console.log('Error loading account ID:', error);
+        setErrorMessage('Terjadi kesalahan. Silakan coba lagi.');
       }
     };
 
     loadAccountId();
   }, []);
+  
+  // Clear error message after 5 seconds
+  useEffect(() => {
+    if (errorMessage) {
+      const timer = setTimeout(() => {
+        setErrorMessage('');
+      }, 5000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [errorMessage]);
 
   const savePinToDatabase = async (pinToSave: string) => {
     if (!accountId) {
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Data akun tidak ditemukan. Silakan coba lagi.',
-        position: 'bottom'
-      });
+      setErrorMessage('Data akun tidak ditemukan. Silakan coba lagi.');
       return;
     }
 
@@ -142,12 +133,7 @@ export default function SecuritySetupScreen() {
       const success = await DatabaseService.setAccountPin(accountId, pinToSave);
       
       if (!success) {
-        Toast.show({
-          type: 'error',
-          text1: 'Error',
-          text2: 'Gagal menyimpan PIN. Silakan coba lagi.',
-          position: 'bottom'
-        });
+        setErrorMessage('Gagal menyimpan PIN. Silakan coba lagi.');
         setIsLoading(false);
         return;
       }
@@ -163,13 +149,8 @@ export default function SecuritySetupScreen() {
       const loginSuccess = await login(accountId);
       
       if (!loginSuccess) {
-        console.error('Failed to login after PIN setup');
-        Toast.show({
-          type: 'error',
-          text1: 'Error',
-          text2: 'Gagal masuk ke akun. Silakan coba lagi.',
-          position: 'bottom'
-        });
+        console.log('Failed to login after PIN setup');
+        setErrorMessage('Gagal masuk ke akun. Silakan coba lagi.');
         setIsLoading(false);
         return;
       }
@@ -178,13 +159,8 @@ export default function SecuritySetupScreen() {
       console.log('PIN setup complete, navigating to dashboard');
       router.replace('/dashboard');
     } catch (error) {
-      console.error('Error saving PIN:', error);
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Terjadi kesalahan. Silakan coba lagi.',
-        position: 'bottom'
-      });
+      console.log('Error saving PIN:', error);
+      setErrorMessage('Terjadi kesalahan. Silakan coba lagi.');
       setIsLoading(false);
     }
   };
@@ -209,6 +185,10 @@ export default function SecuritySetupScreen() {
                 ? 'Masukkan 6 digit PIN kamu'
                 : 'Masukkan kembali PIN kamu untuk konfirmasi'
               }
+            </Text>
+            
+            <Text style={[styles.errorText, !errorMessage && styles.errorTextHidden]}>
+              {errorMessage || 'PIN yang Anda masukkan salah. Silakan coba lagi.'}
             </Text>
         
         <View style={styles.pinContainer}>
@@ -239,7 +219,7 @@ export default function SecuritySetupScreen() {
         )}
       </View>
       
-      <Toast />
+
     </SafeAreaProvider>
   );
 }
@@ -273,8 +253,19 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     color: '#666',
-    marginBottom: 40,
+    marginBottom: 10,
     textAlign: 'center',
+  },
+  errorText: {
+    fontSize: 14,
+    color: '#FF3B30',
+    marginBottom: 20,
+    textAlign: 'center',
+    height: 20,
+    opacity: 1,
+  },
+  errorTextHidden: {
+    opacity: 0,
   },
   pinContainer: {
     flexDirection: 'row',

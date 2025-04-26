@@ -6,7 +6,6 @@ import { supabase } from '../../lib/supabase';
 import { storage } from '../../lib/storage';
 import { BackHeader } from '../../components/header/back-header';
 import { useAuth } from '../../context/auth-context';
-import Toast from 'react-native-toast-message';
 
 interface PinKeypadProps {
   onKeyPress: (key: string) => void;
@@ -50,6 +49,7 @@ export default function VerificationCodeScreen() {
   const [canResend, setCanResend] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [accountId, setAccountId] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string>('');
   
   // Load phone number and account ID from storage
   useEffect(() => {
@@ -94,6 +94,17 @@ export default function VerificationCodeScreen() {
     
     return () => clearInterval(timer);
   }, []);
+  
+  // Clear error message after 5 seconds
+  useEffect(() => {
+    if (errorMessage) {
+      const timer = setTimeout(() => {
+        setErrorMessage('');
+      }, 5000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [errorMessage]);
   
   const handleKeyPress = (key: string) => {
     if (key === 'del') {
@@ -144,22 +155,12 @@ export default function VerificationCodeScreen() {
   
   const handleVerify = async (inputPin: string = pin) => {
     if (inputPin.length !== 6) {
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Mohon masukkan kode 6 digit lengkap',
-        position: 'bottom'
-      });
+      setErrorMessage('Mohon masukkan kode 6 digit lengkap');
       return;
     }
     
     if (!accountId) {
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Tidak dapat menemukan data akun. Silakan coba lagi.',
-        position: 'bottom'
-      });
+      setErrorMessage('Tidak dapat menemukan data akun. Silakan coba lagi.');
       return;
     }
     
@@ -176,25 +177,15 @@ export default function VerificationCodeScreen() {
         .single();
       
       if (error) {
-        console.error('Error fetching account for PIN verification:', error);
-        Toast.show({
-          type: 'error',
-          text1: 'Error',
-          text2: 'Terjadi kesalahan saat verifikasi PIN. Silakan coba lagi.',
-          position: 'bottom'
-        });
+        console.log('Error fetching account for PIN verification:', error);
+        setErrorMessage('Terjadi kesalahan saat verifikasi PIN. Silakan coba lagi.');
         setIsVerifying(false);
         return;
       }
       
       if (!account || !account.pin) {
-        console.error('Account has no PIN set');
-        Toast.show({
-          type: 'error',
-          text1: 'Error',
-          text2: 'Akun belum memiliki PIN. Silakan buat PIN baru.',
-          position: 'bottom'
-        });
+        console.log('Account has no PIN set');
+        setErrorMessage('Akun belum memiliki PIN. Silakan buat PIN baru.');
         router.push('/onboarding/security-setup');
         return;
       }
@@ -217,42 +208,22 @@ export default function VerificationCodeScreen() {
             // Navigate directly to dashboard with the updated user data
             router.replace('/dashboard');
           } else {
-            console.error('Failed to login with the new account ID');
-            Toast.show({
-              type: 'error',
-              text1: 'Error',
-              text2: 'Gagal memuat data pengguna. Silakan coba lagi.',
-              position: 'bottom'
-            });
+            console.log('Failed to login with the new account ID');
+            setErrorMessage('Gagal memuat data pengguna. Silakan coba lagi.');
           }
         } catch (storageError) {
-          console.error('Error updating auth storage:', storageError);
-          Toast.show({
-            type: 'error',
-            text1: 'Error',
-            text2: 'Terjadi kesalahan saat menyimpan sesi. Silakan coba lagi.',
-            position: 'bottom'
-          });
+          console.log('Error updating auth storage:', storageError);
+          setErrorMessage('Terjadi kesalahan saat menyimpan sesi. Silakan coba lagi.');
         }
       } else {
-        console.error('Incorrect PIN');
-        Toast.show({
-          type: 'error',
-          text1: 'PIN Salah',
-          text2: 'PIN yang Anda masukkan salah. Silakan coba lagi.',
-          position: 'bottom'
-        });
+        console.log('Incorrect PIN');
+        setErrorMessage('PIN yang Anda masukkan salah. Silakan coba lagi.');
         // Reset PIN input when incorrect
         setPin('');
       }
     } catch (error) {
-      console.error('Error during PIN verification:', error);
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Terjadi kesalahan saat verifikasi PIN. Silakan coba lagi.',
-        position: 'bottom'
-      });
+      console.log('Error during PIN verification:', error);
+      setErrorMessage('Terjadi kesalahan saat verifikasi PIN. Silakan coba lagi.');
     } finally {
       setIsVerifying(false);
     }
@@ -266,6 +237,10 @@ export default function VerificationCodeScreen() {
         <Text style={styles.title}>Masukkan PIN</Text>
         <Text style={styles.subtitle}>
           Masukkan 6 digit PIN kamu
+        </Text>
+        
+        <Text style={[styles.errorText, !errorMessage && styles.errorTextHidden]}>
+          {errorMessage || 'PIN yang Anda masukkan salah. Silakan coba lagi.'}
         </Text>
         
         <View style={styles.pinContainer}>
@@ -293,7 +268,7 @@ export default function VerificationCodeScreen() {
         </View>
       </View>
       
-      <Toast />
+
     </SafeAreaProvider>
   );
 }
@@ -320,6 +295,17 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 40,
     textAlign: 'center',
+  },
+  errorText: {
+    fontSize: 14,
+    color: '#FF3B30',
+    marginBottom: 20,
+    textAlign: 'center',
+    height: 20,
+    opacity: 1,
+  },
+  errorTextHidden: {
+    opacity: 0,
   },
   pinContainer: {
     flexDirection: 'row',
