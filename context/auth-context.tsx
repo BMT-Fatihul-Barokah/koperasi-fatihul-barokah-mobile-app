@@ -42,16 +42,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const loadSession = async () => {
       try {
+        // Reset auth state first
+        setState({
+          ...initialState,
+          isLoading: true
+        });
+        
+        console.log('Auth: Checking for existing session');
         const accountId = await storage.getItem(AUTH_STORAGE_KEY);
         
         if (accountId) {
+          console.log(`Auth: Found stored account ID: ${accountId}`);
           const success = await login(accountId);
           if (!success) {
+            console.log('Auth: Login failed, removing stored account ID');
             await storage.removeItem(AUTH_STORAGE_KEY);
           }
+        } else {
+          console.log('Auth: No stored account ID found');
         }
       } catch (error) {
-        console.error('Error loading auth session:', error);
+        console.error('Auth: Error loading auth session:', error);
         setState(prev => ({ ...prev, error: error as Error }));
       } finally {
         setState(prev => ({ ...prev, isLoading: false }));
@@ -62,24 +73,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = async (accountId: string): Promise<boolean> => {
-    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    // First, reset the auth state completely
+    setState({
+      ...initialState,
+      isLoading: true
+    });
     
     try {
+      console.log(`Auth: Attempting to login with account ID: ${accountId}`);
       const accountDetails = await DatabaseService.getAccountDetails(accountId);
       
       if (!accountDetails) {
-        setState(prev => ({ 
-          ...prev, 
+        console.error('Auth: Account not found during login');
+        setState({
+          ...initialState,
           isLoading: false,
-          isAuthenticated: false,
           error: new Error('Account not found')
-        }));
+        });
         return false;
       }
+      
+      console.log(`Auth: Login successful for account ID: ${accountId}`);
+      console.log('Auth: Member details:', {
+        id: accountDetails.member.id,
+        nama: accountDetails.member.nama,
+        nomor_rekening: accountDetails.member.nomor_rekening
+      });
       
       // Store account ID in secure storage
       await storage.setItem(AUTH_STORAGE_KEY, accountId);
       
+      // Set the auth state with the new user's information
       setState({
         isLoading: false,
         isAuthenticated: true,
@@ -91,12 +115,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       return true;
     } catch (error) {
-      console.error('Error during login:', error);
-      setState(prev => ({ 
-        ...prev, 
-        isLoading: false, 
-        error: error as Error 
-      }));
+      console.error('Auth: Error during login:', error);
+      setState({
+        ...initialState,
+        isLoading: false,
+        error: error as Error
+      });
       return false;
     }
   };

@@ -3,7 +3,8 @@ import { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import * as SecureStore from 'expo-secure-store';
+import { storage } from '../../lib/storage';
+import { supabase } from '../../lib/supabase';
 
 export default function PhoneVerificationScreen() {
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -28,16 +29,47 @@ export default function PhoneVerificationScreen() {
     try {
       // Format phone number but skip OTP verification
       const internationalNumber = formatPhoneNumber(phoneNumber);
+      console.log('Formatted phone number:', internationalNumber);
       
       // Store phone number in secure storage for later use
-      await SecureStore.setItemAsync('temp_phone_number', internationalNumber);
+      await storage.setItem('temp_phone_number', internationalNumber);
       
-      // Skip OTP verification and go directly to account validation
-      // Note: In production, we would implement proper phone verification
-      console.log('Bypassing phone verification for:', internationalNumber);
-      router.push('/onboarding/account-validation');
+      // Check if phone number already exists in akun table
+      const { data: existingAccount, error } = await supabase
+        .from('akun')
+        .select('id, anggota_id, pin')
+        .eq('nomor_telepon', internationalNumber)
+        .single();
+      
+      if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
+        console.error('Error checking existing account:', error);
+        Alert.alert('Error', 'Terjadi kesalahan saat memeriksa akun. Silakan coba lagi.');
+        setIsLoading(false);
+        return;
+      }
+      
+      if (existingAccount) {
+        console.log('Existing account found:', existingAccount);
+        
+        // Store account ID for later use
+        await storage.setItem('temp_account_id', existingAccount.id);
+        
+        if (existingAccount.pin) {
+          // Account already has PIN, go to PIN verification
+          console.log('Account has PIN, going to PIN verification');
+          router.push('/onboarding/verification-code');
+        } else {
+          // Account exists but no PIN, go to PIN setup
+          console.log('Account has no PIN, going to PIN setup');
+          router.push('/onboarding/security-setup');
+        }
+      } else {
+        // No existing account, go to account validation
+        console.log('No existing account, going to account validation');
+        router.push('/onboarding/account-validation');
+      }
     } catch (error) {
-      console.error('Error storing phone number:', error);
+      console.error('Error in phone verification:', error);
       Alert.alert('Error', 'Terjadi kesalahan. Silakan coba lagi.');
     } finally {
       setIsLoading(false);

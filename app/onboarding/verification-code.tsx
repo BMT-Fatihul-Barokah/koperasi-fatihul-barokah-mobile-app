@@ -1,19 +1,53 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { supabase } from '../../lib/supabase';
+import { storage } from '../../lib/storage';
 
 export default function VerificationCodeScreen() {
   const params = useLocalSearchParams<{ phoneNumber: string; method: string }>();
-  const phoneNumber = params.phoneNumber || '';
+  
+  const [phoneNumber, setPhoneNumber] = useState(params.phoneNumber || '');
   const method = params.method || 'sms';
   
   const [code, setCode] = useState(['', '', '', '', '', '']);
   const [timeLeft, setTimeLeft] = useState(60);
   const [canResend, setCanResend] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [accountId, setAccountId] = useState<string | null>(null);
   
   const inputRefs = useRef<Array<TextInput | null>>([]);
   
+  // Load phone number and account ID from storage
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const storedPhoneNumber = await storage.getItem('temp_phone_number');
+        const storedAccountId = await storage.getItem('temp_account_id');
+        
+        if (storedPhoneNumber) {
+          setPhoneNumber(storedPhoneNumber);
+        }
+        
+        if (storedAccountId) {
+          setAccountId(storedAccountId);
+          console.log('Loaded account ID:', storedAccountId);
+        } else {
+          console.error('No account ID found in storage');
+          Alert.alert('Error', 'Tidak dapat menemukan data akun. Silakan coba lagi.');
+          router.replace('/onboarding/phone-verification');
+        }
+      } catch (error) {
+        console.error('Error loading data from storage:', error);
+        Alert.alert('Error', 'Terjadi kesalahan saat memuat data. Silakan coba lagi.');
+      }
+    };
+    
+    loadData();
+  }, []);
+  
+  // Timer for resend code
   useEffect(() => {
     const timer = setInterval(() => {
       setTimeLeft((prevTime) => {
@@ -59,10 +93,24 @@ export default function VerificationCodeScreen() {
     setCanResend(false);
     
     // In a real app, we would resend the verification code here
-    Alert.alert('Kode Terkirim', `Kode verifikasi baru telah dikirim melalui ${method === 'whatsapp' ? 'WhatsApp' : 'SMS'}`);
+    // For now, just show an alert
+    Alert.alert(
+      'Lupa PIN?', 
+      'Jika Anda lupa PIN, silakan hubungi customer service kami untuk mereset PIN Anda.',
+      [
+        { text: 'OK' },
+        { 
+          text: 'Hubungi CS', 
+          onPress: () => {
+            // In a real app, this would open the phone app or WhatsApp
+            Alert.alert('Info', 'Fitur ini akan tersedia segera.');
+          } 
+        }
+      ]
+    );
   };
   
-  const handleVerify = () => {
+  const handleVerify = async () => {
     const fullCode = code.join('');
     
     if (fullCode.length !== 6) {
@@ -70,9 +118,67 @@ export default function VerificationCodeScreen() {
       return;
     }
     
-    // In a real app, we would verify the code here
-    // For now, we'll just navigate to the account validation screen
-    router.push('/onboarding/account-validation');
+    if (!accountId) {
+      Alert.alert('Error', 'Tidak dapat menemukan data akun. Silakan coba lagi.');
+      return;
+    }
+    
+    setIsVerifying(true);
+    
+    try {
+      console.log(`Verifying PIN for account ID: ${accountId}`);
+      
+      // Get account details to check PIN
+      const { data: account, error } = await supabase
+        .from('akun')
+        .select('pin')
+        .eq('id', accountId)
+        .single();
+      
+      if (error) {
+        console.error('Error fetching account for PIN verification:', error);
+        Alert.alert('Error', 'Terjadi kesalahan saat verifikasi PIN. Silakan coba lagi.');
+        setIsVerifying(false);
+        return;
+      }
+      
+      if (!account || !account.pin) {
+        console.error('Account has no PIN set');
+        Alert.alert('Error', 'Akun belum memiliki PIN. Silakan buat PIN baru.');
+        router.push('/onboarding/security-setup');
+        return;
+      }
+      
+      // Verify PIN
+      if (account.pin === fullCode) {
+        console.log('PIN verification successful');
+        
+        try {
+          // First clear any existing auth data
+          await storage.removeItem('koperasi_auth_account_id');
+          
+          // Store the new account ID in secure storage for authentication
+          await storage.setItem('koperasi_auth_account_id', accountId);
+          
+          // Small delay to ensure storage is updated before navigation
+          setTimeout(() => {
+            // Navigate to dashboard
+            router.replace('/dashboard');
+          }, 100);
+        } catch (storageError) {
+          console.error('Error updating auth storage:', storageError);
+          Alert.alert('Error', 'Terjadi kesalahan saat menyimpan sesi. Silakan coba lagi.');
+        }
+      } else {
+        console.error('Incorrect PIN');
+        Alert.alert('Error', 'PIN yang Anda masukkan salah. Silakan coba lagi.');
+      }
+    } catch (error) {
+      console.error('Error during PIN verification:', error);
+      Alert.alert('Error', 'Terjadi kesalahan saat verifikasi PIN. Silakan coba lagi.');
+    } finally {
+      setIsVerifying(false);
+    }
   };
   
   return (
@@ -87,9 +193,9 @@ export default function VerificationCodeScreen() {
       </View>
       
       <View style={styles.content}>
-        <Text style={styles.title}>Masukkan kode verifikasi</Text>
+        <Text style={styles.title}>Masukkan PIN Anda</Text>
         <Text style={styles.subtitle}>
-          Kami telah mengirim kode 6 digit ke {phoneNumber} melalui {method === 'whatsapp' ? 'WhatsApp' : 'SMS'}
+          Masukkan 6 digit PIN untuk akun dengan nomor telepon {phoneNumber}
         </Text>
         
         <View style={styles.codeContainer}>
@@ -111,23 +217,28 @@ export default function VerificationCodeScreen() {
         <View style={styles.resendContainer}>
           <Text style={styles.resendText}>
             {canResend 
-              ? "Tidak menerima kode?" 
-              : `Kirim ulang kode dalam ${timeLeft}d`
+              ? "Lupa PIN Anda?" 
+              : `Lupa PIN? Tunggu ${timeLeft}d`
             }
           </Text>
           {canResend && (
             <TouchableOpacity onPress={handleResendCode}>
-              <Text style={styles.resendButton}>Kirim Ulang Kode</Text>
+              <Text style={styles.resendButton}>Reset PIN</Text>
             </TouchableOpacity>
           )}
         </View>
       </View>
       
       <TouchableOpacity 
-        style={styles.verifyButton}
+        style={[styles.verifyButton, isVerifying && styles.disabledButton]}
         onPress={handleVerify}
+        disabled={isVerifying}
       >
-        <Text style={styles.verifyButtonText}>Verifikasi</Text>
+        {isVerifying ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.verifyButtonText}>Verifikasi PIN</Text>
+        )}
       </TouchableOpacity>
     </View>
   );
@@ -138,6 +249,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
     padding: 20,
+  },
+  disabledButton: {
+    backgroundColor: '#ccc',
   },
   header: {
     flexDirection: 'row',
