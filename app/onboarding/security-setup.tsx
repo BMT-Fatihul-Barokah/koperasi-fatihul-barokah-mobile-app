@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, SafeAreaView } from 'react-native';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { storage } from '../../lib/storage';
 import { DatabaseService } from '../../lib/database.service';
 import { useAuth } from '../../context/auth-context';
+import { Ionicons } from '@expo/vector-icons';
 
 interface PinKeypadProps {
   onKeyPress: (key: string) => void;
@@ -161,12 +162,15 @@ export default function SecuritySetupScreen() {
   };
   
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <StatusBar style="auto" />
       
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.backButton}>← Kembali</Text>
+        <TouchableOpacity 
+          style={styles.backButton} 
+          onPress={() => router.back()}
+        >
+          <Ionicons name="chevron-back" size={24} color="#000" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Pengaturan Keamanan</Text>
       </View>
@@ -216,7 +220,7 @@ export default function SecuritySetupScreen() {
         </>
         )}
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -224,7 +228,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-    padding: 20,
   },
   loadingContainer: {
     flex: 1,
@@ -239,20 +242,23 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 30,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    marginBottom: 20,
   },
   backButton: {
-    fontSize: 16,
-    color: '#007BFF',
+    padding: 4,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginLeft: 20,
+    marginLeft: 16,
   },
   content: {
     flex: 1,
-    alignItems: 'center',
+    paddingHorizontal: 24,
   },
   title: {
     fontSize: 24,

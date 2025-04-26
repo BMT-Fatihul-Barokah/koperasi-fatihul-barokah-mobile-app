@@ -1,10 +1,10 @@
-import React from 'react';
-import { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ActivityIndicator, SafeAreaView } from 'react-native';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { storage } from '../../lib/storage';
 import { supabase } from '../../lib/supabase';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function PhoneVerificationScreen() {
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -93,28 +93,36 @@ export default function PhoneVerificationScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <StatusBar style="auto" />
       
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.backButton}>← Kembali</Text>
+        <TouchableOpacity 
+          style={styles.backButton} 
+          onPress={() => router.back()}
+        >
+          <Ionicons name="chevron-back" size={24} color="#000" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Verifikasi Nomor Telepon</Text>
       </View>
       
       <View style={styles.content}>
-        <Text style={styles.title}>Masukkan nomor telepon Anda</Text>
+        <Text style={styles.title}>Verifikasi Nomor Telepon</Text>
         <Text style={styles.subtitle}>
-          Kami akan mengirimkan kode verifikasi untuk mengkonfirmasi identitas Anda
+          Masukkan nomor telepon Anda untuk menerima kode verifikasi
         </Text>
+        
+        <Text style={styles.inputLabel}>Nomor Telepon</Text>
         
         {/* Phone input with static country code */}
         <View style={styles.phoneInputContainer}>
-          <Text style={styles.countryCode}>+62</Text>
+          <View style={styles.countryCodeContainer}>
+            <Text style={styles.countryCode}>+62</Text>
+          </View>
           <TextInput
-            style={[styles.input, { flex: 1 }]}
+            style={styles.phoneInput}
             placeholder="8xxxxxxxxxx"
+            placeholderTextColor="#999"
             keyboardType="phone-pad"
             value={phoneNumber}
             onChangeText={setPhoneNumber}
@@ -133,7 +141,7 @@ export default function PhoneVerificationScreen() {
           <Text style={styles.continueButtonText}>Lanjutkan</Text>
         )}
       </TouchableOpacity>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -141,7 +149,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-    padding: 20,
   },
   disabledButton: {
     backgroundColor: '#ccc',
@@ -149,52 +156,78 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 30,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
   backButton: {
-    fontSize: 16,
-    color: '#007BFF',
+    padding: 4,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginLeft: 20,
+    marginLeft: 16,
   },
   content: {
     flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 40,
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    marginBottom: 10,
+    marginBottom: 12,
+    color: '#000',
   },
   subtitle: {
     fontSize: 16,
     color: '#666',
-    marginBottom: 30,
+    marginBottom: 40,
+    lineHeight: 22,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
+  inputLabel: {
     fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    color: '#000',
   },
   phoneInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 30,
+    height: 56,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+  },
+  countryCodeContainer: {
+    height: '100%',
+    paddingHorizontal: 16,
+    justifyContent: 'center',
+    borderRightWidth: 1,
+    borderRightColor: '#ddd',
   },
   countryCode: {
     fontSize: 16,
-    marginRight: 8,
+    fontWeight: '500',
+    color: '#000',
+  },
+  phoneInput: {
+    flex: 1,
+    fontSize: 16,
+    paddingHorizontal: 16,
+    height: '100%',
   },
   continueButton: {
-    backgroundColor: '#007BFF',
-    paddingVertical: 15,
+    backgroundColor: '#007bff',
     borderRadius: 8,
+    padding: 16,
     alignItems: 'center',
-    marginTop: 'auto',
+    justifyContent: 'center',
+    marginHorizontal: 24,
+    marginBottom: 24,
+    height: 56,
   },
   continueButtonText: {
     color: '#fff',

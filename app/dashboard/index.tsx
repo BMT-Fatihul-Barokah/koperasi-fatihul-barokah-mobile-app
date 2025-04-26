@@ -128,14 +128,6 @@ export default function DashboardScreen() {
               <Text style={styles.viewDetailsText}>Lihat Detail</Text>
             </TouchableOpacity>
           </View>
-          
-          <View style={styles.balanceCard}>
-            <Text style={styles.balanceLabel}>Saldo Pembiayaan</Text>
-            <Text style={styles.balanceAmount}>{formatCurrency(loanBalance)}</Text>
-            <TouchableOpacity style={styles.viewDetailsButton}>
-              <Text style={styles.viewDetailsText}>Lihat Detail</Text>
-            </TouchableOpacity>
-          </View>
         </View>
         
         <View style={styles.quickActionsSection}>
@@ -267,10 +259,10 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#007BFF',
     paddingTop: 60,
-    paddingBottom: 20,
+    paddingBottom: 30,
     paddingHorizontal: 20,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    borderBottomLeftRadius: 25,
+    borderBottomRightRadius: 25,
   },
   greeting: {
     fontSize: 16,
@@ -299,15 +291,13 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   balanceSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     marginBottom: 20,
   },
   balanceCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 15,
-    width: '48%',
+    padding: 20,
+    width: '100%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -320,10 +310,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   balanceAmount: {
-    fontSize: 18,
+    fontSize: 28,
     fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 10,
+    marginVertical: 10,
+    color: '#007BFF',
   },
   viewDetailsButton: {
     backgroundColor: '#f0f0f0',

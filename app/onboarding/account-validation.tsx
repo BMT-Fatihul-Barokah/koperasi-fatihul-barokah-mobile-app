@@ -146,8 +146,11 @@ export default function AccountValidationScreen() {
       <StatusBar style="auto" />
       
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.backButton}>← Kembali</Text>
+        <TouchableOpacity 
+          style={styles.backButtonContainer} 
+          onPress={() => router.back()}
+        >
+          <Text style={styles.backButtonIcon}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Validasi Akun</Text>
       </View>
@@ -228,9 +231,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 30,
   },
-  backButton: {
-    fontSize: 16,
-    color: '#007BFF',
+  backButtonContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  backButtonIcon: {
+    fontSize: 18,
+    color: '#333',
   },
   headerTitle: {
     fontSize: 18,
