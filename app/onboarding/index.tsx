@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Link, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import Logo from '../../assets/logo.svg';
 
 export default function OnboardingScreen() {
   return (
@@ -9,10 +10,10 @@ export default function OnboardingScreen() {
       <StatusBar style="auto" />
       
       <View style={styles.imageContainer}>
-      <Image 
-           source={require('../../assets/logo.png')} 
+      <Logo 
+           width={300}
+           height={300}
            style={styles.logo} 
-           resizeMode="contain"
          />
       </View>
       
@@ -45,8 +46,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logo: {
-    width: 300,
-    height: 300,
     marginBottom: 20
   },
   contentContainer: {
