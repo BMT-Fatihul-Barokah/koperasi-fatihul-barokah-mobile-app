@@ -11,16 +11,34 @@ interface Env {
 }
 
 // Get environment variables from Expo Constants
+// These are loaded from app.config.js/app.json which can reference process.env
 const expoConstants = Constants.expoConfig?.extra;
 
-// Create environment object with fallbacks to process.env
+// Create environment object with fallbacks
 export const env: Env = {
-  // Always use the hardcoded values to ensure consistency across platforms
-  NEXT_PUBLIC_SUPABASE_URL: 'https://hyiwhckxwrngegswagrb.supabase.co',
+  // Use environment variables from Expo Constants
+  NEXT_PUBLIC_SUPABASE_URL: 
+    process.env.EXPO_PUBLIC_SUPABASE_URL ||
+    expoConstants?.SUPABASE_URL ||
+    '',
   
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5aXdoY2t4d3JuZ2Vnc3dhZ3JiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU0OTY4MzcsImV4cCI6MjA2MTA3MjgzN30.bpDSX9CUEA0F99x3cwNbeTVTVq-NHw5GC5jmp2QqnNM',
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: 
+    process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
+    expoConstants?.SUPABASE_ANON_KEY ||
+    '',
 };
 
-// Log environment variables for debugging
+// Validate environment variables
+if (!env.NEXT_PUBLIC_SUPABASE_URL) {
+  console.error('Missing Supabase URL environment variable');
+}
+
+if (!env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+  console.error('Missing Supabase Anon Key environment variable');
+}
+
+// Log environment variables for debugging (only show partial key for security)
 console.log('Supabase URL:', env.NEXT_PUBLIC_SUPABASE_URL);
-console.log('Supabase Anon Key:', env.NEXT_PUBLIC_SUPABASE_ANON_KEY.substring(0, 10) + '...');
+if (env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+  console.log('Supabase Anon Key:', env.NEXT_PUBLIC_SUPABASE_ANON_KEY.substring(0, 10) + '...');
+}

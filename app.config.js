@@ -1,0 +1,50 @@
+const path = require('path');
+const dotenv = require('dotenv');
+
+// Load environment variables from .env file
+const env = dotenv.config({ path: path.resolve(__dirname, '.env') }).parsed || {};
+
+export default {
+  name: "Koperasi Fatihul Barokah",
+  slug: "koperasi-fatihul-barokah-mobile-apps",
+  version: "1.0.0",
+  orientation: "portrait",
+  icon: "./assets/icon.png",
+  userInterfaceStyle: "light",
+  splash: {
+    image: "./assets/splash.png",
+    resizeMode: "contain",
+    backgroundColor: "#007BFF"
+  },
+  assetBundlePatterns: [
+    "**/*"
+  ],
+  ios: {
+    supportsTablet: true
+  },
+  android: {
+    adaptiveIcon: {
+      foregroundImage: "./assets/adaptive-icon.png",
+      backgroundColor: "#007BFF"
+    }
+  },
+  web: {
+    favicon: "./assets/favicon.png"
+  },
+  // Pass environment variables to the app securely
+  extra: {
+    SUPABASE_URL: env.NEXT_PUBLIC_SUPABASE_URL,
+    SUPABASE_ANON_KEY: env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  },
+  // Define public environment variables
+  plugins: [
+    [
+      "expo-build-properties",
+      {
+        ios: {
+          useFrameworks: "static",
+        },
+      },
+    ],
+  ],
+};
