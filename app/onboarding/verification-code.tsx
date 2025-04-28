@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, useWindowDimensions, Platform } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 import { storage } from '../../lib/storage';
 import { BackHeader } from '../../components/header/back-header';
@@ -12,7 +12,12 @@ interface PinKeypadProps {
 }
 
 const PinKeypad = ({ onKeyPress }: PinKeypadProps) => {
+  const { width } = useWindowDimensions();
   const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'];
+  
+  // Calculate responsive button size based on screen width
+  const buttonSize = Math.min(width * 0.22, 70); // Slightly smaller buttons (22% of width)
+  const buttonMargin = 10; // Fixed margin to match design
   
   return (
     <View style={styles.keypadContainer}>
@@ -22,6 +27,11 @@ const PinKeypad = ({ onKeyPress }: PinKeypadProps) => {
           style={[
             styles.keyButton,
             key === '' && styles.emptyButton,
+            { 
+              width: buttonSize, 
+              height: buttonSize,
+              margin: buttonMargin 
+            }
           ]}
           onPress={() => key && onKeyPress(key)}
           disabled={key === ''}
@@ -229,46 +239,54 @@ export default function VerificationCodeScreen() {
     }
   };
   
+  const { height } = useWindowDimensions();
+  
   return (
-    <SafeAreaProvider style={styles.container}>
-      <BackHeader title="Masukkan PIN" />
-      
-      <View style={styles.content}>
-        <Text style={styles.title}>Masukkan PIN</Text>
-        <Text style={styles.subtitle}>
-          Masukkan 6 digit PIN kamu
-        </Text>
+    <SafeAreaProvider>
+      <SafeAreaView style={styles.container} edges={['bottom']}>
+        <BackHeader title="Masukkan PIN" />
         
-        <Text style={[styles.errorText, !errorMessage && styles.errorTextHidden]}>
-          {errorMessage || 'PIN yang Anda masukkan salah. Silakan coba lagi.'}
-        </Text>
-        
-        <View style={styles.pinContainer}>
-          {Array(6).fill(0).map((_, index) => (
-            <View 
-              key={index} 
-              style={[
-                styles.pinDot,
-                index < pin.length && styles.pinDotFilled
-              ]}
-            />
-          ))}
-        </View>
-        
-        <PinKeypad onKeyPress={handleKeyPress} />
-        
-        <View style={styles.optionsContainer}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.optionButton}>Gunakan Akun Lain</Text>
-          </TouchableOpacity>
+        <View style={styles.content}>
+          <View style={styles.headerSection}>
+            <Text style={styles.title}>Masukkan PIN</Text>
+            <Text style={styles.subtitle}>
+              Masukkan 6 digit PIN kamu
+            </Text>
+            
+            <Text style={[styles.errorText, !errorMessage && styles.errorTextHidden]}>
+              {errorMessage || 'PIN yang Anda masukkan salah. Silakan coba lagi.'}
+            </Text>
+            
+            <View style={styles.pinContainer}>
+              {Array(6).fill(0).map((_, index) => (
+                <View 
+                  key={index} 
+                  style={[
+                    styles.pinDot,
+                    index < pin.length && styles.pinDotFilled
+                  ]}
+                />
+              ))}
+            </View>
+          </View>
           
-          <TouchableOpacity onPress={handleResendCode}>
-            <Text style={styles.optionButton}>Gunakan Password</Text>
-          </TouchableOpacity>
+          <View style={styles.keypadSection}>
+            <PinKeypad onKeyPress={handleKeyPress} />
+          </View>
+          
+          <View style={styles.footerSection}>
+            <View style={styles.optionsContainer}>
+              <TouchableOpacity onPress={() => router.back()}>
+                <Text style={styles.optionButton}>Gunakan Akun Lain</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity onPress={handleResendCode}>
+                <Text style={styles.optionButton}>Lupa PIN?</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
-      </View>
-      
-
+      </SafeAreaView>
     </SafeAreaProvider>
   );
 }
@@ -281,8 +299,20 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 24,
-    paddingTop: 20,
+    justifyContent: 'space-between', // Distribute space between sections
+  },
+  headerSection: {
     alignItems: 'center',
+    paddingTop: 20,
+  },
+  keypadSection: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1, // Take available space
+  },
+  footerSection: {
+    width: '100%',
+    paddingBottom: Platform.OS === 'ios' ? 10 : 20, // Add padding at the bottom
   },
   title: {
     fontSize: 24,
@@ -293,7 +323,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     color: '#666',
-    marginBottom: 40,
+    marginBottom: 20,
     textAlign: 'center',
   },
   errorText: {
@@ -310,7 +340,7 @@ const styles = StyleSheet.create({
   pinContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: 40,
+    marginBottom: 20,
   },
   pinDot: {
     width: 16,
@@ -326,19 +356,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
+    alignItems: 'center',
     width: '100%',
     maxWidth: 340,
-    marginTop: 30,
     paddingHorizontal: 10,
+    marginTop: 20,
   },
   keyButton: {
-    width: '28%',
-    aspectRatio: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    margin: '2.5%',
     borderRadius: 50,
     backgroundColor: '#f8f8f8',
+    marginVertical: 12, // Add vertical spacing between buttons
+    marginHorizontal: 12, // Add horizontal spacing between buttons
+    // Width and height are now set dynamically
   },
   emptyButton: {
     backgroundColor: 'transparent',
@@ -356,9 +387,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     width: '100%',
-    marginTop: 40,
     paddingHorizontal: 20,
-    marginBottom: 20,
+    paddingVertical: 15,
   },
   optionButton: {
     fontSize: 14,
