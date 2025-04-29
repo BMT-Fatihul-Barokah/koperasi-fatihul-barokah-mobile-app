@@ -1,5 +1,18 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  TextInput, 
+  TouchableOpacity, 
+  Alert, 
+  ActivityIndicator, 
+  Keyboard, 
+  TouchableWithoutFeedback,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView
+} from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { storage } from '../../lib/storage';
@@ -92,45 +105,70 @@ export default function PhoneVerificationScreen() {
     }
   };
 
+  // Function to dismiss keyboard
+  const dismissKeyboard = () => {
+    Keyboard.dismiss();
+  };
+
+  // Reference to the text input
+  const phoneInputRef = useRef<TextInput>(null);
+
   return (
     <SafeAreaProvider style={styles.container}>
-      <BackHeader title="Verifikasi Nomor Telepon" />
-      
-      <View style={styles.content}>
-        <Text style={styles.title}>Verifikasi Nomor Telepon</Text>
-        <Text style={styles.subtitle}>
-          Masukkan nomor telepon Anda untuk menerima kode verifikasi
-        </Text>
-        
-        <Text style={styles.inputLabel}>Nomor Telepon</Text>
-        
-        {/* Phone input with static country code */}
-        <View style={styles.phoneInputContainer}>
-          <View style={styles.countryCodeContainer}>
-            <Text style={styles.countryCode}>+62</Text>
-          </View>
-          <TextInput
-            style={styles.phoneInput}
-            placeholder="8xxxxxxxxxx"
-            placeholderTextColor="#999"
-            keyboardType="phone-pad"
-            value={phoneNumber}
-            onChangeText={setPhoneNumber}
-          />
-        </View>
-      </View>
-      
-      <TouchableOpacity 
-        style={[styles.continueButton, isLoading && styles.disabledButton]}
-        onPress={handleContinue}
-        disabled={isLoading}
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
       >
-        {isLoading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.continueButtonText}>Lanjutkan</Text>
-        )}
-      </TouchableOpacity>
+        <TouchableWithoutFeedback onPress={dismissKeyboard}>
+          <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+            <BackHeader title="Verifikasi Nomor Telepon" />
+            
+            <View style={styles.content}>
+              <Text style={styles.title}>Verifikasi Nomor Telepon</Text>
+              <Text style={styles.subtitle}>
+                Masukkan nomor telepon Anda untuk menerima kode verifikasi
+              </Text>
+              
+              <Text style={styles.inputLabel}>Nomor Telepon</Text>
+              
+              {/* Phone input with static country code */}
+              <View style={styles.phoneInputContainer}>
+                <View style={styles.countryCodeContainer}>
+                  <Text style={styles.countryCode}>+62</Text>
+                </View>
+                <TextInput
+                  ref={phoneInputRef}
+                  style={styles.phoneInput}
+                  placeholder="8xxxxxxxxxx"
+                  placeholderTextColor="#999"
+                  keyboardType="phone-pad"
+                  value={phoneNumber}
+                  onChangeText={setPhoneNumber}
+                  returnKeyType="done"
+                  onSubmitEditing={dismissKeyboard}
+                />
+              </View>
+            </View>
+            
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity 
+                style={[styles.continueButton, isLoading && styles.disabledButton]}
+                onPress={() => {
+                  dismissKeyboard();
+                  handleContinue();
+                }}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.continueButtonText}>Lanjutkan</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
     </SafeAreaProvider>
   );
 }
@@ -147,6 +185,10 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 24,
     paddingTop: 40,
+  },
+  buttonContainer: {
+    paddingHorizontal: 24,
+    paddingBottom: Platform.OS === 'ios' ? 20 : 16,
   },
   title: {
     fontSize: 28,
