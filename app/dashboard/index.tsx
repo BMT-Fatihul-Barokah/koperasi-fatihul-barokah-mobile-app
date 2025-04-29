@@ -26,8 +26,13 @@ export default function DashboardScreen() {
       refreshUserData();
     } else {
       console.log('Dashboard: User is not authenticated, redirecting to login');
-      // If not authenticated, redirect to login
-      router.replace('/');
+      // Use setTimeout to ensure the Root Layout is mounted before navigation
+      // This helps prevent the "Attempted to navigate before mounting the Root Layout component" error in web
+      const timer = setTimeout(() => {
+        router.replace('/');
+      }, 100);
+      
+      return () => clearTimeout(timer);
     }
   }, [isAuthenticated]);
   
@@ -220,7 +225,7 @@ export default function DashboardScreen() {
         
         <TouchableOpacity style={styles.navItem}>
           <Text style={styles.navIcon}>💼</Text>
-          <Text style={styles.navText}>Rekening</Text>
+          <Text style={styles.navText}>Aktifitas</Text>
         </TouchableOpacity>
         
         <TouchableOpacity style={styles.navItem}>
