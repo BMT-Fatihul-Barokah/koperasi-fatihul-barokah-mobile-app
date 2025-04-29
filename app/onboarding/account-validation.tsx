@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ScrollView, ActivityIndicator, Platform } from 'react-native';
+import React, { useState, useEffect, useMemo } from 'react';
+import { View, Text, StyleSheet, TextInput, Alert, ScrollView, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import NetInfo from '@react-native-community/netinfo';
@@ -7,6 +7,8 @@ import { DatabaseService } from '../../lib/database.service';
 import { checkSupabaseConnection } from '../../lib/supabase';
 import { storage } from '../../lib/storage';
 import { BackHeader } from '../../components/header/back-header';
+import { PrimaryButton } from '../../components/buttons/primary-button';
+import { SecondaryButton } from '../../components/buttons/secondary-button';
 
 export default function AccountValidationScreen() {
   const [fullName, setFullName] = useState('');
@@ -14,6 +16,11 @@ export default function AccountValidationScreen() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
+  
+  // Check if form is valid
+  const isFormValid = useMemo(() => {
+    return fullName.trim().length > 0 && accountNumber.trim().length > 0;
+  }, [fullName, accountNumber]);
 
   // Load phone number from secure storage
   useEffect(() => {
@@ -183,24 +190,19 @@ export default function AccountValidationScreen() {
       </View>
       
       <View style={styles.buttonContainer}>
-        <TouchableOpacity 
-          style={[styles.validateButton, isValidating && styles.disabledButton]}
+        <PrimaryButton
+          label="Validasi Akun"
           onPress={handleValidate}
-          disabled={isValidating}
-        >
-          {isValidating ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.validateButtonText}>Validasi Akun</Text>
-          )}
-        </TouchableOpacity>
+          isDisabled={!isFormValid}
+          isLoading={isValidating}
+          style={styles.primaryButton}
+        />
         
-        <TouchableOpacity 
-          style={styles.newAccountButton}
+        <SecondaryButton 
+          label="Daftar Rekening BMT Fatihul Barokah"
           onPress={handleNewAccount}
-        >
-          <Text style={styles.newAccountButtonText}>Daftar Rekening BMT Fatihul Barokah</Text>
-        </TouchableOpacity>
+          style={styles.secondaryButton}
+        />
       </View>
     </ScrollView>
     </SafeAreaProvider>
@@ -212,9 +214,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
-  disabledButton: {
-    backgroundColor: '#ccc',
-  },
+
   contentContainer: {
     padding: 20,
     flexGrow: 1,
@@ -284,29 +284,10 @@ const styles = StyleSheet.create({
   buttonContainer: {
     marginTop: 'auto',
   },
-  validateButton: {
-    backgroundColor: '#007BFF',
-    paddingVertical: 15,
-    borderRadius: 8,
-    alignItems: 'center',
+  primaryButton: {
     marginBottom: 15,
   },
-  validateButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  newAccountButton: {
-    backgroundColor: '#fff',
-    paddingVertical: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#007BFF',
-  },
-  newAccountButtonText: {
-    color: '#007BFF',
-    fontSize: 16,
-    fontWeight: 'bold',
+  secondaryButton: {
+    marginTop: 10,
   },
 });

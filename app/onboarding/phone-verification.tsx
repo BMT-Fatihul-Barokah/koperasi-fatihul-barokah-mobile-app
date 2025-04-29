@@ -1,12 +1,10 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { 
   View, 
   Text, 
   StyleSheet, 
   TextInput, 
-  TouchableOpacity, 
   Alert, 
-  ActivityIndicator, 
   Keyboard, 
   TouchableWithoutFeedback,
   KeyboardAvoidingView,
@@ -18,10 +16,16 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { storage } from '../../lib/storage';
 import { supabase } from '../../lib/supabase';
 import { BackHeader } from '../../components/header/back-header';
+import { PrimaryButton } from '../../components/buttons/primary-button';
 
 export default function PhoneVerificationScreen() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Check if phone number is valid
+  const isValidPhoneNumber = useMemo(() => {
+    return phoneNumber.trim().length >= 9; // Minimum length for Indonesian phone numbers
+  }, [phoneNumber]);
 
   // Format phone to international string
   const formatPhoneNumber = (input: string) => {
@@ -151,20 +155,15 @@ export default function PhoneVerificationScreen() {
             </View>
             
             <View style={styles.buttonContainer}>
-              <TouchableOpacity 
-                style={[styles.continueButton, isLoading && styles.disabledButton]}
+              <PrimaryButton 
+                label="Lanjutkan"
                 onPress={() => {
                   dismissKeyboard();
                   handleContinue();
                 }}
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.continueButtonText}>Lanjutkan</Text>
-                )}
-              </TouchableOpacity>
+                isDisabled={!isValidPhoneNumber}
+                isLoading={isLoading}
+              />
             </View>
           </ScrollView>
         </TouchableWithoutFeedback>
@@ -178,9 +177,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
-  disabledButton: {
-    backgroundColor: '#ccc',
-  },
+
   content: {
     flex: 1,
     paddingHorizontal: 24,
@@ -189,6 +186,7 @@ const styles = StyleSheet.create({
   buttonContainer: {
     paddingHorizontal: 24,
     paddingBottom: Platform.OS === 'ios' ? 20 : 16,
+    marginTop: 20,
   },
   title: {
     fontSize: 28,
@@ -235,19 +233,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     height: '100%',
   },
-  continueButton: {
-    backgroundColor: '#007bff',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 24,
-    marginBottom: 24,
-    height: 56,
-  },
-  continueButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+
 });

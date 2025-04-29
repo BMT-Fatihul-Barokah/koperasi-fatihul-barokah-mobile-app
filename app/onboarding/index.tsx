@@ -1,8 +1,9 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Link, router } from 'expo-router';
+import { View, Text, StyleSheet } from 'react-native';
+import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import Logo from '../../assets/logo.svg';
+import { PrimaryButton } from '../../components/buttons/primary-button';
 
 export default function OnboardingScreen() {
   return (
@@ -24,12 +25,12 @@ export default function OnboardingScreen() {
         </Text>
       </View>
       
-      <TouchableOpacity 
-        style={styles.button}
-        onPress={() => router.push('/onboarding/phone-verification')}
-      >
-        <Text style={styles.buttonText}>Lanjutkan</Text>
-      </TouchableOpacity>
+      <View style={styles.buttonContainer}>
+        <PrimaryButton 
+          label="Lanjutkan"
+          onPress={() => router.push('/onboarding/phone-verification')}
+        />
+      </View>
     </View>
   );
 }
@@ -65,18 +66,8 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 20,
   },
-  button: {
-    backgroundColor: '#007BFF',
-    paddingVertical: 15,
-    paddingHorizontal: 32,
-    borderRadius: 8,
-    alignSelf: 'stretch',
+  buttonContainer: {
+    paddingHorizontal: 20,
     marginBottom: 30,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-    textAlign: 'center',
   },
 });
