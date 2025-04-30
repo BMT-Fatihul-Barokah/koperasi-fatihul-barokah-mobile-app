@@ -8,6 +8,7 @@ import Constants from 'expo-constants';
 interface Env {
   NEXT_PUBLIC_SUPABASE_URL: string;
   NEXT_PUBLIC_SUPABASE_ANON_KEY: string;
+  SUPABASE_SERVICE_ROLE_KEY: string;
 }
 
 // Get environment variables from Expo Constants
@@ -26,6 +27,11 @@ export const env: Env = {
     process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
     expoConstants?.SUPABASE_ANON_KEY ||
     '',
+    
+  SUPABASE_SERVICE_ROLE_KEY:
+    process.env.EXPO_PUBLIC_SUPABASE_SERVICE_ROLE_KEY ||
+    expoConstants?.SUPABASE_SERVICE_ROLE_KEY ||
+    '',
 };
 
 // Validate environment variables
@@ -41,4 +47,7 @@ if (!env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
 console.log('Supabase URL:', env.NEXT_PUBLIC_SUPABASE_URL);
 if (env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
   console.log('Supabase Anon Key:', env.NEXT_PUBLIC_SUPABASE_ANON_KEY.substring(0, 10) + '...');
+}
+if (env.SUPABASE_SERVICE_ROLE_KEY) {
+  console.log('Supabase Service Key:', env.SUPABASE_SERVICE_ROLE_KEY.substring(0, 10) + '...');
 }

@@ -1,12 +1,15 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { BackHeader } from '../../../components/header/back-header';
 
 export default function SubmissionConfirmationScreen() {
-  // Generate a random submission ID
-  const submissionId = `REG-${Math.floor(10000 + Math.random() * 90000)}`;
+  // Get the submission ID from route params
+  const { submissionId } = useLocalSearchParams<{ submissionId: string }>();
+  
+  // Fallback to a generated ID if none was provided (shouldn't happen in normal flow)
+  const displaySubmissionId = submissionId || `REG-${Math.floor(10000 + Math.random() * 90000)}`;
   
   const handleGoToLogin = () => {
     // Navigate back to the main login screen
@@ -30,7 +33,7 @@ export default function SubmissionConfirmationScreen() {
         
         <View style={styles.submissionIdContainer}>
           <Text style={styles.submissionIdLabel}>ID Pendaftaran:</Text>
-          <Text style={styles.submissionId}>{submissionId}</Text>
+          <Text style={styles.submissionId}>{displaySubmissionId}</Text>
         </View>
         
         <View style={styles.infoContainer}>

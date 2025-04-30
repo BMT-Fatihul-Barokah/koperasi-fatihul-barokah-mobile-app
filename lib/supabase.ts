@@ -41,9 +41,10 @@ const createStorageAdapter = () => {
   }
 };
 
-// Get Supabase URL and anon key from environment variables
+// Get Supabase URL and keys from environment variables
 const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseServiceKey = env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables');
@@ -73,6 +74,23 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     timeout: 10000, // 10 seconds
   },
 });
+
+// Create an admin client with service role key to bypass RLS policies
+// This should only be used for operations that require admin privileges
+// and never exposed to the client side
+export const supabaseAdmin = supabaseServiceKey 
+  ? createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+      global: {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      },
+    })
+  : supabase; // Fallback to regular client if service key is not available
 
 // Log platform and connection info for debugging
 console.log(`Running on platform: ${Platform.OS}`);

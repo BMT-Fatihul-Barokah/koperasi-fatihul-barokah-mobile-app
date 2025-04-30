@@ -1,27 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, Platform, Modal, Pressable, FlatList, Keyboard } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, Platform, Modal, Pressable, FlatList, Keyboard, ActivityIndicator } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { router } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { filterCities } from '../../../lib/data/indonesia-cities';
 import { BackHeader } from '../../../components/header/back-header';
+import { registerNewMember, RegistrationFormData } from '../../../services/registration';
 
-interface FormData {
-  nama: string;
-  alamat: string;
-  kotaKabupaten: string;
-  tempatLahir: string;
-  tanggalLahir: string;
-  pekerjaan: string;
-  jenisIdentitas: 'KTP' | 'SIM' | 'PASPOR';
-  noIdentitas: string;
-  noTelepon: string;
-  sifatAnggota: string;
-  jenisKelamin: 'Laki-laki' | 'Perempuan';
-}
+// Using the RegistrationFormData interface from the registration service
 
 export default function NewAccountScreen() {
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState<RegistrationFormData>({
     nama: '',
     alamat: '',
     kotaKabupaten: '',
@@ -34,6 +23,8 @@ export default function NewAccountScreen() {
     sifatAnggota: '',
     jenisKelamin: 'Laki-laki'
   });
+  
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // City autocomplete state
   const [citySuggestions, setCitySuggestions] = useState<string[]>([]);
@@ -51,7 +42,7 @@ export default function NewAccountScreen() {
   const monthListRef = useRef<FlatList>(null);
   const yearListRef = useRef<FlatList>(null);
 
-  const handleChange = (field: keyof FormData, value: string) => {
+  const handleChange = (field: keyof RegistrationFormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     
     // Handle city suggestions when kotaKabupaten field changes
@@ -144,7 +135,7 @@ export default function NewAccountScreen() {
     setFormData(prev => ({ ...prev, jenisKelamin: gender }));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     // Validasi form
     if (!formData.nama || !formData.alamat || !formData.kotaKabupaten || 
         !formData.tempatLahir || !formData.tanggalLahir || !formData.pekerjaan || 
@@ -153,13 +144,27 @@ export default function NewAccountScreen() {
       return;
     }
 
-    // Di sini nantinya akan terhubung ke Supabase
-    console.log('Data anggota yang akan dikirim:', formData);
-    
-    // Untuk sementara, tampilkan pesan sukses dan navigasi ke halaman submission
-    Alert.alert('Sukses', 'Data berhasil disimpan', [
-      { text: 'OK', onPress: () => router.push('/onboarding/new-account/submission') }
-    ]);
+    try {
+      setIsSubmitting(true);
+      
+      // Submit data to Supabase
+      const result = await registerNewMember(formData);
+      
+      if (result.success) {
+        // Store submission ID in router params and navigate to submission page
+        router.push({
+          pathname: '/onboarding/new-account/submission',
+          params: { submissionId: result.submissionId }
+        });
+      } else {
+        Alert.alert('Error', result.message || 'Terjadi kesalahan saat mendaftar');
+      }
+    } catch (error) {
+      console.error('Registration error:', error);
+      Alert.alert('Error', 'Terjadi kesalahan saat mendaftar');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -498,10 +503,15 @@ export default function NewAccountScreen() {
         </View>
         
         <TouchableOpacity 
-          style={styles.submitButton}
+          style={[styles.submitButton, isSubmitting && styles.disabledButton]}
           onPress={handleSubmit}
+          disabled={isSubmitting}
         >
-          <Text style={styles.submitButtonText}>Kirim Pendaftaran</Text>
+          {isSubmitting ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <Text style={styles.submitButtonText}>Kirim Pendaftaran</Text>
+          )}
         </TouchableOpacity>
       </KeyboardAwareScrollView>
     </SafeAreaProvider>
@@ -764,5 +774,9 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
-  }
+  },
+  disabledButton: {
+    backgroundColor: '#ccc',
+    opacity: 0.7,
+  },
 });
