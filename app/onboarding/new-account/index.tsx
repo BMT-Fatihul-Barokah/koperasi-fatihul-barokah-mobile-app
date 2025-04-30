@@ -1,7 +1,9 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Alert, Platform, Modal, Pressable, FlatList } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, Platform, Modal, Pressable, FlatList, Keyboard } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { router } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { filterCities } from '../../../lib/data/indonesia-cities';
 import { BackHeader } from '../../../components/header/back-header';
 
 interface FormData {
@@ -32,6 +34,10 @@ export default function NewAccountScreen() {
     sifatAnggota: '',
     jenisKelamin: 'Laki-laki'
   });
+  
+  // City autocomplete state
+  const [citySuggestions, setCitySuggestions] = useState<string[]>([]);
+  const [showCitySuggestions, setShowCitySuggestions] = useState(false);
 
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -47,6 +53,23 @@ export default function NewAccountScreen() {
 
   const handleChange = (field: keyof FormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    
+    // Handle city suggestions when kotaKabupaten field changes
+    if (field === 'kotaKabupaten') {
+      const suggestions = filterCities(value);
+      setCitySuggestions(suggestions);
+      setShowCitySuggestions(suggestions.length > 0 && value.length > 0);
+    }
+  };
+  
+  const handleCitySelect = (city: string) => {
+    handleChange('kotaKabupaten', city);
+    // Short delay before hiding suggestions to show the selection highlight
+    setTimeout(() => {
+      setShowCitySuggestions(false);
+      // Remove focus from the input to dismiss keyboard
+      Keyboard.dismiss();
+    }, 150);
   };
 
   // Generate arrays for days, months, and years
@@ -142,7 +165,15 @@ export default function NewAccountScreen() {
   return (
     <SafeAreaProvider>
       <BackHeader title="Pendaftaran Anggota Baru" />
-      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+      <KeyboardAwareScrollView 
+        style={styles.container} 
+        contentContainerStyle={styles.contentContainer}
+        keyboardShouldPersistTaps="handled"
+        enableOnAndroid={true}
+        enableResetScrollToCoords={false}
+        extraScrollHeight={Platform.OS === 'ios' ? 20 : 40}
+        keyboardOpeningTime={0}
+        showsVerticalScrollIndicator={true}>
         <View style={styles.content}>
           <Text style={styles.title}>Formulir Pendaftaran Anggota Baru</Text>
           <Text style={styles.subtitle}>
@@ -176,12 +207,50 @@ export default function NewAccountScreen() {
             
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Kota/Kabupaten <Text style={styles.requiredStar}>*</Text></Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Masukkan kota/kabupaten"
-                value={formData.kotaKabupaten}
-                onChangeText={(value) => handleChange('kotaKabupaten', value)}
-              />
+              <View style={styles.autoCompleteContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Masukkan kota/kabupaten"
+                  value={formData.kotaKabupaten}
+                  onChangeText={(value) => handleChange('kotaKabupaten', value)}
+                  onFocus={() => {
+                    if (formData.kotaKabupaten && citySuggestions.length > 0) {
+                      setShowCitySuggestions(true);
+                    }
+                  }}
+                />
+                {showCitySuggestions && (
+                  <View style={styles.suggestionsContainer}>
+                    <FlatList
+                      data={citySuggestions}
+                      keyExtractor={(item) => item}
+                      showsVerticalScrollIndicator={true}
+                      keyboardShouldPersistTaps="handled"
+                      initialNumToRender={10}
+                      maxToRenderPerBatch={20}
+                      windowSize={10}
+                      contentContainerStyle={styles.suggestionsList}
+                      renderItem={({ item }) => {
+                        const isSelected = item === formData.kotaKabupaten;
+                        return (
+                          <TouchableOpacity 
+                            style={[styles.suggestionItem, isSelected && styles.suggestionItemSelected]}
+                            onPress={() => handleCitySelect(item)}
+                            activeOpacity={0.6}
+                          >
+                            <Text 
+                              style={[styles.suggestionText, isSelected && styles.suggestionTextSelected]}
+                              numberOfLines={1}
+                            >
+                              {item}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      }}
+                    />
+                  </View>
+                )}
+              </View>
             </View>
             
             <View style={styles.inputRow}>
@@ -434,7 +503,7 @@ export default function NewAccountScreen() {
         >
           <Text style={styles.submitButtonText}>Kirim Pendaftaran</Text>
         </TouchableOpacity>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaProvider>
   );
 }
@@ -446,7 +515,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   contentContainer: {
-    flexGrow: 1,
+    paddingBottom: 80,
   },
   content: {
     flex: 1,
@@ -626,6 +695,51 @@ const styles = StyleSheet.create({
     color: '#007BFF',
     fontWeight: 'bold',
   },
+  autoCompleteContainer: {
+    position: 'relative',
+    zIndex: 10,
+  },
+  suggestionsContainer: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    maxHeight: 150,
+    zIndex: 20,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    overflow: 'hidden',
+    marginTop: 2,
+  },
+  suggestionsList: {
+    paddingVertical: 5,
+  },
+  suggestionItem: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    backgroundColor: '#fff',
+    paddingHorizontal: 15,
+  },
+  suggestionItemSelected: {
+    backgroundColor: 'rgba(0, 123, 255, 0.1)',
+  },
+  suggestionText: {
+    fontSize: 16,
+    color: '#333',
+    paddingVertical: 2,
+  },
+  suggestionTextSelected: {
+    color: '#007BFF',
+    fontWeight: 'bold',
+  },
   infoContainer: {
     backgroundColor: 'rgba(0, 123, 255, 0.1)',
     borderRadius: 8,
@@ -643,7 +757,8 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: 30,
+    marginBottom: 20,
   },
   submitButtonText: {
     color: '#fff',
