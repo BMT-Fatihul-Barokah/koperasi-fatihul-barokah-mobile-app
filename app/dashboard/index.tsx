@@ -143,28 +143,28 @@ export default function DashboardScreen() {
               <View style={styles.quickActionIcon}>
                 <Text style={styles.quickActionIconText}>💰</Text>
               </View>
-              <Text style={styles.quickActionText}>Transfer</Text>
+              <Text style={styles.quickActionText}>Informasi Deposit</Text>
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.quickActionItem}>
               <View style={styles.quickActionIcon}>
                 <Text style={styles.quickActionIconText}>📝</Text>
               </View>
-              <Text style={styles.quickActionText}>Pembayaran</Text>
+              <Text style={styles.quickActionText}>Informasi Pinjaman</Text>
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.quickActionItem}>
               <View style={styles.quickActionIcon}>
                 <Text style={styles.quickActionIconText}>📊</Text>
               </View>
-              <Text style={styles.quickActionText}>Riwayat</Text>
+              <Text style={styles.quickActionText}>Pengajuan Pinjaman</Text>
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.quickActionItem}>
               <View style={styles.quickActionIcon}>
                 <Text style={styles.quickActionIconText}>🏦</Text>
               </View>
-              <Text style={styles.quickActionText}>Pembiayaan</Text>
+              <Text style={styles.quickActionText}>Informasi Penarikan Saldo</Text>
             </TouchableOpacity>
           </View>
         </View>

@@ -128,7 +128,7 @@ export default function PhoneVerificationScreen() {
             <BackHeader title="Verifikasi Nomor Telepon" />
             
             <View style={styles.content}>
-              <Text style={styles.title}>Verifikasi Nomor Telepon</Text>
+              <Text style={styles.title}>Masuk atau Daftar</Text>
               <Text style={styles.subtitle}>
                 Masukkan nomor telepon Anda untuk menerima kode verifikasi
               </Text>
