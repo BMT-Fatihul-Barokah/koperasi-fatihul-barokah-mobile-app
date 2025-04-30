@@ -1,105 +1,237 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { BackHeader } from '../../../components/header/back-header';
 
-export default function NewAccountScreen() {
-  const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 4;
+interface FormData {
+  nama: string;
+  alamat: string;
+  kotaKabupaten: string;
+  tempatLahir: string;
+  tanggalLahir: string;
+  pekerjaan: string;
+  jenisIdentitas: 'KTP' | 'SIM' | 'PASPOR';
+  noIdentitas: string;
+  noTelepon: string;
+  sifatAnggota: string;
+  jenisKelamin: 'Laki-laki' | 'Perempuan';
+}
 
-  const handleNext = () => {
-    if (currentStep < totalSteps) {
-      router.push(`/onboarding/new-account/step-${currentStep + 1}`);
+export default function NewAccountScreen() {
+  const [formData, setFormData] = useState<FormData>({
+    nama: '',
+    alamat: '',
+    kotaKabupaten: '',
+    tempatLahir: '',
+    tanggalLahir: '',
+    pekerjaan: '',
+    jenisIdentitas: 'KTP',
+    noIdentitas: '',
+    noTelepon: '',
+    sifatAnggota: '',
+    jenisKelamin: 'Laki-laki'
+  });
+
+  const handleChange = (field: keyof FormData, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleIdentityTypeSelect = (type: 'KTP' | 'SIM' | 'PASPOR') => {
+    setFormData(prev => ({ ...prev, jenisIdentitas: type }));
+  };
+
+  const handleGenderSelect = (gender: 'Laki-laki' | 'Perempuan') => {
+    setFormData(prev => ({ ...prev, jenisKelamin: gender }));
+  };
+
+  const handleSubmit = () => {
+    // Validasi form
+    if (!formData.nama || !formData.alamat || !formData.kotaKabupaten || 
+        !formData.tempatLahir || !formData.tanggalLahir || !formData.pekerjaan || 
+        !formData.noIdentitas || !formData.noTelepon) {
+      Alert.alert('Error', 'Mohon lengkapi semua data yang diperlukan');
+      return;
     }
+
+    // Di sini nantinya akan terhubung ke Supabase
+    console.log('Data anggota yang akan dikirim:', formData);
+    
+    // Untuk sementara, tampilkan pesan sukses dan navigasi ke halaman submission
+    Alert.alert('Sukses', 'Data berhasil disimpan', [
+      { text: 'OK', onPress: () => router.push('/onboarding/new-account/submission') }
+    ]);
   };
 
   return (
     <SafeAreaProvider>
-      <BackHeader title="New Account Registration" />
+      <BackHeader title="Pendaftaran Anggota Baru" />
       <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      
-      <View style={styles.progressContainer}>
-        <View style={styles.progressBar}>
-          <View style={[styles.progressFill, { width: `${(currentStep / totalSteps) * 100}%` }]} />
+        <View style={styles.content}>
+          <Text style={styles.title}>Formulir Pendaftaran Anggota Baru</Text>
+          <Text style={styles.subtitle}>
+            Silakan lengkapi data diri Anda untuk menjadi anggota Koperasi Fatihul Barokah
+          </Text>
+          
+          <View style={styles.formSection}>
+            <Text style={styles.sectionTitle}>DATA ANGGOTA/CALON ANGGOTA</Text>
+            
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Nama <Text style={styles.requiredStar}>*</Text></Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Masukkan nama lengkap"
+                value={formData.nama}
+                onChangeText={(value) => handleChange('nama', value)}
+              />
+            </View>
+            
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Alamat <Text style={styles.requiredStar}>*</Text></Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                placeholder="Masukkan alamat lengkap"
+                value={formData.alamat}
+                onChangeText={(value) => handleChange('alamat', value)}
+                multiline
+                numberOfLines={3}
+              />
+            </View>
+            
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Kota/Kabupaten <Text style={styles.requiredStar}>*</Text></Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Masukkan kota/kabupaten"
+                value={formData.kotaKabupaten}
+                onChangeText={(value) => handleChange('kotaKabupaten', value)}
+              />
+            </View>
+            
+            <View style={styles.inputRow}>
+              <View style={[styles.inputContainer, { flex: 1, marginRight: 10 }]}>
+                <Text style={styles.inputLabel}>Tempat Lahir <Text style={styles.requiredStar}>*</Text></Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Kota kelahiran"
+                  value={formData.tempatLahir}
+                  onChangeText={(value) => handleChange('tempatLahir', value)}
+                />
+              </View>
+              
+              <View style={[styles.inputContainer, { flex: 1 }]}>
+                <Text style={styles.inputLabel}>Tanggal Lahir <Text style={styles.requiredStar}>*</Text></Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="DD/MM/YYYY"
+                  value={formData.tanggalLahir}
+                  onChangeText={(value) => handleChange('tanggalLahir', value)}
+                />
+              </View>
+            </View>
+            
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Pekerjaan <Text style={styles.requiredStar}>*</Text></Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Masukkan pekerjaan"
+                value={formData.pekerjaan}
+                onChangeText={(value) => handleChange('pekerjaan', value)}
+              />
+            </View>
+            
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Identitas <Text style={styles.requiredStar}>*</Text></Text>
+              <View style={styles.optionContainer}>
+                <TouchableOpacity 
+                  style={[styles.optionButton, formData.jenisIdentitas === 'KTP' && styles.optionButtonSelected]}
+                  onPress={() => handleIdentityTypeSelect('KTP')}
+                >
+                  <Text style={[styles.optionText, formData.jenisIdentitas === 'KTP' && styles.optionTextSelected]}>KTP</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.optionButton, formData.jenisIdentitas === 'SIM' && styles.optionButtonSelected]}
+                  onPress={() => handleIdentityTypeSelect('SIM')}
+                >
+                  <Text style={[styles.optionText, formData.jenisIdentitas === 'SIM' && styles.optionTextSelected]}>SIM</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.optionButton, formData.jenisIdentitas === 'PASPOR' && styles.optionButtonSelected]}
+                  onPress={() => handleIdentityTypeSelect('PASPOR')}
+                >
+                  <Text style={[styles.optionText, formData.jenisIdentitas === 'PASPOR' && styles.optionTextSelected]}>PASPOR</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>No. Identitas <Text style={styles.requiredStar}>*</Text></Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Masukkan nomor identitas"
+                value={formData.noIdentitas}
+                onChangeText={(value) => handleChange('noIdentitas', value)}
+                keyboardType="number-pad"
+              />
+            </View>
+            
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>No. Telepon <Text style={styles.requiredStar}>*</Text></Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Contoh: 08123456789"
+                value={formData.noTelepon}
+                onChangeText={(value) => handleChange('noTelepon', value)}
+                keyboardType="phone-pad"
+              />
+            </View>
+            
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Sifat Anggota <Text style={styles.requiredStar}>*</Text></Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Masukkan sifat anggota"
+                value={formData.sifatAnggota}
+                onChangeText={(value) => handleChange('sifatAnggota', value)}
+              />
+            </View>
+            
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Jenis Kelamin <Text style={styles.requiredStar}>*</Text></Text>
+              <View style={styles.optionContainer}>
+                <TouchableOpacity 
+                  style={[styles.optionButton, formData.jenisKelamin === 'Laki-laki' && styles.optionButtonSelected]}
+                  onPress={() => handleGenderSelect('Laki-laki')}
+                >
+                  <Text style={[styles.optionText, formData.jenisKelamin === 'Laki-laki' && styles.optionTextSelected]}>Laki-laki</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.optionButton, formData.jenisKelamin === 'Perempuan' && styles.optionButtonSelected]}
+                  onPress={() => handleGenderSelect('Perempuan')}
+                >
+                  <Text style={[styles.optionText, formData.jenisKelamin === 'Perempuan' && styles.optionTextSelected]}>Perempuan</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+          
+          <View style={styles.infoContainer}>
+            <Text style={styles.infoText}>
+              • Pastikan data yang diisi sudah benar dan sesuai dengan identitas resmi Anda
+            </Text>
+            <Text style={styles.infoText}>
+              • Anda akan diminta untuk melakukan verifikasi data di kantor kami
+            </Text>
+          </View>
         </View>
-        <Text style={styles.progressText}>Step {currentStep} of {totalSteps}</Text>
-      </View>
-      
-      <View style={styles.content}>
-        <Text style={styles.title}>Welcome to BMT Fatihul Barokah</Text>
-        <Text style={styles.subtitle}>
-          Complete the registration process to open a new account with our cooperative.
-        </Text>
         
-        <View style={styles.infoContainer}>
-          <Text style={styles.infoTitle}>Before You Begin</Text>
-          <Text style={styles.infoText}>
-            • You will need to provide personal information
-          </Text>
-          <Text style={styles.infoText}>
-            • Have your ID card ready for verification
-          </Text>
-          <Text style={styles.infoText}>
-            • You will need to visit our office to finalize your account
-          </Text>
-          <Text style={styles.infoText}>
-            • The registration process takes approximately 5-10 minutes
-          </Text>
-        </View>
-        
-        <View style={styles.stepsContainer}>
-          <Text style={styles.stepsTitle}>Registration Steps</Text>
-          
-          <View style={styles.stepItem}>
-            <View style={[styles.stepNumber, styles.stepNumberActive]}>
-              <Text style={styles.stepNumberText}>1</Text>
-            </View>
-            <View style={styles.stepContent}>
-              <Text style={styles.stepTitle}>Personal Information</Text>
-              <Text style={styles.stepDescription}>Basic details and contact information</Text>
-            </View>
-          </View>
-          
-          <View style={styles.stepItem}>
-            <View style={styles.stepNumber}>
-              <Text style={styles.stepNumberText}>2</Text>
-            </View>
-            <View style={styles.stepContent}>
-              <Text style={styles.stepTitle}>Address & Employment</Text>
-              <Text style={styles.stepDescription}>Your address and employment details</Text>
-            </View>
-          </View>
-          
-          <View style={styles.stepItem}>
-            <View style={styles.stepNumber}>
-              <Text style={styles.stepNumberText}>3</Text>
-            </View>
-            <View style={styles.stepContent}>
-              <Text style={styles.stepTitle}>Account Selection</Text>
-              <Text style={styles.stepDescription}>Choose your account type and services</Text>
-            </View>
-          </View>
-          
-          <View style={styles.stepItem}>
-            <View style={styles.stepNumber}>
-              <Text style={styles.stepNumberText}>4</Text>
-            </View>
-            <View style={styles.stepContent}>
-              <Text style={styles.stepTitle}>Document Upload</Text>
-              <Text style={styles.stepDescription}>Upload required documents for verification</Text>
-            </View>
-          </View>
-        </View>
-      </View>
-      
-      <TouchableOpacity 
-        style={styles.nextButton}
-        onPress={handleNext}
-      >
-        <Text style={styles.nextButtonText}>Begin Registration</Text>
-      </TouchableOpacity>
-    </ScrollView>
+        <TouchableOpacity 
+          style={styles.submitButton}
+          onPress={handleSubmit}
+        >
+          <Text style={styles.submitButtonText}>Kirim Pendaftaran</Text>
+        </TouchableOpacity>
+      </ScrollView>
     </SafeAreaProvider>
   );
 }
@@ -113,25 +245,6 @@ const styles = StyleSheet.create({
   contentContainer: {
     flexGrow: 1,
   },
-  progressContainer: {
-    marginBottom: 25,
-  },
-  progressBar: {
-    height: 6,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 3,
-    marginBottom: 8,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#007BFF',
-    borderRadius: 3,
-  },
-  progressText: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'right',
-  },
   content: {
     flex: 1,
   },
@@ -139,6 +252,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 10,
+    color: '#007BFF',
   },
   subtitle: {
     fontSize: 16,
@@ -146,76 +260,86 @@ const styles = StyleSheet.create({
     marginBottom: 25,
     lineHeight: 22,
   },
-  infoContainer: {
-    backgroundColor: '#f8f8f8',
-    borderRadius: 8,
-    padding: 15,
-    marginBottom: 25,
+  formSection: {
+    marginBottom: 20,
   },
-  infoTitle: {
+  sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 12,
+    marginBottom: 15,
+    color: '#007BFF',
+  },
+  inputContainer: {
+    marginBottom: 15,
+  },
+  inputLabel: {
+    fontSize: 16,
+    marginBottom: 8,
+    color: '#333',
+  },
+  requiredStar: {
+    color: 'red',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+  },
+  textArea: {
+    height: 80,
+    textAlignVertical: 'top',
+  },
+  inputRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  optionContainer: {
+    flexDirection: 'row',
+    marginTop: 5,
+  },
+  optionButton: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    marginRight: 10,
+  },
+  optionButtonSelected: {
+    backgroundColor: '#007BFF',
+    borderColor: '#007BFF',
+  },
+  optionText: {
+    color: '#333',
+  },
+  optionTextSelected: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  infoContainer: {
+    backgroundColor: 'rgba(0, 123, 255, 0.1)',
+    borderRadius: 8,
+    padding: 15,
+    marginTop: 15,
+    marginBottom: 20,
   },
   infoText: {
     fontSize: 14,
-    color: '#333',
-    marginBottom: 8,
-    lineHeight: 20,
+    color: '#007BFF',
+    marginBottom: 5,
   },
-  stepsContainer: {
-    marginBottom: 30,
-  },
-  stepsTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 15,
-  },
-  stepItem: {
-    flexDirection: 'row',
-    marginBottom: 15,
-    alignItems: 'flex-start',
-  },
-  stepNumber: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 15,
-    marginTop: 2,
-  },
-  stepNumberActive: {
-    backgroundColor: '#007BFF',
-  },
-  stepNumberText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#666',
-  },
-  stepContent: {
-    flex: 1,
-  },
-  stepTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  stepDescription: {
-    fontSize: 14,
-    color: '#666',
-  },
-  nextButton: {
+  submitButton: {
     backgroundColor: '#007BFF',
     paddingVertical: 15,
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 10,
   },
-  nextButtonText: {
+  submitButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
-  },
+  }
 });

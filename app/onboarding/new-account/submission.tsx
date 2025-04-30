@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { BackHeader } from '../../../components/header/back-header';
 
 export default function SubmissionConfirmationScreen() {
   // Generate a random submission ID
@@ -14,6 +15,7 @@ export default function SubmissionConfirmationScreen() {
   
   return (
     <SafeAreaProvider>
+      <BackHeader title="Konfirmasi Pendaftaran" />
       <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       
       <View style={styles.content}>
@@ -21,39 +23,39 @@ export default function SubmissionConfirmationScreen() {
           <Text style={styles.successIcon}>✓</Text>
         </View>
         
-        <Text style={styles.title}>Application Submitted!</Text>
+        <Text style={styles.title}>Pendaftaran Terkirim!</Text>
         <Text style={styles.subtitle}>
-          Your account application has been successfully submitted for review.
+          Data pendaftaran anggota Anda telah berhasil dikirim untuk ditinjau.
         </Text>
         
         <View style={styles.submissionIdContainer}>
-          <Text style={styles.submissionIdLabel}>Submission ID:</Text>
+          <Text style={styles.submissionIdLabel}>ID Pendaftaran:</Text>
           <Text style={styles.submissionId}>{submissionId}</Text>
         </View>
         
         <View style={styles.infoContainer}>
-          <Text style={styles.infoTitle}>Next Steps</Text>
+          <Text style={styles.infoTitle}>Langkah Selanjutnya</Text>
           <Text style={styles.infoText}>
-            • Our team will review your application within 1-2 business days
+            • Tim kami akan meninjau pendaftaran Anda dalam 1-2 hari kerja
           </Text>
           <Text style={styles.infoText}>
-            • You will receive a notification via SMS or WhatsApp about your application status
+            • Anda akan menerima notifikasi melalui SMS atau WhatsApp tentang status pendaftaran
           </Text>
           <Text style={styles.infoText}>
-            • Please visit our office with original documents to complete the registration process
+            • Silakan kunjungi kantor kami dengan dokumen asli untuk menyelesaikan proses pendaftaran
           </Text>
           <Text style={styles.infoText}>
-            • Keep your submission ID for reference
+            • Simpan ID pendaftaran Anda untuk referensi
           </Text>
         </View>
         
         <View style={styles.contactContainer}>
-          <Text style={styles.contactTitle}>Need Help?</Text>
+          <Text style={styles.contactTitle}>Butuh Bantuan?</Text>
           <Text style={styles.contactText}>
-            If you have any questions, please contact our customer service:
+            Jika Anda memiliki pertanyaan, silakan hubungi layanan pelanggan kami:
           </Text>
-          <Text style={styles.contactInfo}>Phone: 021-XXXX-XXXX</Text>
-          <Text style={styles.contactInfo}>Email: info@bmtfatihulbarokah.com</Text>
+          <Text style={styles.contactInfo}>Telepon: 021-XXXX-XXXX</Text>
+          <Text style={styles.contactInfo}>Email: info@koperasifatihulbarokah.com</Text>
         </View>
       </View>
       
@@ -61,7 +63,7 @@ export default function SubmissionConfirmationScreen() {
         style={styles.doneButton}
         onPress={handleGoToLogin}
       >
-        <Text style={styles.doneButtonText}>Return to Home</Text>
+        <Text style={styles.doneButtonText}>Kembali ke Beranda</Text>
       </TouchableOpacity>
     </ScrollView>
     </SafeAreaProvider>
@@ -99,6 +101,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 10,
     textAlign: 'center',
+    color: '#007BFF',
   },
   subtitle: {
     fontSize: 16,
@@ -127,7 +130,7 @@ const styles = StyleSheet.create({
     color: '#007BFF',
   },
   infoContainer: {
-    backgroundColor: '#f8f8f8',
+    backgroundColor: 'rgba(0, 123, 255, 0.1)',
     borderRadius: 8,
     padding: 15,
     width: '100%',
@@ -137,6 +140,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 12,
+    color: '#007BFF',
   },
   infoText: {
     fontSize: 14,
@@ -152,6 +156,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 10,
+    color: '#007BFF',
   },
   contactText: {
     fontSize: 14,
