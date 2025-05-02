@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, useWindowDimensions, Platform } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { storage } from '../../lib/storage';
 import { DatabaseService } from '../../lib/database.service';
 import { useAuth } from '../../context/auth-context';
@@ -12,7 +12,12 @@ interface PinKeypadProps {
 }
 
 const PinKeypad = ({ onKeyPress }: PinKeypadProps) => {
+  const { width } = useWindowDimensions();
   const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'];
+  
+  // Calculate responsive button size based on screen width
+  const buttonSize = Math.min(width * 0.22, 70); // Slightly smaller buttons (22% of width)
+  const buttonMargin = 10; // Fixed margin to match design
   
   return (
     <View style={styles.keypadContainer}>
@@ -22,6 +27,11 @@ const PinKeypad = ({ onKeyPress }: PinKeypadProps) => {
           style={[
             styles.keyButton,
             key === '' && styles.emptyButton,
+            { 
+              width: buttonSize, 
+              height: buttonSize,
+              margin: buttonMargin 
+            }
           ]}
           onPress={() => key && onKeyPress(key)}
           disabled={key === ''}
@@ -165,11 +175,14 @@ export default function SecuritySetupScreen() {
     }
   };
   
+  const { height } = useWindowDimensions();
+  
   return (
-    <SafeAreaProvider style={styles.container}>
-      <BackHeader title="Pengaturan Keamanan" />
-      
-      <View style={styles.content}>
+    <SafeAreaProvider>
+      <SafeAreaView style={styles.container} edges={['bottom']}>
+        <BackHeader title="Pengaturan Keamanan" />
+        
+        <View style={styles.content}>
         {isLoading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#007BFF" />
@@ -178,7 +191,7 @@ export default function SecuritySetupScreen() {
         ) : (
           <>
             <Text style={styles.title}>
-              {step === 'create' ? 'Masukkan PIN' : 'Konfirmasi PIN'}
+              {step === 'create' ? 'Buat PIN Anda' : 'Konfirmasi PIN'}
             </Text>
             <Text style={styles.subtitle}>
               {step === 'create' 
@@ -191,35 +204,40 @@ export default function SecuritySetupScreen() {
               {errorMessage || 'PIN yang Anda masukkan salah. Silakan coba lagi.'}
             </Text>
         
-        <View style={styles.pinContainer}>
-          {Array(6).fill(0).map((_, index) => {
-            const currentPin = step === 'create' ? pin : confirmPin;
-            const isFilled = index < currentPin.length;
-            
-            return (
-              <View 
-                key={index} 
-                style={[
-                  styles.pinDot,
-                  isFilled && styles.pinDotFilled
-                ]}
-              />
-            );
-          })}
+        <View style={styles.headerSection}>
+          <View style={styles.pinContainer}>
+            {Array(6).fill(0).map((_, index) => {
+              const currentPin = step === 'create' ? pin : confirmPin;
+              const isFilled = index < currentPin.length;
+              
+              return (
+                <View 
+                  key={index} 
+                  style={[
+                    styles.pinDot,
+                    isFilled && styles.pinDotFilled
+                  ]}
+                />
+              );
+            })}
+          </View>
         </View>
         
-        <PinKeypad onKeyPress={handleKeyPress} />
+        <View style={styles.keypadSection}>
+          <PinKeypad onKeyPress={handleKeyPress} />
+        </View>
         
-        <View style={styles.infoContainer}>
-          <Text style={styles.infoText}>
-            PIN Anda akan digunakan untuk mengamankan akun dan mengotorisasi transaksi.
-          </Text>
+        <View style={styles.footerSection}>
+          <View style={styles.infoContainer}>
+            <Text style={styles.infoText}>
+              PIN Anda akan digunakan untuk mengamankan akun dan mengotorisasi transaksi.
+            </Text>
+          </View>
         </View>
         </>
         )}
       </View>
-      
-
+      </SafeAreaView>
     </SafeAreaProvider>
   );
 }
@@ -242,6 +260,20 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 24,
+    justifyContent: 'space-between',
+  },
+  headerSection: {
+    alignItems: 'center',
+    paddingTop: 20,
+  },
+  keypadSection: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+  },
+  footerSection: {
+    width: '100%',
+    paddingBottom: Platform.OS === 'ios' ? 10 : 20,
     alignItems: 'center',
   },
   title: {
@@ -286,19 +318,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
+    alignItems: 'center',
     width: '100%',
     maxWidth: 340,
-    marginTop: 30,
     paddingHorizontal: 10,
   },
   keyButton: {
-    width: '28%',
-    aspectRatio: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    margin: '2.5%',
     borderRadius: 50,
     backgroundColor: '#f8f8f8',
+    marginVertical: 12,
+    marginHorizontal: 12,
   },
   emptyButton: {
     backgroundColor: 'transparent',
@@ -316,8 +347,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 123, 255, 0.1)',
     borderRadius: 8,
     padding: 15,
-    marginTop: 40,
-    width: '100%',
+    marginTop: 10,
+    marginBottom: 10,
+    width: '90%',
+    maxWidth: 340,
   },
   infoText: {
     fontSize: 14,
