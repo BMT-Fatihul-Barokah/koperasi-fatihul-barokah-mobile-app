@@ -247,7 +247,10 @@ export default function DashboardScreen() {
           <Text style={styles.navText}>Aktifitas</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.navItem}>
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => router.push('/dashboard/notifications')}
+        >
           <Text style={styles.navIcon}>🔔</Text>
           <Text style={styles.navText}>Notifikasi</Text>
         </TouchableOpacity>
