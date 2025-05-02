@@ -172,7 +172,7 @@ export default function DashboardScreen() {
         <View style={styles.transactionsSection}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Transaksi Terbaru</Text>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/activity')}>
               <Text style={styles.seeAllText}>Lihat Semua</Text>
             </TouchableOpacity>
           </View>
@@ -223,7 +223,10 @@ export default function DashboardScreen() {
           <Text style={[styles.navText, styles.activeNavText]}>Beranda</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.navItem}>
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => router.push('/activity')}
+        >
           <Text style={styles.navIcon}>💼</Text>
           <Text style={styles.navText}>Aktifitas</Text>
         </TouchableOpacity>
