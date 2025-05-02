@@ -14,13 +14,14 @@ export default function AccountValidationScreen() {
   const [fullName, setFullName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [rawAccountNumber, setRawAccountNumber] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   
   // Check if form is valid
   const isFormValid = useMemo(() => {
-    return fullName.trim().length > 0 && accountNumber.trim().length > 0;
-  }, [fullName, accountNumber]);
+    return fullName.trim().length > 0 && rawAccountNumber.trim().length >= 6; // Minimum 6 digits for account number
+  }, [fullName, rawAccountNumber]);
 
   // Load phone number from secure storage
   useEffect(() => {
@@ -49,8 +50,8 @@ export default function AccountValidationScreen() {
       return;
     }
 
-    if (!accountNumber.trim()) {
-      Alert.alert('Error', 'Mohon masukkan nomor rekening Anda');
+    if (!rawAccountNumber.trim() || rawAccountNumber.trim().length < 6) {
+      Alert.alert('Error', 'Mohon masukkan nomor rekening Anda dengan benar');
       return;
     }
 
@@ -175,10 +176,34 @@ export default function AccountValidationScreen() {
           <Text style={styles.inputLabel}>Nomor Rekening</Text>
           <TextInput
             style={styles.input}
-            placeholder="Masukkan nomor rekening Anda"
+            placeholder="XX.X.XXXX"
             keyboardType="number-pad"
             value={accountNumber}
-            onChangeText={setAccountNumber}
+            onChangeText={(text) => {
+              // Remove all non-digit characters
+              const digitsOnly = text.replace(/\D/g, '');
+              setRawAccountNumber(digitsOnly);
+              
+              // Format with separators (XX.X.XXXX)
+              let formatted = '';
+              if (digitsOnly.length > 0) {
+                // First group (2 digits)
+                formatted = digitsOnly.substring(0, Math.min(2, digitsOnly.length));
+                
+                // Add first separator and second group (1 digit)
+                if (digitsOnly.length > 2) {
+                  formatted += '.' + digitsOnly.substring(2, Math.min(3, digitsOnly.length));
+                  
+                  // Add second separator and third group (remaining digits)
+                  if (digitsOnly.length > 3) {
+                    formatted += '.' + digitsOnly.substring(3);
+                  }
+                }
+              }
+              
+              setAccountNumber(formatted);
+            }}
+            maxLength={10} // XX.X.XXXX format has max 10 characters
           />
         </View>
         
