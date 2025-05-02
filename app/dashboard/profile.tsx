@@ -211,6 +211,56 @@ export default function ProfileScreen() {
           <Text style={styles.versionText}>Koperasi Fatihul Barokah v1.0.0</Text>
         </View>
       </ScrollView>
+      
+      <View style={styles.navbar}>
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => router.push('/dashboard')}
+        >
+          <Image 
+            source={require('../../assets/Beranda.png')} 
+            style={styles.navIcon} 
+            resizeMode="contain"
+            tintColor="#999"
+          />
+          <Text style={styles.navText}>Beranda</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => router.push('/activity')}
+        >
+          <Image 
+            source={require('../../assets/aktifitas.png')} 
+            style={styles.navIcon} 
+            resizeMode="contain"
+            tintColor="#999"
+          />
+          <Text style={styles.navText}>Aktifitas</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => router.push('/dashboard/notifications')}
+        >
+          <Image 
+            source={require('../../assets/notifikasi.png')} 
+            style={styles.navIcon} 
+            resizeMode="contain"
+            tintColor="#999"
+          />
+          <Text style={styles.navText}>Notifikasi</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity style={styles.navItem}>
+          <Image 
+            source={require('../../assets/profil.png')} 
+            style={[styles.navIcon, styles.activeNavIcon]} 
+            resizeMode="contain"
+          />
+          <Text style={[styles.navText, styles.activeNavText]}>Profil</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
@@ -396,7 +446,33 @@ const styles = StyleSheet.create({
     marginVertical: 20,
   },
   versionText: {
+    fontSize: 12,
+    color: '#999',
+  },
+  navbar: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    backgroundColor: '#fff',
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  navItem: {
+    alignItems: 'center',
+  },
+  navIcon: {
+    width: 36,
+    height: 36,
+    marginBottom: 6,
+  },
+  activeNavIcon: {
+    tintColor: '#007BFF',
+  },
+  navText: {
     fontSize: 14,
     color: '#999',
   },
+  activeNavText: {
+    color: '#007BFF',
+  }
 });

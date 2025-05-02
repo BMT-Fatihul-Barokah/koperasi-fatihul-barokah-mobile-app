@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import { useAuth } from '../../context/auth-context';
@@ -276,7 +276,11 @@ export default function DashboardScreen() {
       
       <View style={styles.navbar}>
         <TouchableOpacity style={styles.navItem}>
-          <Text style={[styles.navIcon, styles.activeNavIcon]}>🏠</Text>
+          <Image 
+            source={require('../../assets/Beranda.png')} 
+            style={[styles.navIcon, styles.activeNavIcon]} 
+            resizeMode="contain"
+          />
           <Text style={[styles.navText, styles.activeNavText]}>Beranda</Text>
         </TouchableOpacity>
         
@@ -284,7 +288,12 @@ export default function DashboardScreen() {
           style={styles.navItem}
           onPress={() => router.push('/activity')}
         >
-          <Text style={styles.navIcon}>💼</Text>
+          <Image 
+            source={require('../../assets/aktifitas.png')} 
+            style={styles.navIcon} 
+            resizeMode="contain"
+            tintColor="#999"
+          />
           <Text style={styles.navText}>Aktifitas</Text>
         </TouchableOpacity>
         
@@ -292,7 +301,12 @@ export default function DashboardScreen() {
           style={styles.navItem}
           onPress={() => router.push('/dashboard/notifications')}
         >
-          <Text style={styles.navIcon}>🔔</Text>
+          <Image 
+            source={require('../../assets/notifikasi.png')} 
+            style={styles.navIcon} 
+            resizeMode="contain"
+            tintColor="#999"
+          />
           <Text style={styles.navText}>Notifikasi</Text>
         </TouchableOpacity>
         
@@ -300,7 +314,12 @@ export default function DashboardScreen() {
           style={styles.navItem}
           onPress={() => router.push('/dashboard/profile')}
         >
-          <Text style={styles.navIcon}>👤</Text>
+          <Image 
+            source={require('../../assets/profil.png')} 
+            style={styles.navIcon} 
+            resizeMode="contain"
+            tintColor="#999"
+          />
           <Text style={styles.navText}>Profil</Text>
         </TouchableOpacity>
       </View>
@@ -560,7 +579,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     backgroundColor: '#fff',
-    paddingVertical: 12,
+    paddingVertical: 16,
     borderTopWidth: 1,
     borderTopColor: '#eee',
   },
@@ -568,15 +587,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   navIcon: {
-    fontSize: 24,
-    marginBottom: 4,
-    color: '#999',
+    width: 36,
+    height: 36,
+    marginBottom: 6,
   },
   activeNavIcon: {
-    color: '#007BFF',
+    tintColor: '#007BFF',
   },
   navText: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#999',
   },
   activeNavText: {
