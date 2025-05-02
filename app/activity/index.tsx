@@ -241,14 +241,17 @@ export default function ActivityScreen() {
           <Text style={[styles.navText, styles.activeNavText]}>Aktifitas</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.navItem}>
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => router.push('/dashboard/notifications')}
+        >
           <Text style={styles.navIcon}>🔔</Text>
           <Text style={styles.navText}>Notifikasi</Text>
         </TouchableOpacity>
         
         <TouchableOpacity 
           style={styles.navItem}
-          onPress={() => router.push('/profile')}
+          onPress={() => router.push('/dashboard/profile')}
         >
           <Text style={styles.navIcon}>👤</Text>
           <Text style={styles.navText}>Profil</Text>
