@@ -1,21 +1,29 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import { useAuth } from '../../context/auth-context';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
+import { supabase } from '../../lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 
-interface TransactionItem {
+interface Transaction {
   id: string;
-  date: string;
-  description: string;
-  amount: number;
-  type: 'credit' | 'debit';
+  anggota_id: string;
+  tipe_transaksi: 'masuk' | 'keluar';
+  kategori: string;
+  deskripsi: string;
+  reference_number?: string;
+  jumlah: number;
+  created_at: string;
+  recipient_name?: string;
+  bank_name?: string;
 }
 
 export default function DashboardScreen() {
   const { isLoading, isAuthenticated, member, balance, refreshUserData } = useAuth();
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
   
   // Loan balance is still mock data for now
   const loanBalance = 2000000;
@@ -50,43 +58,65 @@ export default function DashboardScreen() {
     }
   }, [member, balance]);
   
-  const recentTransactions: TransactionItem[] = [
-    {
-      id: 'tx1',
-      date: '12 Apr 2025',
-      description: 'Setoran Tunai',
-      amount: 500000,
-      type: 'credit'
-    },
-    {
-      id: 'tx2',
-      date: '10 Apr 2025',
-      description: 'Penarikan Tunai',
-      amount: 250000,
-      type: 'debit'
-    },
-    {
-      id: 'tx3',
-      date: '05 Apr 2025',
-      description: 'Angsuran Pembiayaan',
-      amount: 350000,
-      type: 'debit'
-    },
-    {
-      id: 'tx4',
-      date: '01 Apr 2025',
-      description: 'Bagi Hasil',
-      amount: 75000,
-      type: 'credit'
-    },
-    {
-      id: 'tx5',
-      date: '28 Mar 2025',
-      description: 'Setoran Tunai',
-      amount: 1000000,
-      type: 'credit'
-    }
-  ];
+  // Fetch recent transactions
+  useEffect(() => {
+    if (!isAuthenticated || !member) return;
+    
+    const fetchRecentTransactions = async () => {
+      setIsLoadingTransactions(true);
+      try {
+        const { data, error } = await supabase
+          .from('transaksi')
+          .select('*')
+          .eq('anggota_id', member.id)
+          .order('created_at', { ascending: false })
+          .limit(5);
+
+        if (error) {
+          console.error('Error fetching recent transactions:', error);
+          return;
+        }
+
+        // Add recipient data for transfer transactions
+        const transactionsWithRecipients = data.map(tx => {
+          let recipientName, bankName;
+          
+          if (tx.kategori === 'transfer') {
+            if (tx.deskripsi?.includes('BLU')) {
+              recipientName = 'NOVANDRA ANUGRAH';
+              bankName = 'BLU BY BCA DIGITAL';
+            } else if (tx.deskripsi?.includes('SHOPEE')) {
+              recipientName = 'SHOPEE - nXXXXXXXX9';
+              bankName = 'BCA Virtual Account';
+            } else if (tx.deskripsi?.includes('OVO')) {
+              recipientName = 'NOVANDRA ANUGRAH';
+              bankName = 'OVO';
+            }
+          }
+          
+          return {
+            ...tx,
+            recipient_name: recipientName,
+            bank_name: bankName
+          };
+        });
+        
+        setTransactions(transactionsWithRecipients);
+      } catch (error) {
+        console.error('Error in transaction fetch:', error);
+      } finally {
+        setIsLoadingTransactions(false);
+      }
+    };
+
+    fetchRecentTransactions();
+  }, [isAuthenticated, member]);
+  
+  // Format date for display
+  const formatTransactionDate = (dateString: string) => {
+    const date = parseISO(dateString);
+    return format(date, 'd MMM yyyy');
+  };
 
   // Format currency
   const formatCurrency = (amount: number) => {
@@ -193,23 +223,34 @@ export default function DashboardScreen() {
             </TouchableOpacity>
           </View>
           
-          {recentTransactions.map((transaction) => (
-            <View key={transaction.id} style={styles.transactionItem}>
-              <View style={styles.transactionInfo}>
-                <Text style={styles.transactionDate}>{transaction.date}</Text>
-                <Text style={styles.transactionDescription}>{transaction.description}</Text>
-              </View>
-              
-              <Text 
-                style={[
-                  styles.transactionAmount,
-                  transaction.type === 'credit' ? styles.creditAmount : styles.debitAmount
-                ]}
-              >
-                {transaction.type === 'credit' ? '+' : '-'} {formatCurrency(transaction.amount)}
-              </Text>
+          {isLoadingTransactions ? (
+            <View style={styles.loadingTransactions}>
+              <ActivityIndicator size="small" color="#007BFF" />
+              <Text style={styles.loadingText}>Memuat transaksi...</Text>
             </View>
-          ))}
+          ) : transactions.length > 0 ? (
+            transactions.map((transaction) => (
+              <View key={transaction.id} style={styles.transactionItem}>
+                <View style={styles.transactionInfo}>
+                  <Text style={styles.transactionDate}>{formatTransactionDate(transaction.created_at)}</Text>
+                  <Text style={styles.transactionDescription}>{transaction.deskripsi}</Text>
+                </View>
+                
+                <Text 
+                  style={[
+                    styles.transactionAmount,
+                    transaction.tipe_transaksi === 'masuk' ? styles.creditAmount : styles.debitAmount
+                  ]}
+                >
+                  {transaction.tipe_transaksi === 'masuk' ? '+' : '-'} {formatCurrency(transaction.jumlah)}
+                </Text>
+              </View>
+            ))
+          ) : (
+            <View style={styles.emptyTransactions}>
+              <Text style={styles.emptyTransactionsText}>Belum ada transaksi</Text>
+            </View>
+          )}
         </View>
         
         <View style={styles.announcementsSection}>
@@ -467,6 +508,21 @@ const styles = StyleSheet.create({
   },
   debitAmount: {
     color: '#dc3545',
+  },
+  loadingTransactions: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyTransactions: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyTransactionsText: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
   },
   announcementsSection: {
     backgroundColor: '#fff',
