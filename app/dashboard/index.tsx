@@ -186,30 +186,38 @@ export default function DashboardScreen() {
           
           <View style={styles.quickActionsGrid}>
             <TouchableOpacity style={styles.quickActionItem}>
-              <View style={styles.quickActionIcon}>
-                <Text style={styles.quickActionIconText}>💰</Text>
-              </View>
+              <Image 
+                source={require('../../assets/informasi-deposit.png')} 
+                style={styles.quickActionImage} 
+                resizeMode="contain"
+              />
               <Text style={styles.quickActionText}>Informasi Deposit</Text>
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.quickActionItem}>
-              <View style={styles.quickActionIcon}>
-                <Text style={styles.quickActionIconText}>📝</Text>
-              </View>
+              <Image 
+                source={require('../../assets/informasi-pinjaman.png')} 
+                style={styles.quickActionImage} 
+                resizeMode="contain"
+              />
               <Text style={styles.quickActionText}>Informasi Pinjaman</Text>
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.quickActionItem}>
-              <View style={styles.quickActionIcon}>
-                <Text style={styles.quickActionIconText}>📊</Text>
-              </View>
+              <Image 
+                source={require('../../assets/pengajuan-pinjaman.png')} 
+                style={styles.quickActionImage} 
+                resizeMode="contain"
+              />
               <Text style={styles.quickActionText}>Pengajuan Pinjaman</Text>
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.quickActionItem}>
-              <View style={styles.quickActionIcon}>
-                <Text style={styles.quickActionIconText}>🏦</Text>
-              </View>
+              <Image 
+                source={require('../../assets/informasi-penarikan-saldo.png')} 
+                style={styles.quickActionImage} 
+                resizeMode="contain"
+              />
               <Text style={styles.quickActionText}>Informasi Penarikan Saldo</Text>
             </TouchableOpacity>
           </View>
@@ -460,22 +468,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 15,
   },
-  quickActionIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
+  quickActionImage: {
+    width: 70,
+    height: 70,
     marginBottom: 8,
   },
-  quickActionIconText: {
-    fontSize: 20,
-  },
   quickActionText: {
-    fontSize: 12,
+    fontSize: 13,
     textAlign: 'center',
     color: '#666',
+    fontWeight: '500',
   },
   transactionsSection: {
     backgroundColor: '#fff',
@@ -579,7 +581,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     backgroundColor: '#fff',
-    paddingVertical: 16,
+    paddingVertical: 10,
     borderTopWidth: 1,
     borderTopColor: '#eee',
   },
