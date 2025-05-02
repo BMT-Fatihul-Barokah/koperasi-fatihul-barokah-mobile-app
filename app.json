@@ -4,6 +4,7 @@
     "plugins": [
       "expo-router"
     ],
+    "sdkVersion": "53.0.0",
     "name": "koperasi-syariah-app",
     "slug": "koperasi-syariah-app",
     "version": "1.0.0",

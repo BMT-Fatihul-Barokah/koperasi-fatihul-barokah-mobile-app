@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import { useAuth } from '../../context/auth-context';
 import { format } from 'date-fns';
+import { Ionicons } from '@expo/vector-icons';
 
 interface TransactionItem {
   id: string;
@@ -114,13 +115,28 @@ export default function DashboardScreen() {
       <StatusBar style="light" />
       
       <View style={styles.header}>
-        <Text style={styles.greeting}>Assalamu'alaikum</Text>
-        <Text style={styles.userName}>{member?.nama || 'Anggota'}</Text>
-        
-        <View style={styles.lastUpdateContainer}>
-          <Text style={styles.lastUpdateText}>
-            Terakhir diperbarui: {currentDate}
-          </Text>
+        <View style={styles.headerContent}>
+          <View>
+            <Text style={styles.greeting}>Assalamu'alaikum</Text>
+            <Text style={styles.userName}>{member?.nama || 'Anggota'}</Text>
+            
+            <View style={styles.lastUpdateContainer}>
+              <Text style={styles.lastUpdateText}>
+                Terakhir diperbarui: {currentDate}
+              </Text>
+            </View>
+          </View>
+          
+          <TouchableOpacity 
+            style={styles.profileButton}
+            onPress={() => router.push('/dashboard/profile')}
+          >
+            <View style={styles.profileAvatar}>
+              <Text style={styles.profileAvatarText}>
+                {member?.nama ? member.nama.charAt(0).toUpperCase() : 'A'}
+              </Text>
+            </View>
+          </TouchableOpacity>
         </View>
       </View>
       
@@ -238,7 +254,7 @@ export default function DashboardScreen() {
         
         <TouchableOpacity 
           style={styles.navItem}
-          onPress={() => router.push('/profile')}
+          onPress={() => router.push('/dashboard/profile')}
         >
           <Text style={styles.navIcon}>👤</Text>
           <Text style={styles.navText}>Profil</Text>
@@ -267,10 +283,31 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#007BFF',
     paddingTop: 60,
-    paddingBottom: 30,
+    paddingBottom: 20,
     paddingHorizontal: 20,
     borderBottomLeftRadius: 25,
     borderBottomRightRadius: 25,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  profileButton: {
+    padding: 5,
+  },
+  profileAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileAvatarText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
   },
   greeting: {
     fontSize: 16,
