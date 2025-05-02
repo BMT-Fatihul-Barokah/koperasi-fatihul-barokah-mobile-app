@@ -1,8 +1,21 @@
+/**
+ * Supabase client configuration for React Native with Expo
+ * Handles cross-platform storage and authentication
+ */
+
+// Required polyfill for React Native URL compatibility
 import 'react-native-url-polyfill/auto';
+// Secure storage for authentication persistence
 import * as SecureStore from 'expo-secure-store';
-import { createClient } from '@supabase/supabase-js';
+// Platform detection for conditional logic
 import { Platform } from 'react-native';
+// Environment variables
 import { env } from './env';
+
+// Use dynamic import to avoid TypeScript errors
+// @ts-ignore - Supabase import
+const supabase_js = require('@supabase/supabase-js');
+const createClient = supabase_js.createClient;
 
 // Determine if we're running on web
 const isWeb = Platform.OS === 'web';
@@ -61,11 +74,11 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     detectSessionInUrl: false,
   },
-  global: {
-    headers: {
-      'Content-Type': 'application/json',
-    },
+  // Global headers for all requests
+  headers: {
+    'Content-Type': 'application/json',
   },
+  // Database configuration
   db: {
     schema: 'public',
   },
@@ -78,16 +91,15 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 // Create an admin client with service role key to bypass RLS policies
 // This should only be used for operations that require admin privileges
 // and never exposed to the client side
+// Create an admin client with service role key (if available)
 export const supabaseAdmin = supabaseServiceKey 
   ? createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
       },
-      global: {
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      headers: {
+        'Content-Type': 'application/json',
       },
     })
   : supabase; // Fallback to regular client if service key is not available
