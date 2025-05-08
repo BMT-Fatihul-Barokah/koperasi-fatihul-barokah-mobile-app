@@ -1,16 +1,36 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Link } from 'expo-router';
+import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import Logo from '../assets/logo.svg';
+import { PrimaryButton } from '../components/buttons/primary-button';
 
-export default function SplashScreen() {
+export default function OnboardingScreen() {
   return (
     <View style={styles.container}>
       <StatusBar style="auto" />
-      <Text style={styles.title}>Koperasi Syariah BMT Fatihul Barokah</Text>
-      <Link href="/onboarding" style={styles.link}>
-        <Text style={styles.linkText}>Mulai</Text>
-      </Link>
+      
+      <View style={styles.imageContainer}>
+      <Logo 
+           width={300}
+           height={300}
+           style={styles.logo} 
+         />
+      </View>
+      
+      <View style={styles.contentContainer}>
+        <Text style={styles.title}>Selamat Datang di BMT Fatihul Barokah</Text>
+        <Text style={styles.subtitle}>
+          Kelola tabungan, pembiayaan, dan informasi keuangan Anda dengan mudah
+        </Text>
+      </View>
+      
+      <View style={styles.buttonContainer}>
+        <PrimaryButton 
+          label="Lanjutkan"
+          onPress={() => router.push('/onboarding/phone-verification')}
+        />
+      </View>
     </View>
   );
 }
@@ -19,26 +39,35 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
     padding: 20,
+  },
+  imageContainer: {
+    flex: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logo: {
+    marginBottom: 20
+  },
+  contentContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     textAlign: 'center',
+    marginBottom: 10,
+  },
+  subtitle: {
+    fontSize: 16,
+    textAlign: 'center',
+    color: '#666',
     marginBottom: 20,
   },
-  link: {
-    marginTop: 20,
-    paddingVertical: 12,
-    paddingHorizontal: 32,
-    borderRadius: 8,
-    backgroundColor: '#007BFF',
-  },
-  linkText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#fff',
+  buttonContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 30,
   },
 });
