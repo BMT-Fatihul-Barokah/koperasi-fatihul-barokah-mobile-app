@@ -13,12 +13,14 @@ import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/auth-context';
+import { useData } from '../../context/data-context';
 import { format, parseISO } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function ProfileScreen() {
   const { isLoading, member, account, logout, refreshUserData } = useAuth();
+  const { clearCache } = useData();
   const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Refresh user data when profile loads
@@ -51,7 +53,11 @@ export default function ProfileScreen() {
         {
           text: 'Keluar',
           style: 'destructive',
-          onPress: logout,
+          onPress: () => {
+            // Clear data cache before logout
+            clearCache();
+            logout();
+          },
         },
       ]
     );

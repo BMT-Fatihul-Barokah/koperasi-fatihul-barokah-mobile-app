@@ -1,29 +1,18 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image, RefreshControl } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import { useAuth } from '../../context/auth-context';
+import { useData } from '../../context/data-context';
 import { format, parseISO } from 'date-fns';
-import { supabase } from '../../lib/supabase';
+// Removed direct supabase import as we're using the data context now
 import { Ionicons } from '@expo/vector-icons';
 
-interface Transaction {
-  id: string;
-  anggota_id: string;
-  tipe_transaksi: 'masuk' | 'keluar';
-  kategori: string;
-  deskripsi: string;
-  reference_number?: string;
-  jumlah: number;
-  created_at: string;
-  recipient_name?: string;
-  bank_name?: string;
-}
+// Transaction interface is now imported from data-context
 
 export default function DashboardScreen() {
   const { isLoading, isAuthenticated, member, balance, refreshUserData } = useAuth();
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
+  const { transactions, fetchTransactions } = useData();
   
   // Loan balance is still mock data for now
   const loanBalance = 2000000;
@@ -58,59 +47,13 @@ export default function DashboardScreen() {
     }
   }, [member, balance]);
   
-  // Fetch recent transactions
+  // Fetch recent transactions when dashboard loads
   useEffect(() => {
-    if (!isAuthenticated || !member) return;
-    
-    const fetchRecentTransactions = async () => {
-      setIsLoadingTransactions(true);
-      try {
-        const { data, error } = await supabase
-          .from('transaksi')
-          .select('*')
-          .eq('anggota_id', member.id)
-          .order('created_at', { ascending: false })
-          .limit(5);
-
-        if (error) {
-          console.error('Error fetching recent transactions:', error);
-          return;
-        }
-
-        // Add recipient data for transfer transactions
-        const transactionsWithRecipients = data.map(tx => {
-          let recipientName, bankName;
-          
-          if (tx.kategori === 'transfer') {
-            if (tx.deskripsi?.includes('BLU')) {
-              recipientName = 'NOVANDRA ANUGRAH';
-              bankName = 'BLU BY BCA DIGITAL';
-            } else if (tx.deskripsi?.includes('SHOPEE')) {
-              recipientName = 'SHOPEE - nXXXXXXXX9';
-              bankName = 'BCA Virtual Account';
-            } else if (tx.deskripsi?.includes('OVO')) {
-              recipientName = 'NOVANDRA ANUGRAH';
-              bankName = 'OVO';
-            }
-          }
-          
-          return {
-            ...tx,
-            recipient_name: recipientName,
-            bank_name: bankName
-          };
-        });
-        
-        setTransactions(transactionsWithRecipients);
-      } catch (error) {
-        console.error('Error in transaction fetch:', error);
-      } finally {
-        setIsLoadingTransactions(false);
-      }
-    };
-
-    fetchRecentTransactions();
-  }, [isAuthenticated, member]);
+    if (isAuthenticated && member) {
+      console.log('Dashboard: Fetching transactions');
+      fetchTransactions();
+    }
+  }, [isAuthenticated, member, fetchTransactions]);
   
   // Format date for display
   const formatTransactionDate = (dateString: string) => {
@@ -131,6 +74,13 @@ export default function DashboardScreen() {
   // Format current date for last updated
   const currentDate = format(new Date(), 'dd/MM/yyyy HH:mm');
   
+  // Handle refresh action
+  const handleRefresh = () => {
+    console.log('Dashboard: Manual refresh triggered');
+    refreshUserData();
+    fetchTransactions(true); // Force refresh
+  };
+
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -170,7 +120,17 @@ export default function DashboardScreen() {
         </View>
       </View>
       
-      <ScrollView style={styles.content}>
+      <ScrollView 
+        style={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={isLoading || transactions.isLoading}
+            onRefresh={handleRefresh}
+            colors={['#007BFF']}
+            tintColor="#007BFF"
+          />
+        }
+      >
         <View style={styles.balanceSection}>
           <View style={styles.balanceCard}>
             <Text style={styles.balanceLabel}>Saldo Tabungan</Text>
@@ -231,32 +191,34 @@ export default function DashboardScreen() {
             </TouchableOpacity>
           </View>
           
-          {isLoadingTransactions ? (
+          {transactions.isLoading ? (
             <View style={styles.loadingTransactions}>
               <ActivityIndicator size="small" color="#007BFF" />
               <Text style={styles.loadingText}>Memuat transaksi...</Text>
             </View>
-          ) : transactions.length > 0 ? (
-            transactions.map((transaction) => (
-              <View key={transaction.id} style={styles.transactionItem}>
-                <View style={styles.transactionInfo}>
-                  <Text style={styles.transactionDate}>{formatTransactionDate(transaction.created_at)}</Text>
-                  <Text style={styles.transactionDescription}>{transaction.deskripsi}</Text>
-                </View>
-                
-                <Text 
-                  style={[
-                    styles.transactionAmount,
-                    transaction.tipe_transaksi === 'masuk' ? styles.creditAmount : styles.debitAmount
-                  ]}
-                >
-                  {transaction.tipe_transaksi === 'masuk' ? '+' : '-'} {formatCurrency(transaction.jumlah)}
-                </Text>
-              </View>
-            ))
-          ) : (
+          ) : transactions.data.length === 0 ? (
             <View style={styles.emptyTransactions}>
               <Text style={styles.emptyTransactionsText}>Belum ada transaksi</Text>
+            </View>
+          ) : (
+            <View>
+              {transactions.data.map((transaction) => (
+                <View key={transaction.id} style={styles.transactionItem}>
+                  <View style={styles.transactionInfo}>
+                    <Text style={styles.transactionDate}>{formatTransactionDate(transaction.created_at)}</Text>
+                    <Text style={styles.transactionDescription}>{transaction.deskripsi}</Text>
+                  </View>
+                  
+                  <Text 
+                    style={[
+                      styles.transactionAmount,
+                      transaction.tipe_transaksi === 'masuk' ? styles.creditAmount : styles.debitAmount
+                    ]}
+                  >
+                    {transaction.tipe_transaksi === 'masuk' ? '+' : '-'} {formatCurrency(transaction.jumlah)}
+                  </Text>
+                </View>
+              ))}
             </View>
           )}
         </View>

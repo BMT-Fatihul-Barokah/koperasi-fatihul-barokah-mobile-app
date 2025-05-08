@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -14,95 +14,58 @@ import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/auth-context';
-import { Notification, NotificationService } from '../../services/notification.service';
+import { useData } from '../../context/data-context';
+// Notification type is now imported from data-context
 import { format, parseISO, formatDistanceToNow } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function NotificationsScreen() {
   const { member } = useAuth();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { 
+    notifications, 
+    fetchNotifications, 
+    markNotificationAsRead, 
+    markAllNotificationsAsRead 
+  } = useData();
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
 
-  // Load notifications
-  const loadNotifications = useCallback(async () => {
-    if (!member?.id) return;
-    
-    try {
-      setIsLoading(true);
-      const notificationData = await NotificationService.getNotifications(member.id);
-      setNotifications(notificationData);
-      
-      // Count unread notifications
-      const count = notificationData.filter(n => !n.is_read).length;
-      setUnreadCount(count);
-    } catch (error) {
-      console.error('Error loading notifications:', error);
-      Alert.alert('Error', 'Failed to load notifications. Please try again.');
-    } finally {
-      setIsLoading(false);
+  // Load notifications when component mounts - only once
+  useEffect(() => {
+    if (member?.id) {
+      console.log('Notifications: Fetching notifications on mount');
+      fetchNotifications();
     }
-  }, [member?.id]);
+  }, [member?.id]); // Removed fetchNotifications from dependencies
 
   // Refresh notifications
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
-    await loadNotifications();
+    await fetchNotifications(true); // Force refresh
     setIsRefreshing(false);
-  }, [loadNotifications]);
+  }, [fetchNotifications]);
 
   // Mark notification as read
-  const handleMarkAsRead = useCallback(async (notification: Notification) => {
-    if (notification.is_read) return;
-    
-    try {
-      const success = await NotificationService.markAsRead(notification.id);
-      
-      if (success) {
-        // Update local state
-        setNotifications(prev => 
-          prev.map(n => 
-            n.id === notification.id 
-              ? { ...n, is_read: true } 
-              : n
-          )
-        );
-        setUnreadCount(prev => Math.max(0, prev - 1));
-      }
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
-    }
-  }, []);
+  const handleMarkAsRead = useCallback(async (notificationId: string) => {
+    await markNotificationAsRead(notificationId);
+  }, [markNotificationAsRead]);
 
   // Mark all notifications as read
   const handleMarkAllAsRead = useCallback(async () => {
-    if (unreadCount === 0) return;
+    if (notifications.unreadCount === 0) return;
     
-    try {
-      if (!member?.id) return;
-      
-      const success = await NotificationService.markAllAsRead(member.id);
-      
-      if (success) {
-        // Update local state
-        setNotifications(prev => 
-          prev.map(n => ({ ...n, is_read: true }))
-        );
-        setUnreadCount(0);
-        Alert.alert('Success', 'All notifications marked as read');
-      }
-    } catch (error) {
-      console.error('Error marking all notifications as read:', error);
+    const success = await markAllNotificationsAsRead();
+    if (success) {
+      Alert.alert('Success', 'All notifications marked as read');
+    } else {
       Alert.alert('Error', 'Failed to mark all notifications as read');
     }
-  }, [member?.id, unreadCount]);
+  }, [notifications.unreadCount, markAllNotificationsAsRead]);
 
   // Handle notification press
-  const handleNotificationPress = useCallback((notification: Notification) => {
+  const handleNotificationPress = useCallback((notification) => {
     // Mark as read
-    handleMarkAsRead(notification);
+    handleMarkAsRead(notification.id);
     
     // Handle navigation based on notification type and data
     if (notification.data) {
@@ -159,13 +122,8 @@ export default function NotificationsScreen() {
     }
   }, []);
 
-  // Load notifications on mount
-  useEffect(() => {
-    loadNotifications();
-  }, [loadNotifications]);
-
   // Render notification item
-  const renderNotificationItem = ({ item }: { item: Notification }) => (
+  const renderNotificationItem = ({ item }) => (
     <TouchableOpacity
       style={[
         styles.notificationItem,
@@ -217,7 +175,7 @@ export default function NotificationsScreen() {
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Notifikasi</Text>
-        {unreadCount > 0 && (
+        {notifications.unreadCount > 0 && (
           <TouchableOpacity 
             style={styles.markAllButton}
             onPress={handleMarkAllAsRead}
@@ -225,24 +183,24 @@ export default function NotificationsScreen() {
             <Text style={styles.markAllText}>Tandai Semua</Text>
           </TouchableOpacity>
         )}
-        {unreadCount === 0 && <View style={styles.spacer} />}
+        {notifications.unreadCount === 0 && <View style={styles.spacer} />}
       </View>
       
-      {isLoading ? (
+      {notifications.isLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007BFF" />
           <Text style={styles.loadingText}>Memuat notifikasi...</Text>
         </View>
       ) : (
         <FlatList
-          data={notifications}
+          data={notifications.data}
           renderItem={renderNotificationItem}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.listContainer}
           ListEmptyComponent={renderEmptyState}
           refreshControl={
             <RefreshControl
-              refreshing={isRefreshing}
+              refreshing={isRefreshing || notifications.isLoading}
               onRefresh={handleRefresh}
               colors={['#007BFF']}
               tintColor="#007BFF"
