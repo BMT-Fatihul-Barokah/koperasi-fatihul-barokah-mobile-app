@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase';
 import { storage } from '../../lib/storage';
 import { BackHeader } from '../../components/header/back-header';
 import { useAuth } from '../../context/auth-context';
+import { AuthService } from '../../services/auth.service';
 
 interface PinKeypadProps {
   onKeyPress: (key: string) => void;
@@ -179,61 +180,43 @@ export default function VerificationCodeScreen() {
     try {
       console.log(`Verifying PIN for account ID: ${accountId}`);
       
-      // Get account details to check PIN
-      const { data: account, error } = await supabase
-        .from('akun')
-        .select('pin')
-        .eq('id', accountId)
-        .single();
+      // Get phone number from storage
+      const storedPhoneNumber = await storage.getItem('temp_phone_number');
       
-      if (error) {
-        console.log('Error fetching account for PIN verification:', error);
-        setErrorMessage('Terjadi kesalahan saat verifikasi PIN. Silakan coba lagi.');
+      if (!storedPhoneNumber) {
+        console.log('No phone number found in storage');
+        setErrorMessage('Tidak dapat menemukan nomor telepon. Silakan coba lagi.');
         setIsVerifying(false);
         return;
       }
       
-      if (!account || !account.pin) {
-        console.log('Account has no PIN set');
-        setErrorMessage('Akun belum memiliki PIN. Silakan buat PIN baru.');
-        router.push('/onboarding/security-setup');
+      // Login with phone and PIN using the auth service
+      const { success, accountId: verifiedAccountId, message } = await AuthService.loginWithPhone(storedPhoneNumber, inputPin);
+      
+      if (!success) {
+        console.log('Login failed:', message);
+        setErrorMessage(message);
+        setPin(''); // Reset PIN input when incorrect
+        setIsVerifying(false);
         return;
       }
       
-      // Verify PIN
-      if (account.pin === inputPin) {
-        console.log('PIN verification successful');
-        
-        try {
-          // First clear any existing auth data
-          await storage.removeItem('koperasi_auth_account_id');
-          
-          // Store the new account ID in secure storage for authentication
-          await storage.setItem('koperasi_auth_account_id', accountId);
-          
-          // Use the login function from auth context to properly load the user data
-          const loginSuccess = await login(accountId);
-          
-          if (loginSuccess) {
-            // Navigate directly to dashboard with the updated user data
-            router.replace('/dashboard');
-          } else {
-            console.log('Failed to login with the new account ID');
-            setErrorMessage('Gagal memuat data pengguna. Silakan coba lagi.');
-          }
-        } catch (storageError) {
-          console.log('Error updating auth storage:', storageError);
-          setErrorMessage('Terjadi kesalahan saat menyimpan sesi. Silakan coba lagi.');
-        }
-      } else {
-        console.log('Incorrect PIN');
-        setErrorMessage('PIN yang Anda masukkan salah. Silakan coba lagi.');
-        // Reset PIN input when incorrect
-        setPin('');
+      // Login the user with the auth context
+      const loginSuccess = await login(verifiedAccountId || accountId);
+      
+      if (!loginSuccess) {
+        console.log('Login failed after PIN verification');
+        setErrorMessage('Gagal masuk ke akun. Silakan coba lagi.');
+        setIsVerifying(false);
+        return;
       }
+      
+      // Navigate to dashboard
+      console.log('Login successful, navigating to dashboard');
+      router.replace('/dashboard');
     } catch (error) {
-      console.log('Error during PIN verification:', error);
-      setErrorMessage('Terjadi kesalahan saat verifikasi PIN. Silakan coba lagi.');
+      console.error('Error verifying PIN:', error);
+      setErrorMessage('Terjadi kesalahan. Silakan coba lagi.');
     } finally {
       setIsVerifying(false);
     }

@@ -17,6 +17,8 @@ import { storage } from '../../lib/storage';
 import { supabase } from '../../lib/supabase';
 import { BackHeader } from '../../components/header/back-header';
 import { PrimaryButton } from '../../components/buttons/primary-button';
+import { AuthService } from '../../services/auth.service';
+import { useAuth } from '../../context/auth-context';
 
 export default function PhoneVerificationScreen() {
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -51,43 +53,16 @@ export default function PhoneVerificationScreen() {
       // Store phone number in secure storage for later use
       await storage.setItem('temp_phone_number', internationalNumber);
       
-      // Check if phone number already exists in akun table
-      const { data: existingAccount, error } = await supabase
-        .from('akun')
-        .select('id, anggota_id, pin')
-        .eq('nomor_telepon', internationalNumber)
-        .single();
+      // Check if phone number already exists in akun table using the auth service
+      const account = await AuthService.findAccountByPhone(internationalNumber);
       
-      if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
-        console.error('Error checking existing account:', error);
-        Alert.alert('Error', 'Terjadi kesalahan saat memeriksa akun. Silakan coba lagi.');
-        setIsLoading(false);
-        return;
-      }
-      
-      if (existingAccount) {
-        console.log('Existing account found:', existingAccount);
-        
-        // Get anggota details to ensure we're loading the correct user data
-        const { data: anggota, error: anggotaError } = await supabase
-          .from('anggota')
-          .select('id, nama, nomor_rekening')
-          .eq('id', existingAccount.anggota_id)
-          .single();
-        
-        if (anggotaError) {
-          console.error('Error fetching anggota details:', anggotaError);
-          Alert.alert('Error', 'Terjadi kesalahan saat memuat data anggota. Silakan coba lagi.');
-          setIsLoading(false);
-          return;
-        }
-        
-        console.log('Anggota details:', anggota);
+      if (account) {
+        console.log('Existing account found:', account);
         
         // Store account ID for later use
-        await storage.setItem('temp_account_id', existingAccount.id);
+        await storage.setItem('temp_account_id', account.id);
         
-        if (existingAccount.pin) {
+        if (account.pin) {
           // Account already has PIN, go to PIN verification
           console.log('Account has PIN, going to PIN verification');
           router.push('/onboarding/verification-code');
