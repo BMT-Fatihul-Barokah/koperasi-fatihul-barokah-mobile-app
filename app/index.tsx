@@ -5,16 +5,12 @@ import { StatusBar } from 'expo-status-bar';
 import Logo from '../assets/logo.svg';
 import { AuthService } from '../services/auth.service';
 import { useAuth } from '../context/auth-context';
-import { PinEntry } from '../components/auth/pin-entry';
 import { PrimaryButton } from '../components/buttons/primary-button';
 
 export default function LoginScreen() {
   // Auth states
   const [isLoading, setIsLoading] = useState(true);
-  const [phoneNumber, setPhoneNumber] = useState<string | null>(null);
-  const [step, setStep] = useState<'welcome' | 'phone' | 'pin'>('welcome');
-  const [errorMessage, setErrorMessage] = useState('');
-  const [isVerifying, setIsVerifying] = useState(false);
+  const [step, setStep] = useState<'welcome' | 'loading'>('welcome');
   const { login } = useAuth();
 
   // Check for existing session on component mount
@@ -22,7 +18,7 @@ export default function LoginScreen() {
     const checkSession = async () => {
       try {
         setIsLoading(true);
-        const { isLoggedIn, phoneNumber, accountId } = await AuthService.checkExistingSession();
+        const { isLoggedIn, accountId } = await AuthService.checkExistingSession();
         
         if (isLoggedIn && accountId) {
           // User is already logged in, redirect to dashboard
@@ -33,14 +29,8 @@ export default function LoginScreen() {
           }
         }
         
-        if (phoneNumber) {
-          // Phone number exists but not logged in, go to PIN entry
-          setPhoneNumber(phoneNumber);
-          setStep('pin');
-        } else {
-          // No phone number, show welcome screen
-          setStep('welcome');
-        }
+        // No active session, show welcome screen
+        setStep('welcome');
       } catch (error) {
         console.error('Error checking session:', error);
         setStep('welcome');
@@ -52,47 +42,10 @@ export default function LoginScreen() {
     checkSession();
   }, []);
 
-  // Handle continue to phone verification
-  const handleContinueToPhoneVerification = () => {
-    // Navigate to the existing phone verification screen
-    router.push('/onboarding/phone-verification');
-  };
-
-  // Handle PIN submission
-  const handlePinSubmit = async (pin: string) => {
-    if (!phoneNumber) return;
-    
-    try {
-      setIsVerifying(true);
-      setErrorMessage('');
-      
-      // Verify PIN
-      const { success, accountId, message } = await AuthService.loginWithPhone(phoneNumber, pin);
-      
-      if (success && accountId) {
-        // PIN is correct, login and redirect to dashboard
-        const loginSuccess = await login(accountId);
-        if (loginSuccess) {
-          router.replace('/dashboard');
-        } else {
-          setErrorMessage('Gagal masuk ke akun. Silakan coba lagi.');
-        }
-      } else {
-        // PIN is incorrect
-        setErrorMessage(message);
-      }
-    } catch (error) {
-      console.error('Error verifying PIN:', error);
-      setErrorMessage('Terjadi kesalahan. Silakan coba lagi.');
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
   // Handle continue button press
   const handleContinue = () => {
-    // Instead of setting step to 'phone', navigate directly to phone verification
-    handleContinueToPhoneVerification();
+    // Navigate directly to phone verification
+    router.push('/onboarding/phone-verification');
   };
 
   // Show loading indicator while checking session
@@ -138,23 +91,11 @@ export default function LoginScreen() {
         </>
       )}
       
-      {step === 'phone' && (
-        // This step is now handled by navigating to the phone-verification screen
+      {step === 'loading' && (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007BFF" />
-          <Text style={styles.loadingText}>Redirecting...</Text>
+          <Text style={styles.loadingText}>Memuat...</Text>
         </View>
-      )}
-      
-      {step === 'pin' && (
-        <PinEntry 
-          onPinComplete={handlePinSubmit}
-          isLoading={isVerifying}
-          errorMessage={errorMessage}
-          pinLength={4}
-          title="Masukkan PIN"
-          subtitle="Masukkan PIN 4 digit Anda untuk masuk"
-        />
       )}
     </SafeAreaView>
   );

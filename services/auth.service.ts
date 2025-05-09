@@ -14,21 +14,18 @@ export const AuthService = {
   /**
    * Check if a user is already logged in
    */
-  async checkExistingSession(): Promise<{ isLoggedIn: boolean; phoneNumber: string | null; accountId: string | null }> {
+  async checkExistingSession(): Promise<{ isLoggedIn: boolean; accountId: string | null }> {
     try {
-      const phoneNumber = await storage.getItem(PHONE_NUMBER_KEY);
       const accountId = await storage.getItem(ACCOUNT_ID_KEY);
       
       return {
         isLoggedIn: !!accountId,
-        phoneNumber,
         accountId
       };
     } catch (error) {
       console.error('Error checking existing session:', error);
       return {
         isLoggedIn: false,
-        phoneNumber: null,
         accountId: null
       };
     }
