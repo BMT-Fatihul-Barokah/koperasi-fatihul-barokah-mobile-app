@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image, RefreshControl } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image, RefreshControl, useWindowDimensions } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import { useAuth } from '../../context/auth-context';
@@ -7,12 +7,26 @@ import { useData } from '../../context/data-context';
 import { format, parseISO } from 'date-fns';
 // Removed direct supabase import as we're using the data context now
 import { Ionicons } from '@expo/vector-icons';
+import { TabunganWithJenis } from '../../lib/database.types';
+import { TabunganService } from '../../services/tabungan.service';
+import { TabunganCarousel } from '../../components/tabungan/tabungan-carousel';
+import { formatCurrency } from '../../lib/format-utils';
+import { useColorScheme } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // Transaction interface is now imported from data-context
 
 export default function DashboardScreen() {
   const { isLoading, isAuthenticated, member, balance, refreshUserData } = useAuth();
   const { transactions, fetchTransactions } = useData();
+  const { width } = useWindowDimensions();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  
+  // State for tabungan data
+  const [tabunganList, setTabunganList] = useState<TabunganWithJenis[]>([]);
+  const [isTabunganLoading, setIsTabunganLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   
   // Loan balance is still mock data for now
   const loanBalance = 2000000;
@@ -32,7 +46,45 @@ export default function DashboardScreen() {
       
       return () => clearTimeout(timer);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated]); // Remove refreshUserData from dependencies
+  
+  // Fetch tabungan data when member changes
+  useEffect(() => {
+    if (member?.id) {
+      fetchTabunganData(member.id);
+    }
+  }, [member?.id]);
+  
+  // Fetch tabungan data
+  const fetchTabunganData = async (anggotaId: string) => {
+    try {
+      setIsTabunganLoading(true);
+      const tabunganData = await TabunganService.getTabunganByAnggota(anggotaId);
+      setTabunganList(tabunganData);
+    } catch (error) {
+      console.error('Error fetching tabungan data:', error);
+    } finally {
+      setIsTabunganLoading(false);
+    }
+  };
+  
+  // Handle refresh
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    refreshUserData();
+    fetchTransactions();
+    
+    if (member?.id) {
+      await fetchTabunganData(member.id);
+    }
+    
+    setRefreshing(false);
+  };
+  
+  // Handle view all tabungan press
+  const handleViewAllTabungan = () => {
+    router.push('/tabungan');
+  };
   
   // Log member data for debugging
   useEffect(() => {
@@ -75,7 +127,7 @@ export default function DashboardScreen() {
   const currentDate = format(new Date(), 'dd/MM/yyyy HH:mm');
   
   // Handle refresh action
-  const handleRefresh = () => {
+  const handleRefreshAction = () => {
     console.log('Dashboard: Manual refresh triggered');
     refreshUserData();
     fetchTransactions(true); // Force refresh
@@ -94,53 +146,81 @@ export default function DashboardScreen() {
     <View style={styles.container}>
       <StatusBar style="light" />
       
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <View>
-            <Text style={styles.greeting}>Assalamu'alaikum</Text>
-            <Text style={styles.userName}>{member?.nama || 'Anggota'}</Text>
-            
-            <View style={styles.lastUpdateContainer}>
-              <Text style={styles.lastUpdateText}>
-                Terakhir diperbarui: {currentDate}
-              </Text>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
+      >
+        {/* Header Section */}
+        <LinearGradient
+          colors={['#003D82', '#0066CC']}
+          style={styles.header}
+        >
+          <View style={styles.headerContent}>
+            <View style={styles.userInfo}>
+              <Text style={styles.greeting}>Selamat datang,</Text>
+              <Text style={styles.userName}>{member?.nama || 'Anggota'}</Text>
+              <Text style={styles.memberNumber}>No. Anggota: {member?.nomor_rekening || '-'}</Text>
             </View>
+            <TouchableOpacity 
+              style={styles.profileButton} 
+              onPress={() => router.push('/dashboard/settings')}
+            >
+              <View style={styles.profileIconContainer}>
+                <Ionicons name="settings-outline" size={24} color="white" />
+              </View>
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
+        
+        {/* Main Account Card */}
+        <View style={styles.mainAccountCard}>
+          <View style={styles.accountHeader}>
+            <View style={styles.accountInfo}>
+              <Text style={styles.accountLabel}>Saldo Aktif</Text>
+              <Text style={styles.accountNumber}>{member?.nomor_rekening || '-'}</Text>
+            </View>
+            <TouchableOpacity style={styles.copyButton}>
+              <Ionicons name="copy-outline" size={20} color="#0066CC" />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.balanceContainer}>
+            <Text style={styles.balanceAmount}>
+              {balance !== null ? 
+                formatCurrency(balance) : 
+                'Rp -'}
+            </Text>
+            <TouchableOpacity style={styles.eyeButton}>
+              <Ionicons name="eye-outline" size={24} color="#0066CC" />
+            </TouchableOpacity>
           </View>
           
           <TouchableOpacity 
-            style={styles.profileButton}
-            onPress={() => router.push('/dashboard/profile')}
+            style={styles.transactionsButton}
+            onPress={() => router.push('/tabungan')}
           >
-            <View style={styles.profileAvatar}>
-              <Text style={styles.profileAvatarText}>
-                {member?.nama ? member.nama.charAt(0).toUpperCase() : 'A'}
-              </Text>
-            </View>
+            <Text style={styles.transactionsText}>Riwayat Transaksi</Text>
           </TouchableOpacity>
         </View>
-      </View>
-      
-      <ScrollView 
-        style={styles.content}
-        refreshControl={
-          <RefreshControl
-            refreshing={isLoading || transactions.isLoading}
-            onRefresh={handleRefresh}
-            colors={['#007BFF']}
-            tintColor="#007BFF"
-          />
-        }
-      >
-        <View style={styles.balanceSection}>
-          <View style={styles.balanceCard}>
-            <Text style={styles.balanceLabel}>Saldo Tabungan</Text>
-            <Text style={styles.balanceAmount}>{formatCurrency(balance || 0)}</Text>
-            <TouchableOpacity style={styles.viewDetailsButton}>
-              <Text style={styles.viewDetailsText}>Lihat Detail</Text>
-            </TouchableOpacity>
-          </View>
+        
+        {/* Tabungan Carousel Section */}
+        <View style={styles.carouselSection}>
+          {isTabunganLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#0066CC" />
+              <Text style={styles.loadingText}>Memuat data tabungan...</Text>
+            </View>
+          ) : (
+            <TabunganCarousel 
+              tabunganList={tabunganList}
+              onViewAllPress={handleViewAllTabungan}
+            />
+          )}
         </View>
         
+        {/* Quick Actions */}
         <View style={styles.quickActionsSection}>
           <Text style={styles.sectionTitle}>Aksi Cepat</Text>
           
@@ -169,7 +249,7 @@ export default function DashboardScreen() {
                 style={styles.quickActionImage} 
                 resizeMode="contain"
               />
-              <Text style={styles.quickActionText}>Pengajuan Pinjaman</Text>
+              <Text style={styles.quickActionText}>Detail Tabungan</Text>
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.quickActionItem}>
@@ -183,6 +263,7 @@ export default function DashboardScreen() {
           </View>
         </View>
         
+        {/* Transactions */}
         <View style={styles.transactionsSection}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Transaksi Terbaru</Text>
@@ -223,6 +304,7 @@ export default function DashboardScreen() {
           )}
         </View>
         
+        {/* Announcements */}
         <View style={styles.announcementsSection}>
           <Text style={styles.sectionTitle}>Pengumuman</Text>
           
@@ -244,6 +326,7 @@ export default function DashboardScreen() {
         </View>
       </ScrollView>
       
+      {/* Navbar */}
       <View style={styles.navbar}>
         <TouchableOpacity style={styles.navItem}>
           <Image 
@@ -300,36 +383,42 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#F5F7FA',
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f8f8f8',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
+  scrollContent: {
+    paddingBottom: 24,
   },
   header: {
-    backgroundColor: '#007BFF',
     paddingTop: 60,
     paddingBottom: 20,
-    paddingHorizontal: 20,
-    borderBottomLeftRadius: 25,
-    borderBottomRightRadius: 25,
+    paddingHorizontal: 16,
   },
   headerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  profileButton: {
-    padding: 5,
+  userInfo: {
+    flex: 1,
   },
-  profileAvatar: {
+  greeting: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  userName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: 'white',
+    marginVertical: 4,
+  },
+  memberNumber: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  profileButton: {
+    padding: 8,
+  },
+  profileIconContainer: {
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -337,68 +426,98 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  profileAvatarText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  greeting: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginBottom: 5,
-  },
-  userName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 10,
-  },
-  lastUpdateContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-  },
-  lastUpdateText: {
-    fontSize: 12,
-    color: '#fff',
-  },
-  content: {
-    flex: 1,
-    padding: 20,
-  },
-  balanceSection: {
-    marginBottom: 20,
-  },
-  balanceCard: {
-    backgroundColor: '#fff',
+  mainAccountCard: {
+    backgroundColor: 'white',
+    marginHorizontal: 16,
+    marginTop: -20,
     borderRadius: 12,
-    padding: 20,
-    width: '100%',
+    padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 3,
   },
-  balanceLabel: {
+  accountHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  accountInfo: {
+    flex: 1,
+  },
+  accountLabel: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 8,
+    marginBottom: 4,
+  },
+  accountNumber: {
+    fontSize: 16,
+    color: '#333',
+  },
+  copyButton: {
+    padding: 4,
+  },
+  balanceContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   balanceAmount: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
-    marginVertical: 10,
-    color: '#007BFF',
+    color: '#333',
   },
-  viewDetailsButton: {
-    backgroundColor: '#f0f0f0',
-    borderRadius: 20,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    alignSelf: 'flex-start',
+  eyeButton: {
+    padding: 4,
+  },
+  transactionsButton: {
+    backgroundColor: '#0066CC',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  transactionsText: {
+    color: 'white',
+    fontWeight: '500',
+    fontSize: 14,
+  },
+  carouselSection: {
+    marginHorizontal: 16,
+    marginTop: 20,
+  },
+  loadingContainer: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    color: '#666',
+    fontSize: 16,
+  },
+  emptyTabunganContainer: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  emptyTabunganText: {
+    color: '#666',
+    fontSize: 16,
+    marginTop: 16,
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  openTabunganButton: {
+    backgroundColor: '#007BFF',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  openTabunganButtonText: {
+    color: 'white',
+    fontWeight: '500',
+    fontSize: 16,
   },
   viewDetailsText: {
     fontSize: 12,
