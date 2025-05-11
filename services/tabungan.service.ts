@@ -10,6 +10,7 @@ export const TabunganService = {
    */
   async getJenisTabungan(): Promise<JenisTabungan[]> {
     try {
+      console.log('Fetching jenis tabungan...');
       const { data, error } = await supabase
         .from('jenis_tabungan')
         .select('*')
@@ -21,6 +22,7 @@ export const TabunganService = {
         throw error;
       }
       
+      console.log(`Successfully fetched ${data?.length || 0} jenis tabungan`);
       return data as JenisTabungan[];
     } catch (error) {
       console.error('Error in getJenisTabungan:', error);
@@ -33,6 +35,7 @@ export const TabunganService = {
    */
   async getJenisTabunganByKode(kode: string): Promise<JenisTabungan | null> {
     try {
+      console.log(`Fetching jenis tabungan with kode: ${kode}`);
       const { data, error } = await supabase
         .from('jenis_tabungan')
         .select('*')
@@ -44,6 +47,7 @@ export const TabunganService = {
         return null;
       }
       
+      console.log('Successfully fetched jenis tabungan:', data);
       return data as JenisTabungan;
     } catch (error) {
       console.error('Error in getJenisTabunganByKode:', error);
@@ -56,20 +60,91 @@ export const TabunganService = {
    */
   async getTabunganByAnggota(anggotaId: string): Promise<TabunganWithJenis[]> {
     try {
-      const { data, error } = await supabase
-        .from('tabungan')
-        .select(`
-          *,
-          jenis_tabungan:jenis_tabungan_id(*)
-        `)
-        .eq('anggota_id', anggotaId);
+      console.log(`Fetching tabungan for anggota ID: ${anggotaId}`);
       
-      if (error) {
-        console.error(`Error fetching tabungan for anggota ${anggotaId}:`, error);
-        throw error;
+      // Try using the tabungan_display_view which has RLS policies configured
+      const { data: viewData, error: viewError } = await supabase
+        .from('tabungan_display_view')
+        .select('*')
+        .eq('anggota_id', anggotaId)
+        .order('display_order', { ascending: true });
+      
+      if (viewError) {
+        console.error(`Error fetching from tabungan_display_view: ${viewError.message}`);
+        
+        // Fallback to direct query
+        const { data: tabunganData, error: tabunganError } = await supabase
+          .from('tabungan')
+          .select(`
+            *,
+            jenis_tabungan:jenis_tabungan_id(*)
+          `)
+          .eq('anggota_id', anggotaId)
+          .eq('status', 'aktif');
+        
+        if (tabunganError) {
+          console.error(`Error fetching tabungan: ${tabunganError.message}`);
+          throw tabunganError;
+        }
+        
+        if (!tabunganData || tabunganData.length === 0) {
+          console.log('No tabungan found for this anggota');
+          return [];
+        }
+        
+        // Calculate progress percentage for each tabungan if it has a target amount
+        const processedData = tabunganData.map(item => {
+          if (item.target_amount && item.target_amount > 0) {
+            const percentage = Math.min(Math.round((item.saldo / item.target_amount) * 100), 100);
+            return {
+              ...item,
+              progress_percentage: percentage
+            };
+          }
+          return item;
+        });
+        
+        console.log(`Successfully fetched ${processedData.length} tabungan records`);
+        return processedData as TabunganWithJenis[];
       }
       
-      return data as TabunganWithJenis[];
+      // Transform view data to match TabunganWithJenis format
+      const transformedData = viewData.map(item => ({
+        id: item.id,
+        nomor_rekening: item.nomor_rekening,
+        anggota_id: item.anggota_id,
+        jenis_tabungan_id: item.jenis_tabungan_id,
+        saldo: item.saldo,
+        tanggal_buka: item.tanggal_buka,
+        tanggal_jatuh_tempo: item.tanggal_jatuh_tempo,
+        status: item.status,
+        created_at: '', // These fields aren't in the view but are required by the type
+        updated_at: '', // These fields aren't in the view but are required by the type
+        tanggal_setoran_reguler: item.tanggal_setoran_reguler,
+        is_default: item.is_default,
+        last_transaction_date: item.last_transaction_date,
+        target_amount: item.target_amount,
+        progress_percentage: item.progress_percentage || 
+          (item.target_amount && item.target_amount > 0 ? 
+            Math.min(Math.round((item.saldo / item.target_amount) * 100), 100) : 0),
+        jenis_tabungan: {
+          id: item.jenis_tabungan_id,
+          kode: item.jenis_tabungan_kode,
+          nama: item.jenis_tabungan_nama,
+          deskripsi: item.jenis_tabungan_deskripsi,
+          minimum_setoran: item.minimum_setoran,
+          biaya_admin: 0, // Default value
+          is_active: true, // Default value
+          created_at: '', // Default value
+          updated_at: '', // Default value
+          is_reguler: item.is_reguler,
+          periode_setoran: item.periode_setoran,
+          display_order: item.display_order
+        }
+      }));
+      
+      console.log(`Successfully fetched ${transformedData.length} tabungan records from view`);
+      return transformedData as TabunganWithJenis[];
     } catch (error) {
       console.error('Error in getTabunganByAnggota:', error);
       throw error;
@@ -81,21 +156,84 @@ export const TabunganService = {
    */
   async getTabunganById(tabunganId: string): Promise<TabunganWithJenis | null> {
     try {
-      const { data, error } = await supabase
-        .from('tabungan')
-        .select(`
-          *,
-          jenis_tabungan:jenis_tabungan_id(*)
-        `)
+      console.log(`Fetching tabungan with ID: ${tabunganId}`);
+      
+      // Try using the tabungan_display_view first
+      const { data: viewData, error: viewError } = await supabase
+        .from('tabungan_display_view')
+        .select('*')
         .eq('id', tabunganId)
         .single();
       
-      if (error) {
-        console.error(`Error fetching tabungan with ID ${tabunganId}:`, error);
-        return null;
+      if (viewError) {
+        console.error(`Error fetching from tabungan_display_view: ${viewError.message}`);
+        
+        // Fallback to direct query
+        const { data, error } = await supabase
+          .from('tabungan')
+          .select(`
+            *,
+            jenis_tabungan:jenis_tabungan_id(*)
+          `)
+          .eq('id', tabunganId)
+          .single();
+        
+        if (error) {
+          console.error(`Error fetching tabungan with ID ${tabunganId}:`, error);
+          return null;
+        }
+        
+        // Calculate progress percentage if it has a target amount
+        let processedData = data;
+        if (data && data.target_amount && data.target_amount > 0) {
+          const percentage = Math.min(Math.round((data.saldo / data.target_amount) * 100), 100);
+          processedData = {
+            ...data,
+            progress_percentage: percentage
+          };
+        }
+        
+        console.log('Successfully fetched tabungan from direct query');
+        return processedData as TabunganWithJenis;
       }
       
-      return data as TabunganWithJenis;
+      // Transform view data to match TabunganWithJenis format
+      const transformedData = {
+        id: viewData.id,
+        nomor_rekening: viewData.nomor_rekening,
+        anggota_id: viewData.anggota_id,
+        jenis_tabungan_id: viewData.jenis_tabungan_id,
+        saldo: viewData.saldo,
+        tanggal_buka: viewData.tanggal_buka,
+        tanggal_jatuh_tempo: viewData.tanggal_jatuh_tempo,
+        status: viewData.status,
+        created_at: '', // These fields aren't in the view but are required by the type
+        updated_at: '', // These fields aren't in the view but are required by the type
+        tanggal_setoran_reguler: viewData.tanggal_setoran_reguler,
+        is_default: viewData.is_default,
+        last_transaction_date: viewData.last_transaction_date,
+        target_amount: viewData.target_amount,
+        progress_percentage: viewData.progress_percentage || 
+          (viewData.target_amount && viewData.target_amount > 0 ? 
+            Math.min(Math.round((viewData.saldo / viewData.target_amount) * 100), 100) : 0),
+        jenis_tabungan: {
+          id: viewData.jenis_tabungan_id,
+          kode: viewData.jenis_tabungan_kode,
+          nama: viewData.jenis_tabungan_nama,
+          deskripsi: viewData.jenis_tabungan_deskripsi,
+          minimum_setoran: viewData.minimum_setoran,
+          biaya_admin: 0, // Default value
+          is_active: true, // Default value
+          created_at: '', // Default value
+          updated_at: '', // Default value
+          is_reguler: viewData.is_reguler,
+          periode_setoran: viewData.periode_setoran,
+          display_order: viewData.display_order
+        }
+      };
+      
+      console.log('Successfully fetched tabungan from view');
+      return transformedData as TabunganWithJenis;
     } catch (error) {
       console.error('Error in getTabunganById:', error);
       return null;
