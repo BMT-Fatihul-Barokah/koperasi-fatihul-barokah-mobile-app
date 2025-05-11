@@ -7,7 +7,8 @@ import {
   TouchableOpacity, 
   ActivityIndicator, 
   RefreshControl, 
-  useWindowDimensions 
+  useWindowDimensions,
+  Image 
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
@@ -200,77 +201,43 @@ export default function DashboardScreen() {
         
         {/* Quick Actions */}
         <View style={styles.quickActionsSection}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Aksi Cepat</Text>
-          </View>
+          <Text style={styles.sectionTitle}>Aksi Cepat</Text>
           
           <View style={styles.quickActionsGrid}>
-            <TouchableOpacity 
-              style={styles.quickActionItem} 
-              onPress={() => router.push('/tabungan/deposit')}
-            >
-              <LinearGradient
-                colors={isDark ? ['#1565C0', '#0D47A1'] : ['#1976D2', '#1565C0']}
-                style={styles.quickActionGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
-                <View style={styles.quickActionIconContainer}>
-                  <MaterialCommunityIcons name="cash-plus" size={24} color="white" />
-                </View>
-                <Text style={styles.quickActionText}>Setor</Text>
-              </LinearGradient>
+            <TouchableOpacity style={styles.quickActionItem}>
+              <Image 
+                source={require('../../assets/informasi-deposit.png')} 
+                style={styles.quickActionImage} 
+                resizeMode="contain"
+              />
+              <Text style={styles.quickActionText}>Informasi Deposit</Text>
             </TouchableOpacity>
             
-            <TouchableOpacity 
-              style={styles.quickActionItem}
-              onPress={() => router.push('/tabungan/withdraw')}
-            >
-              <LinearGradient
-                colors={isDark ? ['#0097A7', '#006064'] : ['#00BCD4', '#0097A7']}
-                style={styles.quickActionGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
-                <View style={styles.quickActionIconContainer}>
-                  <MaterialCommunityIcons name="cash-minus" size={24} color="white" />
-                </View>
-                <Text style={styles.quickActionText}>Tarik</Text>
-              </LinearGradient>
+            <TouchableOpacity style={styles.quickActionItem}>
+              <Image 
+                source={require('../../assets/informasi-pinjaman.png')} 
+                style={styles.quickActionImage} 
+                resizeMode="contain"
+              />
+              <Text style={styles.quickActionText}>Informasi Pinjaman</Text>
             </TouchableOpacity>
             
-            <TouchableOpacity 
-              style={styles.quickActionItem}
-              onPress={() => router.push('/tabungan/transfer')}
-            >
-              <LinearGradient
-                colors={isDark ? ['#689F38', '#33691E'] : ['#8BC34A', '#689F38']}
-                style={styles.quickActionGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
-                <View style={styles.quickActionIconContainer}>
-                  <MaterialCommunityIcons name="bank-transfer" size={24} color="white" />
-                </View>
-                <Text style={styles.quickActionText}>Transfer</Text>
-              </LinearGradient>
+            <TouchableOpacity style={styles.quickActionItem}>
+              <Image 
+                source={require('../../assets/pengajuan-pinjaman.png')} 
+                style={styles.quickActionImage} 
+                resizeMode="contain"
+              />
+              <Text style={styles.quickActionText}>Detail Tabungan</Text>
             </TouchableOpacity>
             
-            <TouchableOpacity 
-              style={styles.quickActionItem}
-              onPress={() => router.push('/tabungan/history')}
-            >
-              <LinearGradient
-                colors={isDark ? ['#5E35B1', '#311B92'] : ['#7E57C2', '#5E35B1']}
-                style={styles.quickActionGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
-                <View style={styles.quickActionIconContainer}>
-                  <MaterialCommunityIcons name="history" size={24} color="white" />
-                </View>
-                <Text style={styles.quickActionText}>Riwayat</Text>
-              </LinearGradient>
+            <TouchableOpacity style={styles.quickActionItem}>
+              <Image 
+                source={require('../../assets/informasi-penarikan-saldo.png')} 
+                style={styles.quickActionImage} 
+                resizeMode="contain"
+              />
+              <Text style={styles.quickActionText}>Informasi Penarikan Saldo</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -379,6 +346,57 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      
+      {/* Navbar */}
+      <View style={styles.navbar}>
+        <TouchableOpacity style={styles.navItem}>
+          <Image 
+            source={require('../../assets/Beranda.png')} 
+            style={[styles.navIcon, styles.activeNavIcon]} 
+            resizeMode="contain"
+          />
+          <Text style={[styles.navText, styles.activeNavText]}>Beranda</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => router.push('/activity')}
+        >
+          <Image 
+            source={require('../../assets/aktifitas.png')} 
+            style={styles.navIcon} 
+            resizeMode="contain"
+            tintColor="#999"
+          />
+          <Text style={styles.navText}>Aktifitas</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => router.push('/dashboard/notifications')}
+        >
+          <Image 
+            source={require('../../assets/notifikasi.png')} 
+            style={styles.navIcon} 
+            resizeMode="contain"
+            tintColor="#999"
+          />
+          <Text style={styles.navText}>Notifikasi</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => router.push('/dashboard/profile')}
+        >
+          <Image 
+            source={require('../../assets/profil.png')} 
+            style={styles.navIcon} 
+            resizeMode="contain"
+            tintColor="#999"
+          />
+          <Text style={styles.navText}>Profil</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -471,8 +489,14 @@ const createStyles = (isDark: boolean, width: number) => StyleSheet.create({
     justifyContent: 'space-between',
   },
   quickActionItem: {
-    width: (width - 40) / 2,
-    marginBottom: 16,
+    width: '23%',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  quickActionImage: {
+    width: 70,
+    height: 70,
+    marginBottom: 8,
   },
   quickActionGradient: {
     borderRadius: 12,
@@ -491,9 +515,10 @@ const createStyles = (isDark: boolean, width: number) => StyleSheet.create({
     marginBottom: 12,
   },
   quickActionText: {
-    color: 'white',
-    fontWeight: '600',
-    fontSize: 14,
+    fontSize: 13,
+    textAlign: 'center',
+    color: '#666',
+    fontWeight: '500',
   },
   transactionsSection: {
     marginHorizontal: 16,
@@ -600,7 +625,33 @@ const createStyles = (isDark: boolean, width: number) => StyleSheet.create({
   },
   announcementText: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: isDark ? 'rgba(255, 255, 255, 0.8)' : 'white',
     lineHeight: 20,
   },
+  navbar: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    backgroundColor: isDark ? '#1E1E1E' : '#fff',
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: isDark ? '#333' : '#eee',
+  },
+  navItem: {
+    alignItems: 'center',
+  },
+  navIcon: {
+    width: 36,
+    height: 36,
+    marginBottom: 6,
+  },
+  activeNavIcon: {
+    tintColor: '#007BFF',
+  },
+  navText: {
+    fontSize: 14,
+    color: '#999',
+  },
+  activeNavText: {
+    color: '#007BFF',
+  }
 });
