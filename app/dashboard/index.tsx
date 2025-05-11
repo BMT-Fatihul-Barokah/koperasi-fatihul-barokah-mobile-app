@@ -174,36 +174,7 @@ export default function DashboardScreen() {
           </View>
         </LinearGradient>
         
-        {/* Main Account Card */}
-        <View style={styles.mainAccountCard}>
-          <View style={styles.accountHeader}>
-            <View style={styles.accountInfo}>
-              <Text style={styles.accountLabel}>Saldo Aktif</Text>
-              <Text style={styles.accountNumber}>{member?.nomor_rekening || '-'}</Text>
-            </View>
-            <TouchableOpacity style={styles.copyButton}>
-              <Ionicons name="copy-outline" size={20} color="#0066CC" />
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.balanceContainer}>
-            <Text style={styles.balanceAmount}>
-              {balance !== null ? 
-                formatCurrency(balance) : 
-                'Rp -'}
-            </Text>
-            <TouchableOpacity style={styles.eyeButton}>
-              <Ionicons name="eye-outline" size={24} color="#0066CC" />
-            </TouchableOpacity>
-          </View>
-          
-          <TouchableOpacity 
-            style={styles.transactionsButton}
-            onPress={() => router.push('/tabungan')}
-          >
-            <Text style={styles.transactionsText}>Riwayat Transaksi</Text>
-          </TouchableOpacity>
-        </View>
+
         
         {/* Tabungan Carousel Section */}
         <View style={styles.carouselSection}>
