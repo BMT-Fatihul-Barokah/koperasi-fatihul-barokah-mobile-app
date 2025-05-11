@@ -8,7 +8,7 @@ import { TabunganWithJenis } from '../../lib/database.types';
 import { TabunganService } from '../../services/tabungan.service';
 import { formatCurrency, formatDate } from '../../lib/format-utils';
 import { useColorScheme } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { LinearGradient, LinearGradientProps } from 'expo-linear-gradient';
 import { TransactionHistory } from '../../components/tabungan/transaction-history';
 
 export default function TabunganDetailScreen() {
@@ -26,7 +26,7 @@ export default function TabunganDetailScreen() {
   const [hasMoreTransactions, setHasMoreTransactions] = useState(true);
   
   // Get gradient colors based on jenis tabungan
-  const getGradientColors = () => {
+  const getGradientColors = (): [string, string] => {
     if (!tabungan) return isDark ? ['#1a5fb4', '#3584e4'] : ['#3584e4', '#62a0ea'];
     
     switch (tabungan.jenis_tabungan.kode) {
@@ -205,8 +205,8 @@ export default function TabunganDetailScreen() {
         <LinearGradient
           colors={getGradientColors()}
           style={styles.header}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+          start={[0, 0]}
+          end={[1, 1]}
         >
           <View style={styles.headerContent}>
             <Text style={styles.accountType}>{tabungan.jenis_tabungan.nama}</Text>
