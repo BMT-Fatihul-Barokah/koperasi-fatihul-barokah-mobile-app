@@ -171,25 +171,28 @@ export const DatabaseService = {
     try {
       console.log(`Fetching balance for anggota ID: ${anggotaId}`);
       
-      // Get balance directly from the anggota table
+      // Get total balance from all tabungan accounts for this anggota
       const { data, error } = await supabase
-        .from('anggota')
+        .from('tabungan')
         .select('saldo')
-        .eq('id', anggotaId)
-        .single();
+        .eq('anggota_id', anggotaId)
+        .eq('status', 'aktif');
       
       if (error) {
         console.error('Error getting balance:', error);
         return 0;
       }
       
-      if (!data) {
-        console.error('No data found for anggota ID:', anggotaId);
+      if (!data || data.length === 0) {
+        console.log('No active tabungan found for anggota ID:', anggotaId);
         return 0;
       }
       
-      console.log(`Balance found: ${data.saldo}`);
-      return data.saldo;
+      // Calculate total balance from all tabungan accounts
+      const totalBalance = data.reduce((sum, account) => sum + (account.saldo || 0), 0);
+      
+      console.log(`Total balance found: ${totalBalance} from ${data.length} accounts`);
+      return totalBalance;
     } catch (error) {
       console.error('Error in getAccountBalance:', error);
       return 0;
