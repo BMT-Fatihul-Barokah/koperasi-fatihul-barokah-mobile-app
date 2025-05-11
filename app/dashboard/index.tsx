@@ -1,20 +1,26 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image, RefreshControl, useWindowDimensions } from 'react-native';
+import React, { useEffect, useState, useMemo } from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  ScrollView, 
+  TouchableOpacity, 
+  ActivityIndicator, 
+  RefreshControl, 
+  useWindowDimensions 
+} from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import { useAuth } from '../../context/auth-context';
 import { useData } from '../../context/data-context';
 import { format, parseISO } from 'date-fns';
-// Removed direct supabase import as we're using the data context now
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { TabunganWithJenis } from '../../lib/database.types';
 import { TabunganService } from '../../services/tabungan.service';
 import { TabunganCarousel } from '../../components/tabungan/tabungan-carousel';
-import { formatCurrency } from '../../lib/format-utils';
+import { formatCurrency as formatCurrencyUtil } from '../../lib/format-utils';
 import { useColorScheme } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-
-// Transaction interface is now imported from data-context
 
 export default function DashboardScreen() {
   const { isLoading, isAuthenticated, member, balance, refreshUserData } = useAuth();
@@ -27,6 +33,9 @@ export default function DashboardScreen() {
   const [tabunganList, setTabunganList] = useState<TabunganWithJenis[]>([]);
   const [isTabunganLoading, setIsTabunganLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  
+  // Create styles with dynamic values based on theme and dimensions
+  const styles = useMemo(() => createStyles(isDark, width), [isDark, width]);
   
   // Loan balance is still mock data for now
   const loanBalance = 2000000;
@@ -174,8 +183,6 @@ export default function DashboardScreen() {
           </View>
         </LinearGradient>
         
-
-        
         {/* Tabungan Carousel Section */}
         <View style={styles.carouselSection}>
           {isTabunganLoading ? (
@@ -193,175 +200,201 @@ export default function DashboardScreen() {
         
         {/* Quick Actions */}
         <View style={styles.quickActionsSection}>
-          <Text style={styles.sectionTitle}>Aksi Cepat</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Aksi Cepat</Text>
+          </View>
           
           <View style={styles.quickActionsGrid}>
-            <TouchableOpacity style={styles.quickActionItem}>
-              <Image 
-                source={require('../../assets/informasi-deposit.png')} 
-                style={styles.quickActionImage} 
-                resizeMode="contain"
-              />
-              <Text style={styles.quickActionText}>Informasi Deposit</Text>
+            <TouchableOpacity 
+              style={styles.quickActionItem} 
+              onPress={() => router.push('/tabungan/deposit')}
+            >
+              <LinearGradient
+                colors={isDark ? ['#1565C0', '#0D47A1'] : ['#1976D2', '#1565C0']}
+                style={styles.quickActionGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <View style={styles.quickActionIconContainer}>
+                  <MaterialCommunityIcons name="cash-plus" size={24} color="white" />
+                </View>
+                <Text style={styles.quickActionText}>Setor</Text>
+              </LinearGradient>
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.quickActionItem}>
-              <Image 
-                source={require('../../assets/informasi-pinjaman.png')} 
-                style={styles.quickActionImage} 
-                resizeMode="contain"
-              />
-              <Text style={styles.quickActionText}>Informasi Pinjaman</Text>
+            <TouchableOpacity 
+              style={styles.quickActionItem}
+              onPress={() => router.push('/tabungan/withdraw')}
+            >
+              <LinearGradient
+                colors={isDark ? ['#0097A7', '#006064'] : ['#00BCD4', '#0097A7']}
+                style={styles.quickActionGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <View style={styles.quickActionIconContainer}>
+                  <MaterialCommunityIcons name="cash-minus" size={24} color="white" />
+                </View>
+                <Text style={styles.quickActionText}>Tarik</Text>
+              </LinearGradient>
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.quickActionItem}>
-              <Image 
-                source={require('../../assets/pengajuan-pinjaman.png')} 
-                style={styles.quickActionImage} 
-                resizeMode="contain"
-              />
-              <Text style={styles.quickActionText}>Detail Tabungan</Text>
+            <TouchableOpacity 
+              style={styles.quickActionItem}
+              onPress={() => router.push('/tabungan/transfer')}
+            >
+              <LinearGradient
+                colors={isDark ? ['#689F38', '#33691E'] : ['#8BC34A', '#689F38']}
+                style={styles.quickActionGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <View style={styles.quickActionIconContainer}>
+                  <MaterialCommunityIcons name="bank-transfer" size={24} color="white" />
+                </View>
+                <Text style={styles.quickActionText}>Transfer</Text>
+              </LinearGradient>
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.quickActionItem}>
-              <Image 
-                source={require('../../assets/informasi-penarikan-saldo.png')} 
-                style={styles.quickActionImage} 
-                resizeMode="contain"
-              />
-              <Text style={styles.quickActionText}>Informasi Penarikan Saldo</Text>
+            <TouchableOpacity 
+              style={styles.quickActionItem}
+              onPress={() => router.push('/tabungan/history')}
+            >
+              <LinearGradient
+                colors={isDark ? ['#5E35B1', '#311B92'] : ['#7E57C2', '#5E35B1']}
+                style={styles.quickActionGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <View style={styles.quickActionIconContainer}>
+                  <MaterialCommunityIcons name="history" size={24} color="white" />
+                </View>
+                <Text style={styles.quickActionText}>Riwayat</Text>
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         </View>
         
-        {/* Transactions */}
+        {/* Recent Transactions */}
         <View style={styles.transactionsSection}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Transaksi Terbaru</Text>
-            <TouchableOpacity onPress={() => router.push('/activity')}>
-              <Text style={styles.seeAllText}>Lihat Semua</Text>
+            <TouchableOpacity 
+              style={styles.viewAllButton}
+              onPress={() => router.push('/tabungan/history')}
+            >
+              <Text style={styles.viewAllText}>Lihat Semua</Text>
+              <Ionicons name="chevron-forward" size={16} color={isDark ? "#FFFFFF" : "#007BFF"} />
             </TouchableOpacity>
           </View>
           
-          {transactions.isLoading ? (
-            <View style={styles.loadingTransactions}>
-              <ActivityIndicator size="small" color="#007BFF" />
-              <Text style={styles.loadingText}>Memuat transaksi...</Text>
-            </View>
-          ) : transactions.data.length === 0 ? (
+          {transactions.data.length === 0 ? (
             <View style={styles.emptyTransactions}>
+              <MaterialCommunityIcons name="cash" size={48} color={isDark ? "#555" : "#CCC"} />
               <Text style={styles.emptyTransactionsText}>Belum ada transaksi</Text>
             </View>
           ) : (
-            <View>
-              {transactions.data.map((transaction) => (
-                <View key={transaction.id} style={styles.transactionItem}>
-                  <View style={styles.transactionInfo}>
-                    <Text style={styles.transactionDate}>{formatTransactionDate(transaction.created_at)}</Text>
-                    <Text style={styles.transactionDescription}>{transaction.deskripsi}</Text>
-                  </View>
-                  
-                  <Text 
-                    style={[
-                      styles.transactionAmount,
-                      transaction.tipe_transaksi === 'masuk' ? styles.creditAmount : styles.debitAmount
-                    ]}
-                  >
-                    {transaction.tipe_transaksi === 'masuk' ? '+' : '-'} {formatCurrency(transaction.jumlah)}
+            transactions.data.slice(0, 5).map((transaction, index) => (
+              <TouchableOpacity 
+                key={transaction.id} 
+                style={styles.transactionItem}
+                onPress={() => router.push(`/tabungan/transaction/${transaction.id}`)}
+              >
+                <View style={styles.transactionIconContainer}>
+                  <MaterialCommunityIcons 
+                    name={transaction.jenis === 'deposit' ? 'cash-plus' : 
+                          transaction.jenis === 'withdraw' ? 'cash-minus' : 'bank-transfer'} 
+                    size={24} 
+                    color={transaction.jenis === 'deposit' ? '#4CAF50' : 
+                           transaction.jenis === 'withdraw' ? '#F44336' : '#2196F3'} 
+                  />
+                </View>
+                <View style={styles.transactionInfo}>
+                  <Text style={styles.transactionTitle}>
+                    {transaction.jenis === 'deposit' ? 'Setoran' : 
+                     transaction.jenis === 'withdraw' ? 'Penarikan' : 'Transfer'}
+                  </Text>
+                  <Text style={styles.transactionDate}>
+                    {formatTransactionDate(transaction.created_at)}
                   </Text>
                 </View>
-              ))}
-            </View>
+                <Text style={[styles.transactionAmount, 
+                  {color: transaction.jenis === 'deposit' ? '#4CAF50' : '#F44336'}]}>
+                  {transaction.jenis === 'deposit' ? '+ ' : '- '}
+                  {formatCurrency(transaction.jumlah)}
+                </Text>
+              </TouchableOpacity>
+            ))
           )}
         </View>
         
         {/* Announcements */}
         <View style={styles.announcementsSection}>
-          <Text style={styles.sectionTitle}>Pengumuman</Text>
-          
-          <View style={styles.announcementCard}>
-            <Text style={styles.announcementTitle}>Kantor Tutup untuk Idul Fitri</Text>
-            <Text style={styles.announcementDate}>10 Apr 2025</Text>
-            <Text style={styles.announcementContent}>
-              Kantor kami akan tutup dari tanggal 15-18 April 2025 untuk Idul Fitri. Operasional normal akan dilanjutkan pada tanggal 19 April 2025.
-            </Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Pengumuman</Text>
+            <TouchableOpacity style={styles.viewAllButton}>
+              <Text style={styles.viewAllText}>Lihat Semua</Text>
+              <Ionicons name="chevron-forward" size={16} color={isDark ? "#FFFFFF" : "#007BFF"} />
+            </TouchableOpacity>
           </View>
           
-          <View style={styles.announcementCard}>
-            <Text style={styles.announcementTitle}>Program Pembiayaan Baru</Text>
-            <Text style={styles.announcementDate}>05 Apr 2025</Text>
-            <Text style={styles.announcementContent}>
-              Kami meluncurkan program pembiayaan usaha mikro baru dengan margin kompetitif. Kunjungi kantor kami untuk informasi lebih lanjut.
-            </Text>
-          </View>
+          <TouchableOpacity activeOpacity={0.9}>
+            <LinearGradient
+              colors={isDark ? ['#1A237E', '#303F9F'] : ['#1A237E', '#303F9F']}
+              style={styles.announcementCard}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <View style={styles.announcementIconContainer}>
+                <MaterialCommunityIcons name="calendar-alert" size={24} color="white" />
+              </View>
+              <View style={styles.announcementContent}>
+                <Text style={styles.announcementTitle}>Kantor Tutup untuk Idul Fitri</Text>
+                <Text style={styles.announcementDate}>10 Apr 2025</Text>
+                <Text style={styles.announcementText}>
+                  Kantor kami akan tutup dari tanggal 15-18 April 2025 untuk Idul Fitri. Operasional normal akan dilanjutkan pada tanggal 19 April 2025.
+                </Text>
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
+          
+          <TouchableOpacity activeOpacity={0.9}>
+            <LinearGradient
+              colors={isDark ? ['#880E4F', '#C2185B'] : ['#880E4F', '#C2185B']}
+              style={styles.announcementCard}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <View style={styles.announcementIconContainer}>
+                <MaterialCommunityIcons name="cash-multiple" size={24} color="white" />
+              </View>
+              <View style={styles.announcementContent}>
+                <Text style={styles.announcementTitle}>Program Pembiayaan Baru</Text>
+                <Text style={styles.announcementDate}>05 Apr 2025</Text>
+                <Text style={styles.announcementText}>
+                  Kami meluncurkan program pembiayaan usaha mikro baru dengan margin kompetitif. Kunjungi kantor kami untuk informasi lebih lanjut.
+                </Text>
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
         </View>
       </ScrollView>
-      
-      {/* Navbar */}
-      <View style={styles.navbar}>
-        <TouchableOpacity style={styles.navItem}>
-          <Image 
-            source={require('../../assets/Beranda.png')} 
-            style={[styles.navIcon, styles.activeNavIcon]} 
-            resizeMode="contain"
-          />
-          <Text style={[styles.navText, styles.activeNavText]}>Beranda</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.navItem}
-          onPress={() => router.push('/activity')}
-        >
-          <Image 
-            source={require('../../assets/aktifitas.png')} 
-            style={styles.navIcon} 
-            resizeMode="contain"
-            tintColor="#999"
-          />
-          <Text style={styles.navText}>Aktifitas</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.navItem}
-          onPress={() => router.push('/dashboard/notifications')}
-        >
-          <Image 
-            source={require('../../assets/notifikasi.png')} 
-            style={styles.navIcon} 
-            resizeMode="contain"
-            tintColor="#999"
-          />
-          <Text style={styles.navText}>Notifikasi</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.navItem}
-          onPress={() => router.push('/dashboard/profile')}
-        >
-          <Image 
-            source={require('../../assets/profil.png')} 
-            style={styles.navIcon} 
-            resizeMode="contain"
-            tintColor="#999"
-          />
-          <Text style={styles.navText}>Profil</Text>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+// Create styles with dynamic values based on theme and dimensions
+const createStyles = (isDark: boolean, width: number) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F7FA',
+    backgroundColor: isDark ? '#121212' : '#F5F7FA',
   },
   scrollContent: {
-    paddingBottom: 24,
+    paddingBottom: 30,
   },
   header: {
     paddingTop: 60,
-    paddingBottom: 20,
+    paddingBottom: 30,
     paddingHorizontal: 16,
   },
   headerContent: {
@@ -375,19 +408,20 @@ const styles = StyleSheet.create({
   greeting: {
     fontSize: 14,
     color: 'rgba(255, 255, 255, 0.8)',
+    marginBottom: 4,
   },
   userName: {
     fontSize: 20,
     fontWeight: 'bold',
     color: 'white',
-    marginVertical: 4,
+    marginBottom: 4,
   },
   memberNumber: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   profileButton: {
-    padding: 8,
+    marginLeft: 16,
   },
   profileIconContainer: {
     width: 40,
@@ -397,118 +431,39 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  mainAccountCard: {
-    backgroundColor: 'white',
-    marginHorizontal: 16,
-    marginTop: -20,
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  accountHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  accountInfo: {
-    flex: 1,
-  },
-  accountLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
-  },
-  accountNumber: {
-    fontSize: 16,
-    color: '#333',
-  },
-  copyButton: {
-    padding: 4,
-  },
-  balanceContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  balanceAmount: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  eyeButton: {
-    padding: 4,
-  },
-  transactionsButton: {
-    backgroundColor: '#0066CC',
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  transactionsText: {
-    color: 'white',
-    fontWeight: '500',
-    fontSize: 14,
-  },
   carouselSection: {
-    marginHorizontal: 16,
-    marginTop: 20,
+    marginTop: -20,
+    marginBottom: 16,
   },
-  loadingContainer: {
-    padding: 40,
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 16,
-    color: '#666',
-    fontSize: 16,
-  },
-  emptyTabunganContainer: {
-    padding: 40,
-    alignItems: 'center',
-  },
-  emptyTabunganText: {
-    color: '#666',
-    fontSize: 16,
-    marginTop: 16,
-    marginBottom: 24,
-    textAlign: 'center',
-  },
-  openTabunganButton: {
-    backgroundColor: '#007BFF',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-  },
-  openTabunganButtonText: {
-    color: 'white',
-    fontWeight: '500',
-    fontSize: 16,
-  },
-  viewDetailsText: {
-    fontSize: 12,
-    color: '#666',
-  },
-  quickActionsSection: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    paddingHorizontal: 4,
+    marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 15,
+    color: isDark ? '#FFFFFF' : '#333333',
+  },
+  viewAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 123, 255, 0.1)',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+  },
+  viewAllText: {
+    color: isDark ? '#FFFFFF' : '#007BFF',
+    marginRight: 4,
+    fontWeight: '500',
+    fontSize: 14,
+  },
+  quickActionsSection: {
+    marginHorizontal: 16,
+    marginBottom: 24,
   },
   quickActionsGrid: {
     flexDirection: 'row',
@@ -516,143 +471,136 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   quickActionItem: {
-    width: '23%',
-    alignItems: 'center',
-    marginBottom: 15,
+    width: (width - 40) / 2,
+    marginBottom: 16,
   },
-  quickActionImage: {
-    width: 70,
-    height: 70,
-    marginBottom: 8,
+  quickActionGradient: {
+    borderRadius: 12,
+    padding: 16,
+    height: 100,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  quickActionIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   quickActionText: {
-    fontSize: 13,
-    textAlign: 'center',
-    color: '#666',
-    fontWeight: '500',
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 14,
   },
   transactionsSection: {
-    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    marginBottom: 24,
+    backgroundColor: isDark ? '#1E1E1E' : '#FFFFFF',
     borderRadius: 12,
-    padding: 15,
-    marginBottom: 20,
+    padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: isDark ? 0.3 : 0.1,
     shadowRadius: 4,
-    elevation: 2,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  seeAllText: {
-    fontSize: 14,
-    color: '#007BFF',
+    elevation: 3,
   },
   transactionItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+  },
+  transactionIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
   transactionInfo: {
     flex: 1,
   },
-  transactionDate: {
-    fontSize: 12,
-    color: '#999',
+  transactionTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: isDark ? '#FFFFFF' : '#333333',
     marginBottom: 4,
   },
-  transactionDescription: {
-    fontSize: 14,
-    color: '#333',
+  transactionDate: {
+    fontSize: 12,
+    color: isDark ? 'rgba(255, 255, 255, 0.6)' : '#999999',
   },
   transactionAmount: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: 'bold',
   },
-  creditAmount: {
-    color: '#28a745',
-  },
-  debitAmount: {
-    color: '#dc3545',
-  },
-  loadingTransactions: {
-    padding: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   emptyTransactions: {
-    padding: 20,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 30,
   },
   emptyTransactionsText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: isDark ? '#999' : '#666',
+  },
+  loadingContainer: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
     fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
+    color: isDark ? '#CCCCCC' : '#666666',
   },
   announcementsSection: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 15,
+    marginHorizontal: 16,
     marginBottom: 20,
+  },
+  announcementCard: {
+    borderRadius: 12,
+    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 3,
+    overflow: 'hidden',
+    padding: 16,
   },
-  announcementCard: {
-    backgroundColor: '#f9f9f9',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 10,
+  announcementIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  announcementContent: {
+    flex: 1,
   },
   announcementTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 5,
+    color: 'white',
+    marginBottom: 4,
   },
   announcementDate: {
     fontSize: 12,
-    color: '#999',
+    color: 'rgba(255, 255, 255, 0.8)',
     marginBottom: 8,
   },
-  announcementContent: {
-    fontSize: 13,
-    color: '#666',
-    lineHeight: 18,
-  },
-  navbar: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    backgroundColor: '#fff',
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-  },
-  navItem: {
-    alignItems: 'center',
-  },
-  navIcon: {
-    width: 36,
-    height: 36,
-    marginBottom: 6,
-  },
-  activeNavIcon: {
-    tintColor: '#007BFF',
-  },
-  navText: {
+  announcementText: {
     fontSize: 14,
-    color: '#999',
+    color: 'rgba(255, 255, 255, 0.9)',
+    lineHeight: 20,
   },
-  activeNavText: {
-    color: '#007BFF',
-  }
 });

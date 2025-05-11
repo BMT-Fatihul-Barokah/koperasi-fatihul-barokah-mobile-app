@@ -1,9 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet, FlatList, Pressable } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { JenisTabungan } from '../../lib/database.types';
 import { formatCurrency } from '../../lib/format-utils';
 import { useColorScheme } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface JenisTabunganListProps {
   jenisTabungan: JenisTabungan[];
@@ -23,43 +24,43 @@ export function JenisTabunganList({
   const getIcon = (kode: string) => {
     switch (kode) {
       case 'SIBAROKAH':
-        return 'wallet-outline';
+        return <MaterialCommunityIcons name="bank" size={24} color="white" />;
       case 'SIMUROJA':
-        return 'trending-up-outline';
+        return <MaterialCommunityIcons name="calendar-clock" size={24} color="white" />;
       case 'SIDIKA':
-        return 'school-outline';
+        return <MaterialCommunityIcons name="school" size={24} color="white" />;
       case 'SIFITRI':
-        return 'gift-outline';
+        return <MaterialCommunityIcons name="star-crescent" size={24} color="white" />;
       case 'SIQURBAN':
-        return 'paw-outline';
+        return <MaterialCommunityIcons name="sheep" size={24} color="white" />;
       case 'SINIKA':
-        return 'heart-outline';
+        return <MaterialCommunityIcons name="ring" size={24} color="white" />;
       case 'SIUMROH':
-        return 'airplane-outline';
+        return <MaterialCommunityIcons name="mosque" size={24} color="white" />;
       default:
-        return 'wallet-outline';
+        return <MaterialCommunityIcons name="bank" size={24} color="white" />;
     }
   };
 
-  // Get color based on jenis tabungan
-  const getColor = (kode: string) => {
+  // Get gradient colors based on jenis tabungan
+  const getGradientColors = (kode: string) => {
     switch (kode) {
       case 'SIBAROKAH':
-        return isDark ? '#3584e4' : '#3584e4';
+        return isDark ? ['#003D82', '#0066CC'] : ['#003D82', '#0066CC'];
       case 'SIMUROJA':
-        return isDark ? '#9141ac' : '#9141ac';
+        return isDark ? ['#004D40', '#00796B'] : ['#004D40', '#00796B'];
       case 'SIDIKA':
-        return isDark ? '#e01b24' : '#e01b24';
+        return isDark ? ['#4A148C', '#7B1FA2'] : ['#4A148C', '#7B1FA2'];
       case 'SIFITRI':
-        return isDark ? '#986a44' : '#986a44';
+        return isDark ? ['#1A237E', '#303F9F'] : ['#1A237E', '#303F9F'];
       case 'SIQURBAN':
-        return isDark ? '#2ec27e' : '#26a269';
+        return isDark ? ['#BF360C', '#E64A19'] : ['#BF360C', '#E64A19'];
       case 'SINIKA':
-        return isDark ? '#c061cb' : '#c061cb';
+        return isDark ? ['#880E4F', '#C2185B'] : ['#880E4F', '#C2185B'];
       case 'SIUMROH':
-        return isDark ? '#26a269' : '#26a269';
+        return isDark ? ['#0D47A1', '#1976D2'] : ['#0D47A1', '#1976D2'];
       default:
-        return isDark ? '#3584e4' : '#3584e4';
+        return isDark ? ['#003D82', '#0066CC'] : ['#003D82', '#0066CC'];
     }
   };
 
@@ -71,44 +72,69 @@ export function JenisTabunganList({
         { opacity: pressed ? 0.8 : 1 }
       ]}
     >
-      <View 
-        style={[
-          styles.iconContainer, 
-          { backgroundColor: getColor(item.kode) }
-        ]}
+      <LinearGradient 
+        colors={getGradientColors(item.kode) as any}
+        style={styles.cardGradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
       >
-        <Ionicons name={getIcon(item.kode)} size={24} color="white" />
-      </View>
-      
-      <View style={styles.detailsContainer}>
-        <Text style={styles.nameText}>{item.nama}</Text>
-        <Text style={styles.descriptionText}>{item.deskripsi || 'Simpanan anggota koperasi'}</Text>
-        
-        <View style={styles.detailsRow}>
-          {item.minimum_setoran > 0 && (
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Minimum Setoran</Text>
-              <Text style={styles.detailValue}>{formatCurrency(item.minimum_setoran)}</Text>
+        <View style={styles.cardContent}>
+          <View style={styles.headerRow}>
+            <View style={styles.iconContainer}>
+              {getIcon(item.kode)}
             </View>
-          )}
+            
+            <View style={styles.titleContainer}>
+              <Text style={styles.nameText}>{item.nama}</Text>
+              <Text style={styles.descriptionText}>{item.deskripsi || 'Simpanan anggota koperasi'}</Text>
+            </View>
+            
+            <View style={styles.arrowContainer}>
+              <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.8)" />
+            </View>
+          </View>
           
-          {item.bagi_hasil && (
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Bagi Hasil</Text>
-              <Text style={styles.detailValue}>{item.bagi_hasil}%</Text>
+          <View style={styles.detailsContainer}>
+            <View style={styles.detailsRow}>
+              {item.minimum_setoran > 0 && (
+                <View style={styles.detailItem}>
+                  <View style={styles.detailIconContainer}>
+                    <MaterialCommunityIcons name="cash-multiple" size={16} color="rgba(255,255,255,0.9)" />
+                  </View>
+                  <View>
+                    <Text style={styles.detailLabel}>Minimum Setoran</Text>
+                    <Text style={styles.detailValue}>{formatCurrency(item.minimum_setoran)}</Text>
+                  </View>
+                </View>
+              )}
+              
+              {item.bagi_hasil && (
+                <View style={styles.detailItem}>
+                  <View style={styles.detailIconContainer}>
+                    <MaterialCommunityIcons name="percent" size={16} color="rgba(255,255,255,0.9)" />
+                  </View>
+                  <View>
+                    <Text style={styles.detailLabel}>Bagi Hasil</Text>
+                    <Text style={styles.detailValue}>{item.bagi_hasil}%</Text>
+                  </View>
+                </View>
+              )}
+              
+              {item.jangka_waktu && (
+                <View style={styles.detailItem}>
+                  <View style={styles.detailIconContainer}>
+                    <MaterialCommunityIcons name="calendar-range" size={16} color="rgba(255,255,255,0.9)" />
+                  </View>
+                  <View>
+                    <Text style={styles.detailLabel}>Jangka Waktu</Text>
+                    <Text style={styles.detailValue}>{item.jangka_waktu} bulan</Text>
+                  </View>
+                </View>
+              )}
             </View>
-          )}
-          
-          {item.jangka_waktu && (
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Jangka Waktu</Text>
-              <Text style={styles.detailValue}>{item.jangka_waktu} bulan</Text>
-            </View>
-          )}
+          </View>
         </View>
-      </View>
-      
-      <Ionicons name="chevron-forward" size={20} color="#999" />
+      </LinearGradient>
     </Pressable>
   );
 
@@ -139,53 +165,82 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   itemContainer: {
+    borderRadius: 12,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    overflow: 'hidden',
+  },
+  cardGradient: {
+    borderRadius: 12,
+  },
+  cardContent: {
+    padding: 16,
+  },
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
   },
   iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: 12,
+  },
+  titleContainer: {
+    flex: 1,
+  },
+  arrowContainer: {
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   detailsContainer: {
-    flex: 1,
+    marginTop: 4,
   },
   nameText: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 4,
+    color: 'white',
+    marginBottom: 2,
   },
   descriptionText: {
     fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   detailsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    marginTop: 8,
   },
   detailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginRight: 16,
-    marginBottom: 4,
+    marginBottom: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  detailIconContainer: {
+    marginRight: 8,
   },
   detailLabel: {
     fontSize: 12,
-    color: '#999',
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   detailValue: {
     fontSize: 14,
     fontWeight: '500',
+    color: 'white',
   },
 });
