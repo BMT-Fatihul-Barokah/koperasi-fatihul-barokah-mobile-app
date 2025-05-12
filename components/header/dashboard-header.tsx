@@ -48,7 +48,7 @@ export function DashboardHeader({
               style={styles.iconButton}
               onPress={() => router.back()}
             >
-              <Ionicons name="arrow-back" size={24} color="#fff" />
+              <Ionicons name="chevron-back" size={24} color="#fff" />
             </TouchableOpacity>
           ) : (
             <View style={styles.spacer} />

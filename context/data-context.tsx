@@ -184,7 +184,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   // Fetch notifications
   const fetchNotifications = useCallback(async (forceRefresh = false) => {
     // If not authenticated or no member, return
-    if (!isAuthenticated || !member) return;
+    if (!isAuthenticated || !member) {
+      console.log('Data Context: Not authenticated or no member, skipping notification fetch');
+      return;
+    }
+    
+    console.log('Data Context: Member ID for notifications:', member.id);
     
     // Check if cache is valid and we're not forcing a refresh
     const now = Date.now();
@@ -196,7 +201,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       (now - lastFetched < CACHE_EXPIRATION);
     
     if (isCacheValid && !forceRefresh && dataLength > 0) {
-      console.log('Data Context: Using cached notifications data');
+      console.log('Data Context: Using cached notifications data, count:', dataLength);
       return;
     }
     
@@ -210,13 +215,20 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }));
     
     try {
-      console.log('Data Context: Fetching notifications from API');
+      console.log('Data Context: Fetching notifications from API for member:', member.id);
+      
+      // We'll assume the notifikasi table exists in your Supabase database
+      // If it doesn't, you'll need to create it through the Supabase dashboard
+      
+      // Now fetch notifications from the table - both personal and system notifications
+      // We need to fetch both personal notifications and system/announcement notifications
+      // that should be visible to all users
       const { data, error } = await supabase
-        .from('notifikasi')
+        .from('notifikasi') // Use lowercase table name
         .select('*')
-        .eq('anggota_id', member.id)
+        .or(`anggota_id.eq.${member.id},jenis.eq.sistem,jenis.eq.pengumuman`)
         .order('created_at', { ascending: false });
-
+      
       if (error) {
         console.error('Data Context: Error fetching notifications:', error);
         setState(prev => ({
@@ -229,14 +241,25 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         }));
         return;
       }
+      
+      // If we successfully fetched data (even if empty), process it
+      const notificationsData = data || [];
+
+      console.log('Data Context: Successfully fetched notifications, count:', notificationsData?.length || 0);
+      if (notificationsData?.length > 0) {
+        console.log('Data Context: First notification:', JSON.stringify(notificationsData[0], null, 2));
+      } else {
+        console.log('Data Context: No notifications found for member:', member.id);
+      }
 
       // Count unread notifications
-      const unreadCount = data.filter((n: Notification) => !n.is_read).length;
+      const unreadCount = notificationsData?.filter((n: Notification) => !n.is_read).length || 0;
+      console.log('Data Context: Unread notifications count:', unreadCount);
       
       setState(prev => ({
         ...prev,
         notifications: {
-          data,
+          data: notificationsData || [],
           unreadCount,
           lastFetched: now,
           isLoading: false,

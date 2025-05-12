@@ -13,7 +13,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../../context/auth-context';
 import { format, parseISO } from 'date-fns';
 import { supabase } from '../../lib/supabase';
-import { ActivityHeader } from '../../components/header/ActivityHeader';
+import { DashboardHeader } from '../../components/header/dashboard-header';
+import { Ionicons } from '@expo/vector-icons';
 
 // Define transaction interface based on the database schema
 interface Transaction {
@@ -138,9 +139,9 @@ export default function TransactionDetailScreen() {
   if (!transaction) {
     return (
       <SafeAreaView style={styles.container}>
-        <ActivityHeader
+        <DashboardHeader
           title="Detail Transaksi"
-          showBackButton
+          showBackButton={true}
         />
         
         <View style={styles.errorContainer}>
@@ -158,9 +159,9 @@ export default function TransactionDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ActivityHeader 
+      <DashboardHeader 
         title="Detail Transaksi"
-        showBackButton
+        showBackButton={true}
         rightComponent={
           <TouchableOpacity 
             style={styles.shareButton}
