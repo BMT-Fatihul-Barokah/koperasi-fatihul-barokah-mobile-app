@@ -76,6 +76,8 @@ export interface TabunganWithJenis extends Tabungan {
   jenis_tabungan_kode?: string;
   jenis_tabungan_nama?: string;
   jenis_tabungan_deskripsi?: string;
+  target_saldo?: number; // Target amount for savings goal
+  progress_percentage?: number; // Progress towards savings goal
 }
 
 export interface Database {

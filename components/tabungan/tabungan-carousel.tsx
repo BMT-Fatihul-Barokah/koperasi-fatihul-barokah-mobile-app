@@ -1,5 +1,5 @@
-import React, { useRef, useState, useCallback } from 'react';
-import { View, StyleSheet, Dimensions, TouchableOpacity, Text, FlatList, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
+import { View, StyleSheet, Dimensions, TouchableOpacity, Text, FlatList, NativeSyntheticEvent, NativeScrollEvent, Animated } from 'react-native';
 import { TabunganWithJenis } from '../../lib/database.types';
 import { TabunganCard } from './tabungan-card';
 import { useRouter } from 'expo-router';
@@ -13,13 +13,14 @@ interface TabunganCarouselProps {
 }
 
 const { width } = Dimensions.get('window');
-const ITEM_WIDTH = 320;
-const ITEM_SPACING = 16;
+const ITEM_WIDTH = width * 0.85; // Make card width relative to screen width
+const ITEM_SPACING = 12;
 
 export function TabunganCarousel({ tabunganList, onViewAllPress }: TabunganCarouselProps) {
   const router = useRouter();
   const [activeIndex, setActiveIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
+  const scrollX = useRef(new Animated.Value(0)).current;
   
   // Calculate total balance of all savings accounts
   const totalSaldo = tabunganList.reduce((sum, item) => sum + item.saldo, 0);
@@ -40,44 +41,108 @@ export function TabunganCarousel({ tabunganList, onViewAllPress }: TabunganCarou
     }
   };
   
-  // Handle scroll end to update active index
+  // Handle scroll to update active index
   const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (!event || !event.nativeEvent) return;
+    
     const contentOffset = event.nativeEvent.contentOffset;
     const viewSize = event.nativeEvent.layoutMeasurement;
     
-    // Calculate the current index based on the scroll position
-    const newIndex = Math.floor(contentOffset.x / (ITEM_WIDTH + ITEM_SPACING));
+    // Calculate the current index based on the scroll position more accurately
+    // Using the center of the screen as the reference point
+    const centerOfView = contentOffset.x + (viewSize.width / 2);
+    const newIndex = Math.round(centerOfView / (ITEM_WIDTH + ITEM_SPACING));
     
-    // Only update if the index has changed and is valid
-    if (newIndex !== activeIndex && newIndex >= 0 && newIndex < tabunganList.length) {
-      setActiveIndex(newIndex);
+    // Ensure the index is within bounds
+    const validIndex = Math.max(0, Math.min(newIndex, tabunganList.length - 1));
+    
+    // Update the active index
+    if (validIndex !== activeIndex) {
+      setActiveIndex(validIndex);
     }
   }, [activeIndex, tabunganList.length]);
+  
+  // Scroll to initial index on mount
+  useEffect(() => {
+    if (flatListRef.current && tabunganList.length > 0) {
+      // Small delay to ensure the FlatList is properly rendered
+      setTimeout(() => {
+        flatListRef.current?.scrollToIndex({
+          index: 0,
+          animated: false,
+        });
+      }, 100);
+    }
+  }, [tabunganList.length]);
   
   // Render carousel item
   const renderCarouselItem = ({ item }: { item: TabunganWithJenis }) => {
     return (
-      <TabunganCard
-        tabungan={item}
-        onPress={handleTabunganPress}
-      />
+      <View style={styles.cardWrapper}>
+        <TabunganCard
+          tabungan={item}
+          onPress={handleTabunganPress}
+          compact={true} // Add compact prop for dashboard view
+          showTarget={false} // Don't show target in carousel view to save space
+        />
+      </View>
     );
   };
   
-  // Render pagination dots
+  // Render animated pagination dots
   const renderPaginationDots = () => {
     return (
       <View style={styles.paginationContainer}>
-        {tabunganList.map((_, index) => (
-          <TouchableOpacity
-            key={index}
-            style={[
-              styles.paginationDot,
-              index === activeIndex ? styles.paginationDotActive : {}
-            ]}
-            onPress={() => handleDotPress(index)}
-          />
-        ))}
+        {tabunganList.map((_, index) => {
+          // Calculate the input range for the current dot
+          const inputRange = [
+            (index - 1) * (ITEM_WIDTH + ITEM_SPACING),
+            index * (ITEM_WIDTH + ITEM_SPACING),
+            (index + 1) * (ITEM_WIDTH + ITEM_SPACING)
+          ];
+          
+          // Animate the width based on scroll position
+          const width = scrollX.interpolate({
+            inputRange,
+            outputRange: [6, 10, 6],
+            extrapolate: 'clamp'
+          });
+          
+          // Animate the height based on scroll position
+          const height = scrollX.interpolate({
+            inputRange,
+            outputRange: [6, 10, 6],
+            extrapolate: 'clamp'
+          });
+          
+          // Animate the opacity based on scroll position
+          const opacity = scrollX.interpolate({
+            inputRange,
+            outputRange: [0.5, 1, 0.5],
+            extrapolate: 'clamp'
+          });
+          
+          // Animate the background color based on scroll position
+          const backgroundColor = scrollX.interpolate({
+            inputRange,
+            outputRange: ['#CCCCCC', '#007BFF', '#CCCCCC'],
+            extrapolate: 'clamp'
+          });
+          
+          return (
+            <TouchableOpacity
+              key={index}
+              onPress={() => handleDotPress(index)}
+            >
+              <Animated.View
+                style={[
+                  styles.paginationDot,
+                  { width, height, opacity, backgroundColor }
+                ]}
+              />
+            </TouchableOpacity>
+          );
+        })}
       </View>
     );
   };
@@ -108,7 +173,7 @@ export function TabunganCarousel({ tabunganList, onViewAllPress }: TabunganCarou
       <View style={styles.carouselContainer}>
         {tabunganList.length > 0 ? (
           <>
-            <FlatList
+            <Animated.FlatList
               ref={flatListRef}
               data={tabunganList}
               renderItem={renderCarouselItem}
@@ -119,6 +184,10 @@ export function TabunganCarousel({ tabunganList, onViewAllPress }: TabunganCarou
               snapToAlignment="center"
               decelerationRate="fast"
               contentContainerStyle={styles.carouselContent}
+              onScroll={Animated.event(
+                [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+                { useNativeDriver: false, listener: handleScroll }
+              )}
               onMomentumScrollEnd={handleScroll}
               initialScrollIndex={0}
               getItemLayout={(data, index) => ({
@@ -126,6 +195,7 @@ export function TabunganCarousel({ tabunganList, onViewAllPress }: TabunganCarou
                 offset: (ITEM_WIDTH + ITEM_SPACING) * index,
                 index,
               })}
+              scrollEventThrottle={16} // For smoother animations
             />
             
             {tabunganList.length > 1 && renderPaginationDots()}
@@ -193,9 +263,13 @@ const styles = StyleSheet.create({
   },
   carouselContainer: {
     backgroundColor: '#F5F7FA',
-    paddingVertical: 20,
+    paddingVertical: 16,
     borderBottomLeftRadius: 12,
     borderBottomRightRadius: 12,
+  },
+  cardWrapper: {
+    width: ITEM_WIDTH,
+    marginRight: ITEM_SPACING,
   },
   carouselContent: {
     paddingHorizontal: 16,
@@ -205,18 +279,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 16,
+    marginTop: 12,
+    marginBottom: 4,
+    height: 20, // Fixed height to prevent layout shifts
   },
   paginationDot: {
-    width: 8,
-    height: 8,
+    width: 6,
+    height: 6,
     borderRadius: 4,
     backgroundColor: '#CCCCCC',
     marginHorizontal: 4,
+    overflow: 'hidden', // Ensure animations stay within bounds
   },
+  // We'll use animated styles directly instead
   paginationDotActive: {
-    backgroundColor: '#0066CC',
-    width: 16,
+    backgroundColor: '#007BFF',
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   emptyContainer: {
     padding: 40,

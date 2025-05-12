@@ -269,25 +269,22 @@ export default function DashboardScreen() {
               >
                 <View style={styles.transactionIconContainer}>
                   <MaterialCommunityIcons 
-                    name={transaction.jenis === 'deposit' ? 'cash-plus' : 
-                          transaction.jenis === 'withdraw' ? 'cash-minus' : 'bank-transfer'} 
+                    name={transaction.tipe_transaksi === 'masuk' ? 'cash-plus' : 'cash-minus'} 
                     size={24} 
-                    color={transaction.jenis === 'deposit' ? '#4CAF50' : 
-                           transaction.jenis === 'withdraw' ? '#F44336' : '#2196F3'} 
+                    color={transaction.tipe_transaksi === 'masuk' ? '#4CAF50' : '#F44336'} 
                   />
                 </View>
                 <View style={styles.transactionInfo}>
                   <Text style={styles.transactionTitle}>
-                    {transaction.jenis === 'deposit' ? 'Setoran' : 
-                     transaction.jenis === 'withdraw' ? 'Penarikan' : 'Transfer'}
+                    {transaction.tipe_transaksi === 'masuk' ? 'Setoran' : 'Penarikan'}
                   </Text>
                   <Text style={styles.transactionDate}>
                     {formatTransactionDate(transaction.created_at)}
                   </Text>
                 </View>
                 <Text style={[styles.transactionAmount, 
-                  {color: transaction.jenis === 'deposit' ? '#4CAF50' : '#F44336'}]}>
-                  {transaction.jenis === 'deposit' ? '+ ' : '- '}
+                  {color: transaction.tipe_transaksi === 'masuk' ? '#4CAF50' : '#F44336'}]}>
+                  {transaction.tipe_transaksi === 'masuk' ? '+ ' : '- '}
                   {formatCurrency(transaction.jumlah)}
                 </Text>
               </TouchableOpacity>

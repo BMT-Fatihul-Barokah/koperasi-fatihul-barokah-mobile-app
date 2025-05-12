@@ -27,7 +27,8 @@ export default function TabunganScreen() {
   
   // Calculate number of columns based on screen width
   const numColumns = width > 600 ? 2 : 1;
-  const cardWidth = (width - 48) / numColumns;
+  // Add a bit more padding for better spacing
+  const cardWidth = width > 600 ? (width - 64) / numColumns : width - 32;
   
   // Fetch member ID and savings accounts
   useEffect(() => {
@@ -101,6 +102,7 @@ export default function TabunganScreen() {
       <TabunganCard
         tabungan={item}
         onPress={handleTabunganPress}
+        showTarget={true} // Show target progress bar in the main tabungan screen
       />
     </View>
   );
@@ -131,20 +133,22 @@ export default function TabunganScreen() {
       />
       
       {/* Summary Card */}
-      <LinearGradient
-        colors={isDark ? ['#1a5fb4', '#3584e4'] : ['#3584e4', '#62a0ea']}
-        style={styles.summaryCard}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
-        <View style={styles.summaryContent}>
-          <Text style={styles.summaryLabel}>Total Saldo Tabungan</Text>
-          <Text style={styles.summaryAmount}>{formatCurrency(totalSaldo)}</Text>
-          <Text style={styles.summaryAccounts}>
-            {tabunganList.length} {tabunganList.length > 1 ? 'Rekening' : 'Rekening'}
-          </Text>
-        </View>
-      </LinearGradient>
+      <View style={styles.summaryCardContainer}>
+        <LinearGradient
+          colors={isDark ? ['#1a5fb4', '#3584e4'] : ['#3584e4', '#62a0ea']}
+          style={styles.summaryCard}
+          start={[0, 0]}
+          end={[1, 1]}
+        >
+          <View style={styles.summaryContent}>
+            <Text style={styles.summaryLabel}>Total Saldo Tabungan</Text>
+            <Text style={styles.summaryAmount}>{formatCurrency(totalSaldo)}</Text>
+            <Text style={styles.summaryAccounts}>
+              {tabunganList.length} {tabunganList.length > 1 ? 'Rekening' : 'Rekening'}
+            </Text>
+          </View>
+        </LinearGradient>
+      </View>
       
       {isLoading ? (
         <View style={styles.loadingContainer}>
@@ -171,10 +175,12 @@ export default function TabunganScreen() {
           keyExtractor={(item) => item.id}
           numColumns={numColumns}
           contentContainerStyle={styles.gridContainer}
+          columnWrapperStyle={numColumns > 1 ? styles.columnWrapper : undefined}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
           }
           showsVerticalScrollIndicator={false}
+          ItemSeparatorComponent={() => <View style={styles.itemSeparator} />}
         />
       )}
     </SafeAreaView>
@@ -189,9 +195,15 @@ const styles = StyleSheet.create({
   headerButton: {
     padding: 8,
   },
+  summaryCardContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+    backgroundColor: '#F8F9FA',
+  },
   summaryCard: {
-    borderRadius: 0,
-    padding: 20,
+    borderRadius: 16,
+    padding: 24,
     elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -202,27 +214,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   summaryLabel: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 16,
     marginBottom: 8,
+    fontWeight: '500',
   },
   summaryAmount: {
     color: 'white',
     fontWeight: 'bold',
-    fontSize: 32,
-    marginBottom: 8,
+    fontSize: 36,
+    marginBottom: 12,
   },
   summaryAccounts: {
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: 'rgba(255, 255, 255, 0.9)',
     fontSize: 14,
+    fontWeight: '500',
   },
   gridContainer: {
     padding: 16,
-    paddingTop: 8,
+  },
+  columnWrapper: {
+    justifyContent: 'space-between',
   },
   gridItem: {
-    paddingHorizontal: 8,
-    marginBottom: 0,
+    marginBottom: 16,
+  },
+  itemSeparator: {
+    height: 8,
   },
   loadingContainer: {
     flex: 1,

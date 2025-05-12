@@ -9,9 +9,11 @@ import { formatCurrency } from '../../lib/format-utils';
 interface TabunganCardProps {
   tabungan: TabunganWithJenis;
   onPress: (tabungan: TabunganWithJenis) => void;
+  compact?: boolean; // Optional prop for compact mode in dashboard
+  showTarget?: boolean; // Optional prop to show savings target progress bar
 }
 
-export function TabunganCard({ tabungan, onPress }: TabunganCardProps) {
+export function TabunganCard({ tabungan, onPress, compact = false, showTarget = false }: TabunganCardProps) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
@@ -72,28 +74,42 @@ export function TabunganCard({ tabungan, onPress }: TabunganCardProps) {
 
   return (
     <TouchableOpacity
-      style={styles.container}
+      style={[styles.container, compact && styles.compactContainer]}
       activeOpacity={0.9}
       onPress={() => onPress(tabungan)}
     >
-      <LinearGradient colors={getGradientColors() as any} style={styles.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-        <View style={styles.content}>
-          <View style={styles.header}>
-            <View style={styles.iconContainer}>{getTabunganIcon()}</View>
+      <LinearGradient colors={getGradientColors() as any} style={styles.gradient} start={[0, 0]} end={[1, 1]}>
+        <View style={[styles.content, compact && styles.compactContent]}>
+          <View style={[styles.header, compact && styles.compactHeader]}>
+            <View style={[styles.iconContainer, compact && styles.compactIconContainer]}>{getTabunganIcon()}</View>
             <View style={styles.titleContainer}>
-              <Text style={styles.title}>{tabungan.jenis_tabungan.nama}</Text>
+              <Text style={[styles.title, compact && styles.compactTitle]}>{tabungan.jenis_tabungan.nama}</Text>
               <Text style={styles.accountNumber}>{tabungan.nomor_rekening}</Text>
             </View>
           </View>
 
-          <View style={styles.balanceContainer}>
-            <Text style={styles.balanceLabel}>Saldo Aktif</Text>
+          <View style={[styles.balanceContainer, compact && styles.compactBalanceContainer]}>
+            <Text style={[styles.balanceLabel, compact && styles.compactBalanceLabel]}>Saldo Aktif</Text>
             <View style={styles.balanceRow}>
-              <Text style={styles.balance}>{formatCurrency(tabungan.saldo)}</Text>
+              <Text style={[styles.balance, compact && styles.compactBalance]}>{formatCurrency(tabungan.saldo)}</Text>
               <TouchableOpacity style={styles.eyeButton}>
                 <Ionicons name="eye-outline" size={20} color="white" />
               </TouchableOpacity>
             </View>
+            
+            {showTarget && tabungan.target_saldo && tabungan.target_saldo > 0 && (
+              <View style={styles.targetContainer}>
+                <View style={styles.targetLabelRow}>
+                  <Text style={styles.targetLabel}>Target: {formatCurrency(tabungan.target_saldo)}</Text>
+                  <Text style={styles.targetPercentage}>{Math.round((tabungan.saldo / (tabungan.target_saldo || 1)) * 100)}%</Text>
+                </View>
+                <View style={styles.progressBarContainer}>
+                  <View 
+                    style={[styles.progressBar, { width: `${Math.min(100, Math.round((tabungan.saldo / (tabungan.target_saldo || 1)) * 100))}%` }]} 
+                  />
+                </View>
+              </View>
+            )}
 
             {hasGoal && (
               <View style={styles.goalContainer}>
@@ -108,15 +124,22 @@ export function TabunganCard({ tabungan, onPress }: TabunganCardProps) {
             )}
           </View>
 
-          <View style={styles.footer}>
-            <View style={styles.lastTransactionContainer}>
+          {!compact ? (
+            <View style={styles.footer}>
+              <View style={styles.lastTransactionContainer}>
+                <Text style={styles.lastTransactionLabel}>Transaksi Terakhir:</Text>
+                <Text style={styles.lastTransactionDate}>{formatLastTransaction()}</Text>
+              </View>
+              <TouchableOpacity style={styles.transactionsButton}>
+                <Text style={styles.transactionsText}>Riwayat</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.compactFooter}>
               <Text style={styles.lastTransactionLabel}>Transaksi Terakhir:</Text>
               <Text style={styles.lastTransactionDate}>{formatLastTransaction()}</Text>
             </View>
-            <TouchableOpacity style={styles.transactionsButton}>
-              <Text style={styles.transactionsText}>Riwayat</Text>
-            </TouchableOpacity>
-          </View>
+          )}
         </View>
       </LinearGradient>
     </TouchableOpacity>
@@ -125,60 +148,85 @@ export function TabunganCard({ tabungan, onPress }: TabunganCardProps) {
 
 const styles = StyleSheet.create({
   container: {
-    width: 320,
-    borderRadius: 12,
+    width: '100%',
+    borderRadius: 16,
     overflow: 'hidden',
-    elevation: 3,
+    elevation: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    marginHorizontal: 8,
-    height: 230,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    height: 220,
+  },
+  compactContainer: {
+    height: 180, // Adjusted height to prevent content from being cut off
   },
   gradient: {
-    borderRadius: 12,
+    borderRadius: 16,
     height: '100%',
   },
   content: {
-    padding: 16,
+    padding: 20,
     height: '100%',
     justifyContent: 'space-between',
+  },
+  compactContent: {
+    padding: 16,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 18,
+  },
+  compactHeader: {
+    marginBottom: 12,
   },
   iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 14,
+  },
+  compactIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     marginRight: 12,
   },
   titleContainer: {
     flex: 1,
   },
   title: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
     color: 'white',
+  },
+  compactTitle: {
+    fontSize: 16,
   },
   accountNumber: {
     fontSize: 14,
     color: 'rgba(255, 255, 255, 0.8)',
-    marginTop: 2,
+    marginTop: 4,
   },
   balanceContainer: {
     marginBottom: 16,
   },
+  compactBalanceContainer: {
+    marginBottom: 12,
+  },
   balanceLabel: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 15,
+    color: 'rgba(255, 255, 255, 0.9)',
     marginBottom: 8,
+    fontWeight: '500',
+  },
+  compactBalanceLabel: {
+    fontSize: 14,
+    marginBottom: 6,
   },
   balanceRow: {
     flexDirection: 'row',
@@ -186,9 +234,41 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   balance: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: 'bold',
     color: 'white',
+  },
+  compactBalance: {
+    fontSize: 22,
+  },
+  targetContainer: {
+    marginTop: 8,
+  },
+  targetLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  targetLabel: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.9)',
+  },
+  targetPercentage: {
+    fontSize: 12,
+    color: 'white',
+    fontWeight: '600',
+  },
+  progressBarContainer: {
+    height: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    borderRadius: 2,
   },
   eyeButton: {
     padding: 5,
@@ -239,16 +319,19 @@ const styles = StyleSheet.create({
     color: 'white',
   },
   transactionsButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     borderRadius: 8,
-    alignItems: 'center',
   },
   transactionsText: {
     color: 'white',
-    fontWeight: '500',
     fontSize: 14,
+    fontWeight: '600',
+  },
+  compactFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   statusText: {
     fontSize: 12,
