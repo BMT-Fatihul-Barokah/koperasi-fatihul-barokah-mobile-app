@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useState } from 'react';
+import React, { useEffect, useCallback, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
-  Image
+  useColorScheme
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
@@ -19,6 +19,7 @@ import { useData } from '../../context/data-context';
 import { format, parseISO, formatDistanceToNow } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
 import { Ionicons } from '@expo/vector-icons';
+import { BottomNavBar } from '../../components/navigation/BottomNavBar';
 
 export default function NotificationsScreen() {
   const { member } = useAuth();
@@ -29,6 +30,11 @@ export default function NotificationsScreen() {
     markAllNotificationsAsRead 
   } = useData();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  
+  // Create styles with dynamic values based on theme
+  const styles = useMemo(() => createStyles(isDark), [isDark]);
 
   // Load notifications when component mounts - only once
   useEffect(() => {
@@ -209,63 +215,16 @@ export default function NotificationsScreen() {
         />
       )}
       
-      <View style={styles.navbar}>
-        <TouchableOpacity 
-          style={styles.navItem}
-          onPress={() => router.push('/dashboard')}
-        >
-          <Image 
-            source={require('../../assets/Beranda.png')} 
-            style={styles.navIcon} 
-            resizeMode="contain"
-            tintColor="#999"
-          />
-          <Text style={styles.navText}>Beranda</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.navItem}
-          onPress={() => router.push('/activity')}
-        >
-          <Image 
-            source={require('../../assets/aktifitas.png')} 
-            style={styles.navIcon} 
-            resizeMode="contain"
-            tintColor="#999"
-          />
-          <Text style={styles.navText}>Aktifitas</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.navItem}>
-          <Image 
-            source={require('../../assets/notifikasi.png')} 
-            style={[styles.navIcon, styles.activeNavIcon]} 
-            resizeMode="contain"
-          />
-          <Text style={[styles.navText, styles.activeNavText]}>Notifikasi</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.navItem}
-          onPress={() => router.push('/dashboard/profile')}
-        >
-          <Image 
-            source={require('../../assets/profil.png')} 
-            style={styles.navIcon} 
-            resizeMode="contain"
-            tintColor="#999"
-          />
-          <Text style={styles.navText}>Profil</Text>
-        </TouchableOpacity>
-      </View>
+      <BottomNavBar />
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+// Create styles with dynamic values based on theme
+const createStyles = (isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: isDark ? '#121212' : '#f8f8f8',
   },
   header: {
     backgroundColor: '#007BFF',

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, useWindowDimensions, FlatList, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { TabunganWithJenis } from '../../lib/database.types';
 import { TabunganService } from '../../services/tabungan.service';
 import { TabunganCard } from '../../components/tabungan/tabungan-card';
+import { BottomNavBar } from '../../components/navigation/BottomNavBar';
 import { formatCurrency } from '../../lib/format-utils';
 import { useColorScheme } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -24,6 +25,9 @@ export default function TabunganScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [totalSaldo, setTotalSaldo] = useState(0);
   const [anggotaId, setAnggotaId] = useState<string | null>(null);
+  
+  // Create styles with dynamic values based on theme
+  const styles = useMemo(() => createStyles(isDark), [isDark]);
   
   // Calculate number of columns based on screen width
   const numColumns = width > 600 ? 2 : 1;
@@ -183,14 +187,18 @@ export default function TabunganScreen() {
           ItemSeparatorComponent={() => <View style={styles.itemSeparator} />}
         />
       )}
+      
+      {/* Bottom Navigation */}
+      <BottomNavBar />
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+// Create styles with dynamic values based on theme
+const createStyles = (isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: isDark ? '#121212' : '#F8F9FA',
   },
   headerButton: {
     padding: 8,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   View, 
   Text, 
@@ -7,14 +7,19 @@ import {
   TouchableOpacity, 
   ActivityIndicator,
   SafeAreaView,
-  Image
+  useWindowDimensions,
+  RefreshControl
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import { useAuth } from '../../context/auth-context';
 import { format, parseISO } from 'date-fns';
 import { supabase } from '../../lib/supabase';
 import { TransactionCard } from '../../components/transaction/TransactionCard';
 import { ActivityHeader } from '../../components/header/ActivityHeader';
+import { BottomNavBar } from '../../components/navigation/BottomNavBar';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useColorScheme } from 'react-native';
 
 // Define transaction interface based on the database schema
 interface Transaction {
@@ -38,7 +43,13 @@ export default function ActivityScreen() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('transaction');
-  const [currentMonth, setCurrentMonth] = useState<string>(format(new Date(), 'MMMM'));
+  const [refreshing, setRefreshing] = useState(false);
+  const { width } = useWindowDimensions();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  
+  // Create styles with dynamic values based on theme and dimensions
+  const styles = useMemo(() => createStyles(isDark, width), [isDark, width]);
 
   // Fetch transactions from Supabase
   useEffect(() => {
@@ -48,56 +59,95 @@ export default function ActivityScreen() {
       return;
     }
 
-    const fetchTransactions = async () => {
-      setIsLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('transaksi')
-          .select('*')
-          .eq('anggota_id', member.id)
-          .order('created_at', { ascending: false })
-          .limit(20);
-
-        if (error) {
-          console.error('Error fetching transactions:', error);
-          return;
-        }
-
-        // Add mock recipient data for demo purposes
-        // In a real app, this would come from the database
-        const transactionsWithRecipients = data.map(tx => {
-          let recipientName, bankName;
-          
-          if (tx.kategori === 'transfer') {
-            if (tx.deskripsi?.includes('BLU')) {
-              recipientName = 'NOVANDRA ANUGRAH';
-              bankName = 'BLU BY BCA DIGITAL';
-            } else if (tx.deskripsi?.includes('SHOPEE')) {
-              recipientName = 'SHOPEE - nXXXXXXXX9';
-              bankName = 'BCA Virtual Account';
-            } else if (tx.deskripsi?.includes('OVO')) {
-              recipientName = 'NOVANDRA ANUGRAH';
-              bankName = 'OVO';
-            }
-          }
-          
-          return {
-            ...tx,
-            recipient_name: recipientName,
-            bank_name: bankName
-          };
-        });
-        
-        setTransactions(transactionsWithRecipients);
-      } catch (error) {
-        console.error('Error in transaction fetch:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchTransactions();
   }, [isAuthenticated, member]);
+  
+  const fetchTransactions = async () => {
+    setIsLoading(true);
+    try {
+      // Log member info for debugging
+      console.log('Current member info:', { 
+        memberId: member?.id,
+        memberName: member?.nama,
+        isAuthenticated
+      });
+      
+      if (!member?.id) {
+        console.warn('Member ID is undefined, cannot fetch transactions');
+        setIsLoading(false);
+        return;
+      }
+      
+      // Directly fetch transactions for this member
+      const { data, error } = await supabase
+        .from('transaksi')
+        .select('*')
+        .eq('anggota_id', member.id)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (error) {
+        console.error('Error fetching transactions:', error);
+        setIsLoading(false);
+        return;
+      }
+      
+      console.log(`Found ${data?.length || 0} transactions for member ID: ${member.id}`);
+      
+      // If no transactions found, try fetching a sample for debugging
+      if (!data || data.length === 0) {
+        console.log('No transactions found for this member, fetching sample for debugging...');
+        const { data: sampleData, error: sampleError } = await supabase
+          .from('transaksi')
+          .select('id, anggota_id, tipe_transaksi, kategori, jumlah')
+          .limit(5);
+          
+        if (!sampleError && sampleData && sampleData.length > 0) {
+          console.log('Sample transactions:', sampleData);
+        } else if (sampleError) {
+          console.error('Error fetching sample transactions:', sampleError);
+        }
+      }
+
+      // Add mock recipient data for demo purposes
+      // In a real app, this would come from the database
+      const transactionsWithRecipients = (data || []).map(tx => {
+        let recipientName, bankName;
+        
+        if (tx.kategori === 'transfer') {
+          if (tx.deskripsi?.includes('BLU')) {
+            recipientName = 'NOVANDRA ANUGRAH';
+            bankName = 'BLU BY BCA DIGITAL';
+          } else if (tx.deskripsi?.includes('SHOPEE')) {
+            recipientName = 'SHOPEE - nXXXXXXXX9';
+            bankName = 'BCA Virtual Account';
+          } else if (tx.deskripsi?.includes('OVO')) {
+            recipientName = 'NOVANDRA ANUGRAH';
+            bankName = 'OVO';
+          }
+        }
+        
+        return {
+          ...tx,
+          recipient_name: recipientName,
+          bank_name: bankName
+        };
+      });
+      
+      setTransactions(transactionsWithRecipients);
+    } catch (error) {
+      console.error('Error in transaction fetch:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Handle refresh
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchTransactions();
+    setRefreshing(false);
+  };
 
   // Format currency
   const formatCurrency = (amount: number) => {
@@ -109,42 +159,12 @@ export default function ActivityScreen() {
     }).format(amount);
   };
 
-  // Group transactions by month
-  const groupTransactionsByMonth = () => {
-    const grouped: { [key: string]: Transaction[] } = {};
-    
-    transactions.forEach(transaction => {
-      const date = parseISO(transaction.created_at);
-      const month = format(date, 'MMMM');
-      
-      if (!grouped[month]) {
-        grouped[month] = [];
-      }
-      
-      grouped[month].push(transaction);
-    });
-    
-    return grouped;
-  };
-
-  const groupedTransactions = groupTransactionsByMonth();
-
-  // Format date for display
-  const formatTransactionDate = (dateString: string) => {
-    const date = parseISO(dateString);
-    return {
-      day: format(date, 'd'),
-      month: format(date, 'MMM'),
-      year: format(date, 'yyyy')
-    };
-  };
-
   // Render transaction item using the reusable component
   const renderTransactionItem = ({ item }: { item: Transaction }) => (
     <TransactionCard
       id={item.id}
       date={item.created_at}
-      description={item.deskripsi}
+      description={item.deskripsi || ''}
       amount={Number(item.jumlah)}
       type={item.tipe_transaksi}
       category={item.kategori}
@@ -153,247 +173,175 @@ export default function ActivityScreen() {
       onPress={() => router.push(`/activity/${item.id}`)}
     />
   );
-
-  // Render month section
-  const renderMonthSection = (month: string, monthTransactions: Transaction[]) => (
-    <View key={month} style={styles.monthSection}>
-      <Text style={styles.monthTitle}>{month}</Text>
-      {monthTransactions.map(transaction => (
-        <View key={transaction.id}>
-          {renderTransactionItem({ item: transaction })}
-        </View>
-      ))}
+  
+  // Render empty state when no transactions are available
+  const renderEmptyState = () => (
+    <View style={styles.emptyStateContainer}>
+      <MaterialCommunityIcons 
+        name="history" 
+        size={80} 
+        color={isDark ? '#555' : '#ccc'} 
+      />
+      <Text style={[styles.emptyStateTitle, isDark && styles.emptyStateTitleDark]}>
+        Belum ada transaksi
+      </Text>
+      <Text style={[styles.emptyStateText, isDark && styles.emptyStateTextDark]}>
+        Transaksi Anda akan muncul di sini setelah Anda melakukan aktivitas keuangan
+      </Text>
     </View>
   );
 
-  if (authLoading || isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007BFF" />
-        <Text style={styles.loadingText}>Memuat data aktivitas...</Text>
-      </View>
-    );
-  }
-
   return (
-    <SafeAreaView style={styles.container}>
-      <ActivityHeader 
-        title="Activity"
-        showFilterButton
-        onFilterPress={() => console.log('Filter pressed')}
-      />
+    <SafeAreaView style={[styles.container, isDark && styles.containerDark]}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       
-      <View style={styles.tabContainer}>
-        <TouchableOpacity 
+      <ActivityHeader title="Aktivitas" />
+      
+      <View style={styles.tabsContainer}>
+        <TouchableOpacity
           style={[styles.tabButton, activeTab === 'transaction' && styles.activeTabButton]}
           onPress={() => setActiveTab('transaction')}
         >
           <Text style={[styles.tabText, activeTab === 'transaction' && styles.activeTabText]}>
-            Transaction
+            Transaksi
           </Text>
         </TouchableOpacity>
         
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.tabButton, activeTab === 'others' && styles.activeTabButton]}
           onPress={() => setActiveTab('others')}
         >
           <Text style={[styles.tabText, activeTab === 'others' && styles.activeTabText]}>
-            Others
+            Lainnya
           </Text>
         </TouchableOpacity>
       </View>
       
-      {activeTab === 'transaction' ? (
-        <FlatList
-          data={[]}
-          renderItem={null}
-          ListHeaderComponent={
-            <View style={styles.transactionsContainer}>
-              {Object.keys(groupedTransactions).map(month => 
-                renderMonthSection(month, groupedTransactions[month])
-              )}
-              
-              {transactions.length === 0 && (
-                <View style={styles.emptyStateContainer}>
-                  <Text style={styles.emptyStateText}>Tidak ada transaksi</Text>
-                </View>
-              )}
-            </View>
-          }
-          style={styles.flatList}
-        />
-      ) : (
-        <View style={styles.emptyStateContainer}>
-          <Text style={styles.emptyStateText}>Tidak ada data lainnya</Text>
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#007BFF" />
+          <Text style={[styles.loadingText, isDark && styles.loadingTextDark]}>Memuat transaksi...</Text>
         </View>
+      ) : (
+        <FlatList
+          data={transactions}
+          renderItem={renderTransactionItem}
+          keyExtractor={item => item.id}
+          contentContainerStyle={[styles.transactionList, transactions.length === 0 && styles.emptyList]}
+          showsVerticalScrollIndicator={false}
+          ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+          ListEmptyComponent={renderEmptyState}
+          removeClippedSubviews={false}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          getItemLayout={(data, index) => ({
+            length: 80, // Fixed item height (72px card + 8px separator)
+            offset: 80 * index,
+            index,
+          })}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={['#007BFF']}
+              tintColor={isDark ? '#fff' : '#007BFF'}
+            />
+          }
+        />
       )}
       
-      <View style={styles.navbar}>
-        <TouchableOpacity 
-          style={styles.navItem}
-          onPress={() => router.push('/dashboard')}
-        >
-          <Image 
-            source={require('../../assets/Beranda.png')} 
-            style={styles.navIcon} 
-            resizeMode="contain"
-            tintColor="#999"
-          />
-          <Text style={styles.navText}>Beranda</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.navItem}>
-          <Image 
-            source={require('../../assets/aktifitas.png')} 
-            style={[styles.navIcon, styles.activeNavIcon]} 
-            resizeMode="contain"
-          />
-          <Text style={[styles.navText, styles.activeNavText]}>Aktifitas</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.navItem}
-          onPress={() => router.push('/dashboard/notifications')}
-        >
-          <Image 
-            source={require('../../assets/notifikasi.png')} 
-            style={styles.navIcon} 
-            resizeMode="contain"
-            tintColor="#999"
-          />
-          <Text style={styles.navText}>Notifikasi</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.navItem}
-          onPress={() => router.push('/dashboard/profile')}
-        >
-          <Image 
-            source={require('../../assets/profil.png')} 
-            style={styles.navIcon} 
-            resizeMode="contain"
-            tintColor="#999"
-          />
-          <Text style={styles.navText}>Profil</Text>
-        </TouchableOpacity>
-      </View>
+      <BottomNavBar />
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+// Create styles with dynamic values based on theme and dimensions
+const createStyles = (isDark: boolean, width: number) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#F7F9FC',
+  },
+  containerDark: {
+    backgroundColor: '#121212',
+  },
+  tabsContainer: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 16,
+    backgroundColor: isDark ? '#2A2A2A' : '#E8EEF4',
+    borderRadius: 12,
+    padding: 4,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 10,
+  },
+  activeTabButton: {
+    backgroundColor: isDark ? '#3A3A3A' : '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: isDark ? '#888' : '#888',
+  },
+  activeTabText: {
+    color: isDark ? '#FFFFFF' : '#333333',
+    fontWeight: '600',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f8f8',
   },
   loadingText: {
-    marginTop: 16,
+    marginTop: 12,
     fontSize: 16,
     color: '#666',
   },
-  header: {
-    backgroundColor: '#007BFF',
-    paddingTop: 60,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  loadingTextDark: {
+    color: '#AAA',
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
+  transactionList: {
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 100, // Extra padding for bottom nav
   },
-  filterButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  filterIcon: {
-    fontSize: 20,
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  tabButton: {
-    paddingVertical: 15,
-    paddingHorizontal: 15,
-    marginRight: 20,
-  },
-  activeTabButton: {
-    borderBottomWidth: 2,
-    borderBottomColor: '#007BFF',
-  },
-  tabText: {
-    fontSize: 16,
-    color: '#666',
-  },
-  activeTabText: {
-    color: '#007BFF',
-    fontWeight: 'bold',
-  },
-  flatList: {
+  emptyList: {
     flex: 1,
+    justifyContent: 'center',
   },
-  transactionsContainer: {
-    padding: 15,
-  },
-  monthSection: {
-    marginBottom: 20,
-  },
-  monthTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-
   emptyStateContainer: {
-    padding: 40,
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 20,
+    height: 400,
+  },
+  emptyStateTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyStateTitleDark: {
+    color: '#FFF',
   },
   emptyStateText: {
-    fontSize: 16,
-    color: '#999',
-  },
-  navbar: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    backgroundColor: '#fff',
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-  },
-  navItem: {
-    alignItems: 'center',
-  },
-  navIcon: {
-    width: 36,
-    height: 36,
-    marginBottom: 6,
-  },
-  activeNavIcon: {
-    tintColor: '#007BFF',
-  },
-  navText: {
     fontSize: 14,
-    color: '#999',
+    color: '#666',
+    textAlign: 'center',
+    maxWidth: 250,
   },
-  activeNavText: {
-    color: '#007BFF',
-  }
+  emptyStateTextDark: {
+    color: '#AAA',
+  },
 });

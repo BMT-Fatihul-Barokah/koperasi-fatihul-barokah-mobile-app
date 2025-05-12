@@ -3,9 +3,12 @@ import {
   View, 
   Text, 
   StyleSheet, 
-  TouchableOpacity 
+  TouchableOpacity,
+  useColorScheme
 } from 'react-native';
 import { format, parseISO } from 'date-fns';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface TransactionCardProps {
   id: string;
@@ -19,7 +22,8 @@ interface TransactionCardProps {
   onPress?: () => void;
 }
 
-export function TransactionCard({
+// Memoize the component to prevent unnecessary re-renders
+export const TransactionCard = React.memo(function TransactionCard({
   id,
   date,
   description,
@@ -30,6 +34,9 @@ export function TransactionCard({
   bankName,
   onPress
 }: TransactionCardProps) {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  
   // Format currency
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -46,133 +53,214 @@ export function TransactionCard({
     return {
       day: format(date, 'd'),
       month: format(date, 'MMM'),
-      year: format(date, 'yyyy')
+      year: format(date, 'yyyy'),
+      fullDate: format(date, 'd MMM yyyy'),
+      time: format(date, 'HH:mm')
     };
   };
 
   const formattedDate = formatTransactionDate(date);
   const displayName = recipientName || description;
-  const displayDescription = bankName || (category ? `Transfer to ${category.replace('_', ' ')}` : description);
+  const displayDescription = bankName || (category ? `Transfer ke ${category.replace('_', ' ')}` : description);
+  
+  // Determine transaction icon based on category
+  const getTransactionIcon = () => {
+    if (category === 'transfer') {
+      return <MaterialCommunityIcons name="bank-transfer" size={24} color="white" />;
+    } else if (category === 'pembayaran') {
+      return <MaterialCommunityIcons name="cash-multiple" size={24} color="white" />;
+    } else if (category === 'tabungan') {
+      return <MaterialCommunityIcons name="piggy-bank" size={24} color="white" />;
+    } else if (category === 'pinjaman') {
+      return <MaterialCommunityIcons name="cash-refund" size={24} color="white" />;
+    } else {
+      return <Ionicons name="wallet-outline" size={24} color="white" />;
+    }
+  };
+  
+  // Determine gradient colors based on transaction type and category
+  const getGradientColors = () => {
+    if (type === 'masuk') {
+      return ['#00875A', '#20B982'] as const;
+    } else {
+      if (category === 'transfer') {
+        return ['#0066CC', '#0095FF'] as const;
+      } else if (category === 'pembayaran') {
+        return ['#9C27B0', '#BA68C8'] as const;
+      } else {
+        return ['#E53935', '#FF5252'] as const;
+      }
+    }
+  };
+  
+  // Get transaction status text
+  const getStatusText = () => {
+    return 'Berhasil';
+  };
 
   return (
     <TouchableOpacity 
-      style={styles.transactionItem}
+      style={[styles.transactionItem, isDark && styles.transactionItemDark]}
       onPress={onPress}
+      activeOpacity={0.7}
     >
-      <View style={styles.dateColumn}>
-        <Text style={styles.dayText}>{formattedDate.day}</Text>
-        <Text style={styles.monthText}>{formattedDate.month}</Text>
-        <Text style={styles.yearText}>{formattedDate.year}</Text>
-      </View>
-      
-      <View style={styles.detailsColumn}>
-        <Text style={styles.transactionName} numberOfLines={1}>
-          {displayName}
-        </Text>
-        <Text style={styles.transactionDescription} numberOfLines={1}>
-          {displayDescription}
-        </Text>
-        <View style={styles.statusContainer}>
-          <Text style={styles.statusText}>Successful</Text>
+      <View style={styles.transactionContent}>
+        <LinearGradient
+          colors={getGradientColors()}
+          style={styles.iconContainer}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          {getTransactionIcon()}
+        </LinearGradient>
+        
+        <View style={styles.detailsColumn}>
+          <View style={styles.transactionHeader}>
+            <Text style={[styles.transactionName, isDark && styles.transactionNameDark]} numberOfLines={1}>
+              {displayName}
+            </Text>
+            <Text style={[
+              styles.amountText,
+              type === 'masuk' ? styles.creditAmount : styles.debitAmount,
+              isDark && (type === 'masuk' ? styles.creditAmountDark : styles.debitAmountDark)
+            ]}>
+              {type === 'masuk' ? '+' : '-'}{formatCurrency(Number(amount))}
+            </Text>
+          </View>
+          
+          <View style={styles.transactionFooter}>
+            <Text style={[styles.transactionDescription, isDark && styles.transactionDescriptionDark]} numberOfLines={1}>
+              {displayDescription}
+            </Text>
+            
+            <Text style={[styles.dateText, isDark && styles.dateTextDark]}>
+              {formattedDate.fullDate} • {formattedDate.time}
+            </Text>
+          </View>
         </View>
       </View>
       
-      <View style={styles.amountColumn}>
-        <Text style={[
-          styles.amountText,
-          type === 'masuk' ? styles.creditAmount : styles.debitAmount
-        ]}>
-          {type === 'masuk' ? '+' : '-'} {formatCurrency(Number(amount))}
-        </Text>
-        <TouchableOpacity style={styles.detailButton}>
-          <Text style={styles.detailButtonIcon}>›</Text>
-        </TouchableOpacity>
+      <View style={styles.chevronContainer}>
+        <Ionicons 
+          name="chevron-forward" 
+          size={18} 
+          color={isDark ? '#666' : '#CCC'} 
+        />
       </View>
     </TouchableOpacity>
   );
-}
+});
 
 const styles = StyleSheet.create({
   transactionItem: {
     flexDirection: 'row',
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 15,
-    marginBottom: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
     elevation: 2,
-  },
-  dateColumn: {
-    width: 50,
+    overflow: 'hidden',
     alignItems: 'center',
+    height: 72, // Fixed height to prevent layout shifts
+  },
+  transactionItemDark: {
+    backgroundColor: '#1E1E1E',
+    shadowOpacity: 0.2,
+  },
+  transactionContent: {
+    flex: 1,
+    flexDirection: 'row',
+    padding: 12,
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
     justifyContent: 'center',
-    marginRight: 15,
-  },
-  dayText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  monthText: {
-    fontSize: 12,
-    color: '#666',
-  },
-  yearText: {
-    fontSize: 12,
-    color: '#999',
+    alignItems: 'center',
+    marginRight: 12,
   },
   detailsColumn: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    height: '100%',
+  },
+  transactionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 2,
   },
   transactionName: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 4,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#333',
+    flex: 1,
+    marginRight: 8,
+  },
+  transactionNameDark: {
+    color: '#FFFFFF',
   },
   transactionDescription: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#666',
-    marginBottom: 6,
+    flex: 1,
+  },
+  transactionDescriptionDark: {
+    color: '#AAAAAA',
+  },
+  transactionFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 2,
+    height: 20, // Fixed height to prevent layout shifts
   },
   statusContainer: {
-    backgroundColor: '#e6f7e6',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 12,
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+    borderRadius: 10,
     alignSelf: 'flex-start',
   },
+  statusSuccess: {
+    backgroundColor: 'rgba(40, 167, 69, 0.15)',
+  },
+  statusInfo: {
+    backgroundColor: 'rgba(0, 123, 255, 0.15)',
+  },
   statusText: {
-    fontSize: 12,
+    fontSize: 11,
+    fontWeight: '500',
     color: '#28a745',
   },
-  amountColumn: {
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
+  dateText: {
+    fontSize: 11,
+    color: '#999',
+  },
+  dateTextDark: {
+    color: '#777',
   },
   amountText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
-    marginBottom: 10,
   },
   creditAmount: {
     color: '#28a745',
   },
+  creditAmountDark: {
+    color: '#4CAF50',
+  },
   debitAmount: {
     color: '#dc3545',
   },
-  detailButton: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#f0f0f0',
+  debitAmountDark: {
+    color: '#F44336',
+  },
+  chevronContainer: {
+    paddingRight: 12,
+    height: '100%',
     justifyContent: 'center',
-    alignItems: 'center',
-  },
-  detailButtonIcon: {
-    fontSize: 18,
-    color: '#666',
-  },
+  }
 });

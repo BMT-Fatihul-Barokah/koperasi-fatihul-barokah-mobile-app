@@ -19,6 +19,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { TabunganWithJenis } from '../../lib/database.types';
 import { TabunganService } from '../../services/tabungan.service';
 import { TabunganCarousel } from '../../components/tabungan/tabungan-carousel';
+import { BottomNavBar } from '../../components/navigation/BottomNavBar';
 import { formatCurrency as formatCurrencyUtil } from '../../lib/format-utils';
 import { useColorScheme } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -345,55 +346,7 @@ export default function DashboardScreen() {
       </ScrollView>
       
       {/* Navbar */}
-      <View style={styles.navbar}>
-        <TouchableOpacity style={styles.navItem}>
-          <Image 
-            source={require('../../assets/Beranda.png')} 
-            style={[styles.navIcon, styles.activeNavIcon]} 
-            resizeMode="contain"
-          />
-          <Text style={[styles.navText, styles.activeNavText]}>Beranda</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.navItem}
-          onPress={() => router.push('/activity')}
-        >
-          <Image 
-            source={require('../../assets/aktifitas.png')} 
-            style={styles.navIcon} 
-            resizeMode="contain"
-            tintColor="#999"
-          />
-          <Text style={styles.navText}>Aktifitas</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.navItem}
-          onPress={() => router.push('/dashboard/notifications')}
-        >
-          <Image 
-            source={require('../../assets/notifikasi.png')} 
-            style={styles.navIcon} 
-            resizeMode="contain"
-            tintColor="#999"
-          />
-          <Text style={styles.navText}>Notifikasi</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.navItem}
-          onPress={() => router.push('/dashboard/profile')}
-        >
-          <Image 
-            source={require('../../assets/profil.png')} 
-            style={styles.navIcon} 
-            resizeMode="contain"
-            tintColor="#999"
-          />
-          <Text style={styles.navText}>Profil</Text>
-        </TouchableOpacity>
-      </View>
+      <BottomNavBar />
     </View>
   );
 }

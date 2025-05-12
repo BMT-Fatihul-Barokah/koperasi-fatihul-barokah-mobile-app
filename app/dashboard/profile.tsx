@@ -1,28 +1,35 @@
-import React, { useEffect, useState } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
-  TouchableOpacity, 
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
   ActivityIndicator,
-  Image,
-  Alert
+  Alert,
+  useColorScheme
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/auth-context';
 import { useData } from '../../context/data-context';
-import { format, parseISO } from 'date-fns';
+import { supabase } from '../../lib/supabase';
+import { BottomNavBar } from '../../components/navigation/BottomNavBar';
 import { id as idLocale } from 'date-fns/locale';
-import { Ionicons } from '@expo/vector-icons';
+import { format, parseISO } from 'date-fns';
 
 export default function ProfileScreen() {
   const { isLoading, member, account, logout, refreshUserData } = useAuth();
   const { clearCache } = useData();
   const [isRefreshing, setIsRefreshing] = useState(false);
-  
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+
+  // Create styles with dynamic values based on theme
+  const styles = useMemo(() => createStyles(isDark), [isDark]);
+
   // Refresh user data when profile loads
   useEffect(() => {
     refreshUserData();
@@ -218,63 +225,16 @@ export default function ProfileScreen() {
         </View>
       </ScrollView>
       
-      <View style={styles.navbar}>
-        <TouchableOpacity 
-          style={styles.navItem}
-          onPress={() => router.push('/dashboard')}
-        >
-          <Image 
-            source={require('../../assets/Beranda.png')} 
-            style={styles.navIcon} 
-            resizeMode="contain"
-            tintColor="#999"
-          />
-          <Text style={styles.navText}>Beranda</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.navItem}
-          onPress={() => router.push('/activity')}
-        >
-          <Image 
-            source={require('../../assets/aktifitas.png')} 
-            style={styles.navIcon} 
-            resizeMode="contain"
-            tintColor="#999"
-          />
-          <Text style={styles.navText}>Aktifitas</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.navItem}
-          onPress={() => router.push('/dashboard/notifications')}
-        >
-          <Image 
-            source={require('../../assets/notifikasi.png')} 
-            style={styles.navIcon} 
-            resizeMode="contain"
-            tintColor="#999"
-          />
-          <Text style={styles.navText}>Notifikasi</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.navItem}>
-          <Image 
-            source={require('../../assets/profil.png')} 
-            style={[styles.navIcon, styles.activeNavIcon]} 
-            resizeMode="contain"
-          />
-          <Text style={[styles.navText, styles.activeNavText]}>Profil</Text>
-        </TouchableOpacity>
-      </View>
+      <BottomNavBar />
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+// Create styles with dynamic values based on theme
+const createStyles = (isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: isDark ? '#121212' : '#f8f8f8',
   },
   loadingContainer: {
     flex: 1,
