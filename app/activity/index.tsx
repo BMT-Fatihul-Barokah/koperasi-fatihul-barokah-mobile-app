@@ -16,7 +16,7 @@ import { useAuth } from '../../context/auth-context';
 import { format, parseISO } from 'date-fns';
 import { supabase } from '../../lib/supabase';
 import { TransactionCard } from '../../components/transaction/TransactionCard';
-import { ActivityHeader } from '../../components/header/ActivityHeader';
+import { DashboardHeader } from '../../components/header/dashboard-header';
 import { BottomNavBar } from '../../components/navigation/BottomNavBar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useColorScheme } from 'react-native';
@@ -195,7 +195,7 @@ export default function ActivityScreen() {
     <SafeAreaView style={[styles.container, isDark && styles.containerDark]}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
       
-      <ActivityHeader title="Aktivitas" />
+      <DashboardHeader title="Aktivitas" showBackButton={false} />
       
       <View style={styles.tabsContainer}>
         <TouchableOpacity

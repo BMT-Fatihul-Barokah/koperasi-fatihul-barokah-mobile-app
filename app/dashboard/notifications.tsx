@@ -19,6 +19,7 @@ import { useData } from '../../context/data-context';
 import { format, parseISO, formatDistanceToNow } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
 import { Ionicons } from '@expo/vector-icons';
+import { DashboardHeader } from '../../components/header/dashboard-header';
 import { BottomNavBar } from '../../components/navigation/BottomNavBar';
 
 export default function NotificationsScreen() {
@@ -171,26 +172,22 @@ export default function NotificationsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar style="light" />
+      <DashboardHeader 
+        title="Notifikasi" 
+        showBackButton={false}
+        rightComponent={
+          notifications.unreadCount > 0 ? (
+            <TouchableOpacity 
+              style={styles.markAllButton}
+              onPress={handleMarkAllAsRead}
+            >
+              <Text style={styles.markAllText}>Tandai Semua</Text>
+            </TouchableOpacity>
+          ) : undefined
+        }
+      />
       
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Ionicons name="arrow-back" size={24} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Notifikasi</Text>
-        {notifications.unreadCount > 0 && (
-          <TouchableOpacity 
-            style={styles.markAllButton}
-            onPress={handleMarkAllAsRead}
-          >
-            <Text style={styles.markAllText}>Tandai Semua</Text>
-          </TouchableOpacity>
-        )}
-        {notifications.unreadCount === 0 && <View style={styles.spacer} />}
-      </View>
+      {notifications.unreadCount === 0 && <View style={styles.spacer} />}
       
       {notifications.isLoading ? (
         <View style={styles.loadingContainer}>

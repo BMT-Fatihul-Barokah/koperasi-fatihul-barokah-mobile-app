@@ -14,6 +14,7 @@ import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { DashboardHeader } from '../../components/header/dashboard-header';
 import { useAuth } from '../../context/auth-context';
 import { useData } from '../../context/data-context';
 import { BottomNavBar } from '../../components/navigation/BottomNavBar';
@@ -93,32 +94,10 @@ export default function ProfileScreen() {
   
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar style="light" />
-      
-      {/* Header with gradient background */}
-      <LinearGradient
-        colors={['#003D82', '#0066CC']}
-        style={styles.header}
-        start={[0, 0]}
-        end={[1, 1]}
-      >
-        <View style={styles.headerContent}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <Ionicons name="arrow-back" size={24} color="#fff" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Profil Anggota</Text>
-          <TouchableOpacity 
-            style={styles.refreshButton}
-            onPress={handleRefresh}
-            disabled={isRefreshing}
-          >
-            <Ionicons name="refresh" size={24} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
+      <DashboardHeader 
+        title="Profil Anggota" 
+        showBackButton={false}
+      />
       
       <ScrollView 
         style={styles.content}
