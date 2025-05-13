@@ -200,48 +200,7 @@ export default function DashboardScreen() {
           )}
         </View>
         
-        {/* Quick Actions */}
-        <View style={styles.quickActionsSection}>
-          <Text style={styles.sectionTitle}>Aksi Cepat</Text>
-          
-          <View style={styles.quickActionsGrid}>
-            <TouchableOpacity style={styles.quickActionItem}>
-              <Image 
-                source={require('../../assets/informasi-deposit.png')} 
-                style={styles.quickActionImage} 
-                resizeMode="contain"
-              />
-              <Text style={styles.quickActionText}>Informasi Deposit</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.quickActionItem}>
-              <Image 
-                source={require('../../assets/informasi-pinjaman.png')} 
-                style={styles.quickActionImage} 
-                resizeMode="contain"
-              />
-              <Text style={styles.quickActionText}>Informasi Pinjaman</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.quickActionItem}>
-              <Image 
-                source={require('../../assets/pengajuan-pinjaman.png')} 
-                style={styles.quickActionImage} 
-                resizeMode="contain"
-              />
-              <Text style={styles.quickActionText}>Detail Tabungan</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.quickActionItem}>
-              <Image 
-                source={require('../../assets/informasi-penarikan-saldo.png')} 
-                style={styles.quickActionImage} 
-                resizeMode="contain"
-              />
-              <Text style={styles.quickActionText}>Informasi Penarikan Saldo</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+
         
         {/* Recent Transactions */}
         <View style={styles.transactionsSection}>
@@ -429,47 +388,7 @@ const createStyles = (isDark: boolean, width: number) => StyleSheet.create({
     fontWeight: '500',
     fontSize: 14,
   },
-  quickActionsSection: {
-    marginHorizontal: 16,
-    marginBottom: 24,
-  },
-  quickActionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  quickActionItem: {
-    width: '23%',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  quickActionImage: {
-    width: 70,
-    height: 70,
-    marginBottom: 8,
-  },
-  quickActionGradient: {
-    borderRadius: 12,
-    padding: 16,
-    height: 100,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  quickActionIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  quickActionText: {
-    fontSize: 13,
-    textAlign: 'center',
-    color: '#666',
-    fontWeight: '500',
-  },
+
   transactionsSection: {
     marginHorizontal: 16,
     marginBottom: 24,

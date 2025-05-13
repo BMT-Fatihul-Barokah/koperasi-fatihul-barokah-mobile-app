@@ -36,8 +36,13 @@ export function BottomNavBar({ style }: BottomNavBarProps) {
       return true;
     }
     
-    // For activity and other paths
+    // For activity path
     if (path === '/activity' && (currentPath === '/activity' || currentPath.startsWith('/activity/'))) {
+      return true;
+    }
+    
+    // For pinjaman path
+    if (path === '/pinjaman' && (currentPath === '/pinjaman' || currentPath.startsWith('/pinjaman/'))) {
       return true;
     }
     
@@ -57,6 +62,12 @@ export function BottomNavBar({ style }: BottomNavBarProps) {
       icon: 'time-outline' as const,
       activeIcon: 'time' as const,
       path: '/activity',
+    },
+    {
+      name: 'Pinjaman',
+      icon: 'cash-outline' as const,
+      activeIcon: 'cash' as const,
+      path: '/pinjaman',
     },
     {
       name: 'Notifikasi',
