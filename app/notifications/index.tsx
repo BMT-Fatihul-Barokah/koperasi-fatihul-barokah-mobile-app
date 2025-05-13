@@ -24,7 +24,6 @@ import { DashboardHeader } from '../../components/header/dashboard-header';
 import { NOTIFICATION_TYPES, NotificationService } from '../../services/notification.service';
 import { BottomNavBar } from '../../components/navigation/BottomNavBar';
 import { supabase } from '../../lib/supabase';
-import { SupabaseDebug } from '../../components/debug/supabase-debug';
 
 // Filter type for notifications
 type FilterType = 'all' | 'unread' | 'transaksi' | 'pengumuman' | 'info' | 'sistem' | 'jatuh_tempo';
@@ -101,101 +100,7 @@ export default function NotificationsScreen() {
     }
   };
   
-  // Debug: Check and setup database schema
-  const handleCheckDatabase = useCallback(async () => {
-    try {
-      // Check if the notifikasi table exists
-      const { data: tableInfo, error: tableError } = await supabase
-        .from('notifikasi')
-        .select('id')
-        .limit(1);
-      
-      if (tableError) {
-        console.error('Error checking notifikasi table:', tableError);
-        Alert.alert('Error', 'Failed to check database schema');
-        return false;
-      }
-      
-      Alert.alert('Success', 'Database schema checked successfully');
-      return true;
-    } catch (error) {
-      console.error('Error checking database schema:', error);
-      Alert.alert('Error', 'An error occurred while checking database schema');
-      return false;
-    }
-  }, []);
-  
-  // Debug: Add test notifications
-  const handleAddTestNotifications = useCallback(async () => {
-    if (!member?.id) {
-      Alert.alert('Error', 'You must be logged in to add test notifications');
-      return;
-    }
-    
-    try {
-      // First check database
-      const dbCheck = await handleCheckDatabase();
-      if (!dbCheck) return false;
-      
-      // Add test notifications
-      const notificationTypes = ['info', 'transaksi', 'sistem', 'pengumuman', 'jatuh_tempo'];
-      const now = new Date().toISOString();
-      
-      // Create a personal notification for this member
-      const personalNotification = {
-        anggota_id: member.id,
-        judul: 'Notifikasi Personal',
-        pesan: 'Ini adalah notifikasi personal untuk Anda.',
-        jenis: 'info',
-        is_read: false,
-        created_at: now,
-        updated_at: now
-      };
-      
-      // Create a system notification for all users
-      const systemNotification = {
-        anggota_id: member.id,
-        judul: 'Pengumuman Sistem',
-        pesan: 'Ini adalah pengumuman sistem untuk semua pengguna.',
-        jenis: 'sistem',
-        is_read: false,
-        created_at: now,
-        updated_at: now
-      };
-      
-      // Create a transaction notification
-      const transactionNotification = {
-        anggota_id: member.id,
-        judul: 'Transaksi Berhasil',
-        pesan: 'Transaksi simpanan sebesar Rp 100.000 berhasil dilakukan.',
-        jenis: 'transaksi',
-        is_read: false,
-        data: { transaction_id: 'TX-' + Date.now() },
-        created_at: now,
-        updated_at: now
-      };
-      
-      // Insert notifications
-      const { error } = await supabase
-        .from('notifikasi')
-        .insert([personalNotification, systemNotification, transactionNotification]);
-      
-      if (error) {
-        console.error('Error adding test notifications:', error);
-        Alert.alert('Error', 'Failed to add test notifications');
-        return false;
-      }
-      
-      Alert.alert('Success', 'Test notifications added successfully');
-      // Refresh notifications
-      await fetchNotifications(true);
-      return true;
-    } catch (error) {
-      console.error('Error adding test notifications:', error);
-      Alert.alert('Error', 'An error occurred while adding test notifications');
-      return false;
-    }
-  }, [member?.id, fetchNotifications, handleCheckDatabase]);
+
 
   // Refresh notifications
   const handleRefresh = useCallback(async () => {
@@ -321,32 +226,14 @@ export default function NotificationsScreen() {
         title="Notifikasi" 
         showBackButton={false}
         rightComponent={
-          <View style={styles.headerRightContainer}>
-            {__DEV__ && (
-              <View style={styles.debugButtonsContainer}>
-                <TouchableOpacity 
-                  style={[styles.debugButton, { backgroundColor: '#6c757d' }]}
-                  onPress={handleCheckDatabase}
-                >
-                  <Text style={styles.debugButtonText}>Check DB</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={styles.debugButton}
-                  onPress={handleAddTestNotifications}
-                >
-                  <Text style={styles.debugButtonText}>Add Test</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-            {notifications.unreadCount > 0 && (
-              <TouchableOpacity 
-                style={styles.markAllButton}
-                onPress={handleMarkAllAsRead}
-              >
-                <Text style={styles.markAllText}>Tandai Semua</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          notifications.unreadCount > 0 && (
+            <TouchableOpacity 
+              style={styles.markAllButton}
+              onPress={handleMarkAllAsRead}
+            >
+              <Text style={styles.markAllText}>Tandai Semua</Text>
+            </TouchableOpacity>
+          )
         }
       />
       
@@ -425,9 +312,6 @@ export default function NotificationsScreen() {
       )}
       
       <BottomNavBar />
-      
-      {/* Debug tool - only visible in development */}
-      {__DEV__ && <SupabaseDebug />}
     </SafeAreaView>
   );
 }
@@ -500,25 +384,7 @@ const createStyles = (isDark: boolean) => StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  headerRightContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  debugButtonsContainer: {
-    flexDirection: 'row',
-    marginRight: 8,
-  },
-  debugButton: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    backgroundColor: '#dc3545',
-    marginRight: 4,
-  },
-  debugButtonText: {
-    color: '#fff',
-    fontSize: 12,
-  },
+
   spacer: {
     width: 40,
   },

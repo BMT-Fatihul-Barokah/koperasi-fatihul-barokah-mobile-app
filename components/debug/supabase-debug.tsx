@@ -22,8 +22,8 @@ export function SupabaseDebug() {
   // Check Supabase connection
   const checkConnection = async () => {
     try {
-      // Check if we can connect to Supabase
-      const { data, error } = await supabase.from('_anon_key_check').select('*').limit(1);
+      // Check if we can connect to Supabase using a table we know exists
+      const { data, error } = await supabase.from('anggota').select('count').limit(1);
       
       if (error) {
         console.error('Supabase connection error:', error);
@@ -32,9 +32,14 @@ export function SupabaseDebug() {
         return;
       }
       
-      // Get project info
-      const { data: projectData } = await supabase.rpc('get_project_info');
-      setProjectInfo(projectData);
+      // Get basic connection info
+      const projectInfo = {
+        connected: true,
+        timestamp: new Date().toISOString(),
+        url: supabase.supabaseUrl,
+        tables: ['anggota', 'akun', 'notifikasi', 'transaksi']
+      };
+      setProjectInfo(projectInfo);
       
       setConnectionStatus('connected');
     } catch (err) {
