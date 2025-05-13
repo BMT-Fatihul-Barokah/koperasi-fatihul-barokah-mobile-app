@@ -249,7 +249,7 @@ export default function DashboardScreen() {
             <Text style={styles.sectionTitle}>Transaksi Terbaru</Text>
             <TouchableOpacity 
               style={styles.viewAllButton}
-              onPress={() => router.push('/tabungan/history')}
+              onPress={() => router.push('/activity')}
             >
               <Text style={styles.viewAllText}>Lihat Semua</Text>
               <Ionicons name="chevron-forward" size={16} color={isDark ? "#FFFFFF" : "#007BFF"} />
@@ -266,7 +266,7 @@ export default function DashboardScreen() {
               <TouchableOpacity 
                 key={transaction.id} 
                 style={styles.transactionItem}
-                onPress={() => router.push(`/tabungan/transaction/${transaction.id}`)}
+                onPress={() => router.push(`/activity/${transaction.id}`)}
               >
                 <View style={styles.transactionIconContainer}>
                   <MaterialCommunityIcons 

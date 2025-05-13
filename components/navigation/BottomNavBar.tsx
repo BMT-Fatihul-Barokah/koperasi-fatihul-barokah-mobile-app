@@ -21,10 +21,27 @@ export function BottomNavBar({ style }: BottomNavBarProps) {
   
   // Check if the current path matches or starts with the given path
   const isActive = (path: string) => {
+    // Special case for dashboard home
     if (path === '/dashboard' && currentPath === '/dashboard') {
       return true;
     }
-    return currentPath.startsWith(path) && path !== '/dashboard';
+    
+    // Special case for notifications
+    if (path === '/dashboard/notifications' && (currentPath === '/dashboard/notifications' || currentPath === '/notifications' || currentPath.startsWith('/notifications/'))) {
+      return true;
+    }
+    
+    // Special case for profile
+    if (path === '/dashboard/profile' && (currentPath === '/dashboard/profile' || currentPath === '/profile')) {
+      return true;
+    }
+    
+    // For activity and other paths
+    if (path === '/activity' && (currentPath === '/activity' || currentPath.startsWith('/activity/'))) {
+      return true;
+    }
+    
+    return false;
   };
   
   // Navigation items configuration
@@ -46,6 +63,7 @@ export function BottomNavBar({ style }: BottomNavBarProps) {
       icon: 'notifications-outline' as const,
       activeIcon: 'notifications' as const,
       path: '/dashboard/notifications',
+      alternatePaths: ['/notifications'],
     },
     {
       name: 'Profil',
@@ -66,11 +84,13 @@ export function BottomNavBar({ style }: BottomNavBarProps) {
             onPress={() => router.push(item.path)}
             activeOpacity={0.7}
           >
-            <Ionicons 
-              name={active ? item.activeIcon : item.icon} 
-              size={24} 
-              color={active ? (isDark ? '#FFFFFF' : '#007BFF') : (isDark ? '#777777' : '#999999')} 
-            />
+            <View style={active ? styles.activeIconContainer : null}>
+              <Ionicons 
+                name={active ? item.activeIcon : item.icon} 
+                size={24} 
+                color={active ? (isDark ? '#FFFFFF' : '#007BFF') : (isDark ? '#777777' : '#999999')} 
+              />
+            </View>
             <Text 
               style={[
                 styles.navText, 
@@ -126,5 +146,11 @@ const styles = StyleSheet.create({
   },
   activeNavTextDark: {
     color: '#FFFFFF',
+  },
+  activeIconContainer: {
+    backgroundColor: 'rgba(0, 123, 255, 0.1)',
+    borderRadius: 20,
+    padding: 6,
+    marginBottom: -2,
   }
 });

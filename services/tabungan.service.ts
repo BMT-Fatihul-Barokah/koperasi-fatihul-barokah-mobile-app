@@ -158,6 +158,13 @@ export const TabunganService = {
     try {
       console.log(`Fetching tabungan with ID: ${tabunganId}`);
       
+      // Validate that tabunganId is a valid UUID
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(tabunganId)) {
+        console.error(`Invalid tabungan ID format: ${tabunganId}. Expected a UUID.`);
+        return null;
+      }
+      
       // Try using the tabungan_display_view first
       const { data: viewData, error: viewError } = await supabase
         .from('tabungan_display_view')
