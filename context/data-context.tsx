@@ -281,18 +281,60 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   // Mark notification as read
   const markNotificationAsRead = useCallback(async (notificationId: string) => {
-    if (!isAuthenticated || !member) return false;
+    if (!isAuthenticated || !member) {
+      console.log('Data Context: Not authenticated or no member, cannot mark notification as read');
+      return false;
+    }
+    
+    console.log(`Data Context: Marking notification ${notificationId} as read for member ${member.id}`);
     
     try {
+      // First, verify the notification exists and get its current status
+      const { data: checkData, error: checkError } = await supabase
+        .from('notifikasi')
+        .select('id, is_read, anggota_id, jenis')
+        .eq('id', notificationId)
+        .single();
+      
+      if (checkError) {
+        console.error('Data Context: Error checking notification before marking as read:', checkError);
+        return false;
+      }
+      
+      if (!checkData) {
+        console.error(`Data Context: Notification ${notificationId} not found`);
+        return false;
+      }
+      
+      console.log(`Data Context: Found notification ${notificationId}, current read status:`, checkData.is_read);
+      
+      // If already read, no need to update
+      if (checkData.is_read) {
+        console.log(`Data Context: Notification ${notificationId} is already marked as read`);
+        return true;
+      }
+      
+      // Check if this is the user's notification or a system notification
+      const isUserNotification = checkData.anggota_id === member.id;
+      const isSystemNotification = checkData.jenis === 'sistem' || checkData.jenis === 'pengumuman';
+      
+      if (!isUserNotification && !isSystemNotification) {
+        console.error(`Data Context: User ${member.id} does not have permission to mark notification ${notificationId} as read`);
+        return false;
+      }
+      
+      // Update the notification in Supabase
       const { error } = await supabase
         .from('notifikasi')
         .update({ is_read: true })
         .eq('id', notificationId);
       
       if (error) {
-        console.error('Data Context: Error marking notification as read:', error);
+        console.error('Data Context: Error marking notification as read in Supabase:', error);
         return false;
       }
+      
+      console.log(`Data Context: Successfully marked notification ${notificationId} as read in Supabase`);
       
       // Update local state
       setState(prev => {
@@ -321,9 +363,35 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   // Mark all notifications as read
   const markAllNotificationsAsRead = useCallback(async () => {
-    if (!isAuthenticated || !member) return false;
+    if (!isAuthenticated || !member) {
+      console.log('Data Context: Not authenticated or no member, cannot mark all notifications as read');
+      return false;
+    }
+    
+    console.log(`Data Context: Marking all unread notifications as read for member ${member.id}`);
     
     try {
+      // First, check if there are any unread notifications
+      const { data: unreadData, error: checkError } = await supabase
+        .from('notifikasi')
+        .select('id')
+        .eq('anggota_id', member.id)
+        .eq('is_read', false);
+      
+      if (checkError) {
+        console.error('Data Context: Error checking unread notifications:', checkError);
+        return false;
+      }
+      
+      const unreadCount = unreadData?.length || 0;
+      console.log(`Data Context: Found ${unreadCount} unread notifications for member ${member.id}`);
+      
+      if (unreadCount === 0) {
+        console.log('Data Context: No unread notifications to mark as read');
+        return true; // No need to update anything
+      }
+      
+      // Update all unread notifications in Supabase
       const { error } = await supabase
         .from('notifikasi')
         .update({ is_read: true })
@@ -331,19 +399,28 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         .eq('is_read', false);
       
       if (error) {
-        console.error('Data Context: Error marking all notifications as read:', error);
+        console.error('Data Context: Error marking all notifications as read in Supabase:', error);
         return false;
       }
       
+      console.log(`Data Context: Successfully marked ${unreadCount} notifications as read in Supabase`);
+      
       // Update local state
-      setState(prev => ({
-        ...prev,
-        notifications: {
-          ...prev.notifications,
-          data: prev.notifications.data.map(n => ({ ...n, is_read: true })),
-          unreadCount: 0,
-        }
-      }));
+      setState(prev => {
+        // Update all notifications that belong to this member
+        const updatedNotifications = prev.notifications.data.map(n => 
+          n.anggota_id === member.id ? { ...n, is_read: true } : n
+        );
+        
+        return {
+          ...prev,
+          notifications: {
+            ...prev.notifications,
+            data: updatedNotifications,
+            unreadCount: 0,
+          }
+        };
+      });
       
       return true;
     } catch (error) {

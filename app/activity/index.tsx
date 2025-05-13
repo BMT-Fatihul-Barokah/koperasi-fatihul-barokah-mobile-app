@@ -6,10 +6,10 @@ import {
   FlatList, 
   TouchableOpacity, 
   ActivityIndicator,
-  SafeAreaView,
   useWindowDimensions,
   RefreshControl
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import { useAuth } from '../../context/auth-context';
@@ -192,11 +192,12 @@ export default function ActivityScreen() {
   );
 
   return (
-    <SafeAreaView style={[styles.container, isDark && styles.containerDark]}>
-      <StatusBar style={isDark ? 'light' : 'dark'} />
-      
-      <DashboardHeader title="Aktivitas" showBackButton={false} />
-      
+    <SafeAreaView style={styles.container} edges={['bottom']}>
+      <StatusBar style="auto" />
+      <DashboardHeader 
+        title="Aktivitas" 
+        showBackButton={false}
+      />
       <View style={styles.tabsContainer}>
         <TouchableOpacity
           style={[styles.tabButton, activeTab === 'transaction' && styles.activeTabButton]}

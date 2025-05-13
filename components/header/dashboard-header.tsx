@@ -4,12 +4,14 @@ import {
   Text, 
   StyleSheet, 
   TouchableOpacity,
-  useColorScheme
+  useColorScheme,
+  Platform
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface DashboardHeaderProps {
   title: string;
@@ -32,13 +34,14 @@ export function DashboardHeader({
 }: DashboardHeaderProps) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const insets = useSafeAreaInsets();
 
   return (
     <>
       <StatusBar style="light" />
       <LinearGradient
         colors={gradientColors as any}
-        style={styles.header}
+        style={[styles.header, { paddingTop: Math.max(insets.top, 8) }]}
         start={[0, 0]}
         end={[1, 1]}
       >
@@ -78,7 +81,6 @@ export function DashboardHeader({
 const styles = StyleSheet.create({
   header: {
     width: '100%',
-    paddingTop: 8,
     paddingBottom: 16,
   },
   headerContent: {

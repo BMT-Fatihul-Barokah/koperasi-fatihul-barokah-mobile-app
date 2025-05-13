@@ -5,10 +5,11 @@ import {
   StyleSheet, 
   TouchableOpacity, 
   ActivityIndicator,
-  SafeAreaView,
   ScrollView,
-  Share
+  Share,
+  useColorScheme
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../../context/auth-context';
 import { format, parseISO } from 'date-fns';
@@ -127,25 +128,23 @@ export default function TransactionDetailScreen() {
     }
   };
 
+  // Loading state
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007BFF" />
+      <SafeAreaView style={styles.loadingContainer} edges={['top', 'bottom']}>
+        <ActivityIndicator size="large" color="#0066CC" />
         <Text style={styles.loadingText}>Memuat detail transaksi...</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
+  // Error state
   if (!transaction) {
     return (
-      <SafeAreaView style={styles.container}>
-        <DashboardHeader
-          title="Detail Transaksi"
-          showBackButton={true}
-        />
-        
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Transaksi tidak ditemukan</Text>
+      <SafeAreaView style={styles.errorContainer} edges={['top', 'bottom']}>
+        <Ionicons name="alert-circle-outline" size={64} color="#dc3545" />
+        <Text style={styles.errorText}>Transaksi tidak ditemukan</Text>
+        <View style={styles.buttonContainer}>
           <TouchableOpacity 
             style={styles.backToActivityButton}
             onPress={() => router.push('/activity')}
@@ -158,7 +157,7 @@ export default function TransactionDetailScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
       <DashboardHeader 
         title="Detail Transaksi"
         showBackButton={true}
@@ -299,6 +298,9 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '500',
+  },
+  buttonContainer: {
+    marginTop: 20,
   },
 
   shareButton: {

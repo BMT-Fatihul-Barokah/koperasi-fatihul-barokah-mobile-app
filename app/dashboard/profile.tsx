@@ -93,7 +93,7 @@ export default function ProfileScreen() {
   }
   
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
       <DashboardHeader 
         title="Profil Anggota" 
         showBackButton={false}

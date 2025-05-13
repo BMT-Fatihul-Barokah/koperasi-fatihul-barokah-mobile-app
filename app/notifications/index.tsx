@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useState, useMemo } from 'react';
+import React, { useEffect, useCallback, useState, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,8 @@ import {
   RefreshControl,
   Alert,
   useColorScheme,
-  ScrollView
+  ScrollView,
+  Modal
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
@@ -220,22 +221,54 @@ export default function NotificationsScreen() {
     </TouchableOpacity>
   );
 
+  // Menu state and handlers
+  const [menuVisible, setMenuVisible] = useState(false);
+  const toggleMenu = () => setMenuVisible(!menuVisible);
+  
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
       <DashboardHeader 
         title="Notifikasi" 
         showBackButton={false}
-        rightComponent={
-          notifications.unreadCount > 0 && (
-            <TouchableOpacity 
-              style={styles.markAllButton}
-              onPress={handleMarkAllAsRead}
-            >
-              <Text style={styles.markAllText}>Tandai Semua</Text>
-            </TouchableOpacity>
-          )
-        }
+        rightIcon={{
+          name: "ellipsis-vertical",
+          onPress: toggleMenu
+        }}
       />
+      
+      {/* Options Menu Modal */}
+      <Modal
+        visible={menuVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setMenuVisible(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setMenuVisible(false)}
+        >
+          <View style={[styles.menuContainer, isDark && styles.menuContainerDark]}>
+            {notifications.unreadCount > 0 && (
+              <TouchableOpacity 
+                style={styles.menuItem} 
+                onPress={() => {
+                  handleMarkAllAsRead();
+                  setMenuVisible(false);
+                }}
+              >
+                <Ionicons 
+                  name="checkmark-done-outline" 
+                  size={20} 
+                  color={isDark ? '#e0e0e0' : '#333333'} 
+                  style={styles.menuIcon} 
+                />
+                <Text style={[styles.menuText, isDark && styles.menuTextDark]}>Tandai semua sudah dibaca</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
       
       {/* Filter tabs */}
       <View style={styles.filterContainer}>
@@ -383,6 +416,45 @@ const createStyles = (isDark: boolean) => StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '500',
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+  },
+  menuContainer: {
+    marginTop: 60,  // Position below header
+    marginRight: 10,
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    minWidth: 200,
+    overflow: 'hidden',
+  },
+  menuContainerDark: {
+    backgroundColor: '#333333',
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  menuIcon: {
+    marginRight: 12,
+  },
+  menuText: {
+    fontSize: 15,
+    color: '#333333',
+  },
+  menuTextDark: {
+    color: '#e0e0e0',
   },
 
   spacer: {
