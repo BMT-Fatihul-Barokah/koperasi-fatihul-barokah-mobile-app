@@ -13,7 +13,7 @@ import {
   Modal
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/auth-context';
 import { useData } from '../../context/data-context';
@@ -45,7 +45,7 @@ export default function NotificationsScreen() {
   // Create styles with dynamic values based on theme
   const styles = useMemo(() => createStyles(isDark), [isDark]);
 
-  // Load notifications when component mounts - only once
+  // Load notifications when component mounts
   useEffect(() => {
     if (member?.id) {
       console.log('Notifications: Fetching notifications on mount');
@@ -56,6 +56,19 @@ export default function NotificationsScreen() {
       checkNotificationsDirectly(member.id);
     }
   }, [member?.id]); // Removed fetchNotifications from dependencies
+  
+  // Refresh notifications when the screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (member?.id) {
+        console.log('Notifications: Screen focused, refreshing notifications');
+        fetchNotifications(true);
+      }
+      
+      // No cleanup needed for useFocusEffect
+      return () => {};
+    }, [member?.id, fetchNotifications])
+  );
   
   // Direct check for notifications in Supabase (bypassing the data context)
   const checkNotificationsDirectly = async (memberId: string) => {
@@ -159,11 +172,27 @@ export default function NotificationsScreen() {
   // Handle notification press
   const handleNotificationPress = useCallback(async (notification) => {
     try {
-      // Mark notification as read
-      await markNotificationAsRead(notification.id);
+      console.log(`Handling press for notification ${notification.id}, type: ${notification.jenis}`);
       
-      // Handle notification based on type
+      // For transaction notifications, directly update using Supabase
       if (notification.jenis === 'transaksi') {
+        console.log('Using direct Supabase update for transaction notification');
+        const { error: updateError } = await supabase
+          .from('notifikasi')
+          .update({ 
+            is_read: true,
+            updated_at: new Date().toISOString() 
+          })
+          .eq('id', notification.id);
+          
+        if (updateError) {
+          console.error('Error directly updating transaction notification:', updateError);
+        } else {
+          console.log(`Successfully updated transaction notification ${notification.id} directly`);
+          // Update local state
+          await fetchNotifications(true);
+        }
+        
         // Check for transaksi_id (Indonesian) or transaction_id (English) in data
         const transactionId = notification.data?.transaksi_id || notification.data?.transaction_id;
         
@@ -173,6 +202,9 @@ export default function NotificationsScreen() {
           router.push(`/activity/${transactionId}`);
           return;
         }
+      } else {
+        // For other notification types, use the context method
+        await markNotificationAsRead(notification.id);
       }
       
       // For all other notifications or if transaction ID not found
@@ -181,7 +213,7 @@ export default function NotificationsScreen() {
     } catch (error) {
       console.error('Error handling notification press:', error);
     }
-  }, [markNotificationAsRead]);
+  }, [markNotificationAsRead, fetchNotifications]);
 
   // Format relative time
   const formatRelativeTime = useCallback((dateString: string) => {

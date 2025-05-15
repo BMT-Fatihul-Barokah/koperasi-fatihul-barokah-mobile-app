@@ -82,7 +82,45 @@ export default function NotificationDetailScreen() {
         
         // Mark as read if not already read
         if (!data.is_read) {
-          await markNotificationAsRead(id);
+          console.log(`Marking notification ${id} as read, type: ${data.jenis}`);
+          
+          try {
+            // For transaction notifications, directly update using Supabase
+            if (data.jenis === 'transaksi') {
+              console.log('Using direct Supabase update for transaction notification');
+              const { error: updateError } = await supabase
+                .from('notifikasi')
+                .update({ 
+                  is_read: true,
+                  updated_at: new Date().toISOString() 
+                })
+                .eq('id', id);
+                
+              if (updateError) {
+                console.error('Error directly updating transaction notification:', updateError);
+                throw new Error('Failed to update transaction notification');
+              }
+              
+              console.log(`Successfully updated transaction notification ${id} directly`);
+              // Update local state to reflect the change
+              setNotification(prev => prev ? { ...prev, is_read: true } : null);
+            } else {
+              // For other notification types, use the context method
+              const success = await markNotificationAsRead(id);
+              
+              if (success) {
+                console.log(`Successfully marked notification ${id} as read`);
+                // Update local state to reflect the change
+                setNotification(prev => prev ? { ...prev, is_read: true } : null);
+              } else {
+                console.error(`Failed to mark notification ${id} as read`);
+              }
+            }
+          } catch (error) {
+            console.error('Error marking notification as read:', error);
+          }
+        } else {
+          console.log(`Notification ${id} is already marked as read`);
         }
         
         setIsLoading(false);

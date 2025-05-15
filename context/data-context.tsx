@@ -364,10 +364,13 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
       
-      // Update the notification in Supabase
+      // Update the notification in Supabase with updated timestamp
       const { error } = await supabase
         .from('notifikasi')
-        .update({ is_read: true })
+        .update({ 
+          is_read: true,
+          updated_at: new Date().toISOString() 
+        })
         .eq('id', notificationId);
       
       if (error) {
