@@ -117,9 +117,19 @@ export default function NotificationDetailScreen() {
     
     try {
       // Handle based on notification type
-      if (notification.jenis === 'transaksi' && notification.data?.transaction_id) {
-        // Navigate to transaction detail
-        router.push(`/activity/${notification.data.transaction_id}`);
+      if (notification.jenis === 'transaksi') {
+        // Check for transaksi_id (Indonesian) or transaction_id (English) in data
+        const transactionId = notification.data?.transaksi_id || notification.data?.transaction_id;
+        
+        if (transactionId) {
+          // Navigate to transaction detail
+          console.log('Navigating to transaction detail:', transactionId);
+          router.push(`/activity/${transactionId}`);
+          return;
+        }
+        
+        // If no transaction ID found, show alert
+        Alert.alert('Info', 'Detail transaksi tidak ditemukan');
       } else if (notification.jenis === 'jatuh_tempo' && notification.data?.loan_id) {
         // Navigate to loan detail
         router.push(`/loans/${notification.data.loan_id}`);
@@ -196,8 +206,72 @@ export default function NotificationDetailScreen() {
   // Get notification type info
   const typeInfo = getNotificationTypeInfo(notification.jenis);
   const hasRelatedAction = 
-    (notification.jenis === 'transaksi' && notification.data?.transaction_id) || 
+    (notification.jenis === 'transaksi' && (notification.data?.transaksi_id || notification.data?.transaction_id)) || 
     (notification.jenis === 'jatuh_tempo' && notification.data?.loan_id);
+    
+  // Format currency for transaction amount
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount);
+  };
+  
+  // Render transaction details if this is a transaction notification
+  const renderTransactionDetails = () => {
+    if (notification?.jenis !== 'transaksi' || !notification.data) return null;
+    
+    const { jenis, jumlah } = notification.data;
+    let transactionType = '';
+    
+    // Map transaction type to human-readable text
+    switch(jenis) {
+      case 'setoran':
+        transactionType = 'Setoran';
+        break;
+      case 'penarikan':
+        transactionType = 'Penarikan';
+        break;
+      case 'transfer':
+        transactionType = 'Transfer';
+        break;
+      case 'angsuran':
+        transactionType = 'Pembayaran Angsuran';
+        break;
+      case 'bagi_hasil':
+        transactionType = 'Bagi Hasil';
+        break;
+      default:
+        transactionType = 'Transaksi';
+    }
+    
+    return (
+      <View style={styles.transactionDetailsContainer}>
+        <Text style={styles.dataTitle}>Detail Transaksi:</Text>
+        
+        <View style={styles.transactionDetail}>
+          <Text style={styles.dataKey}>Jenis:</Text>
+          <Text style={styles.dataValue}>{transactionType}</Text>
+        </View>
+        
+        {jumlah && (
+          <View style={styles.transactionDetail}>
+            <Text style={styles.dataKey}>Jumlah:</Text>
+            <Text style={styles.dataValue}>{formatCurrency(jumlah)}</Text>
+          </View>
+        )}
+        
+        {notification.data.penerima && (
+          <View style={styles.transactionDetail}>
+            <Text style={styles.dataKey}>Penerima:</Text>
+            <Text style={styles.dataValue}>{notification.data.penerima}</Text>
+          </View>
+        )}
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -231,16 +305,21 @@ export default function NotificationDetailScreen() {
           
           <Text style={styles.message}>{notification.pesan}</Text>
           
-          {/* Additional data if available */}
-          {notification.data && Object.keys(notification.data).length > 0 && (
-            <View style={styles.dataContainer}>
-              <Text style={styles.dataTitle}>Informasi Tambahan:</Text>
-              {Object.entries(notification.data).map(([key, value]) => (
-                <Text key={key} style={styles.dataItem}>
-                  <Text style={styles.dataKey}>{key.replace(/_/g, ' ')}:</Text> {String(value)}
-                </Text>
-              ))}
-            </View>
+          {/* Render specialized transaction details for transaction notifications */}
+          {notification.jenis === 'transaksi' ? (
+            renderTransactionDetails()
+          ) : (
+            /* For other notification types, show raw data if available */
+            notification.data && Object.keys(notification.data).length > 0 && (
+              <View style={styles.dataContainer}>
+                <Text style={styles.dataTitle}>Informasi Tambahan:</Text>
+                {Object.entries(notification.data).map(([key, value]) => (
+                  <Text key={key} style={styles.dataItem}>
+                    <Text style={styles.dataKey}>{key.replace(/_/g, ' ')}:</Text> {String(value)}
+                  </Text>
+                ))}
+              </View>
+            )
           )}
         </View>
         
@@ -381,14 +460,31 @@ const createStyles = (isDark: boolean) => StyleSheet.create({
     marginBottom: 8,
   },
   dataItem: {
-    fontSize: 14,
-    color: isDark ? '#cccccc' : '#666666',
-    marginBottom: 4,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
   },
   dataKey: {
-    fontWeight: '500',
+    fontWeight: 'bold',
     color: isDark ? '#e0e0e0' : '#333333',
-    textTransform: 'capitalize',
+  },
+  dataValue: {
+    flex: 1,
+    color: isDark ? '#e0e0e0' : '#333333',
+    textAlign: 'right',
+  },
+  transactionDetailsContainer: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: isDark ? '#2a2a2a' : '#f0f0f0',
+    borderRadius: 8,
+  },
+  transactionDetail: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: isDark ? '#444444' : '#e0e0e0',
   },
   actionButton: {
     backgroundColor: '#007BFF',

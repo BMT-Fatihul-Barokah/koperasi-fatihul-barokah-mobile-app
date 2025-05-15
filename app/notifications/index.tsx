@@ -75,11 +75,33 @@ export default function NotificationsScreen() {
       
       // Fetch notifications directly from Supabase
       // Include both personal notifications and system/announcement notifications
+      // Make sure to include transaksi notifications
       const { data, error } = await supabase
         .from('notifikasi')
         .select('*')
         .or(`anggota_id.eq.${memberId},jenis.eq.sistem,jenis.eq.pengumuman`)
         .order('created_at', { ascending: false });
+        
+      // If we don't find transaction notifications, try a direct query
+      if (!error && data && data.filter(n => n.jenis === 'transaksi').length === 0) {
+        console.log('No transaction notifications found in main query, trying direct query');
+        
+        // Try a direct query specifically for transaction notifications
+        const { data: transactionData, error: transactionError } = await supabase
+          .from('notifikasi')
+          .select('*')
+          .eq('anggota_id', memberId)
+          .eq('jenis', 'transaksi')
+          .order('created_at', { ascending: false });
+          
+        if (!transactionError && transactionData && transactionData.length > 0) {
+          console.log(`Found ${transactionData.length} transaction notifications in direct query`);
+          // Add transaction notifications to the data array
+          data.push(...transactionData);
+          // Re-sort by created_at
+          data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        }
+      }
       
       if (error) {
         console.error('Error fetching notifications directly:', error);
@@ -88,6 +110,13 @@ export default function NotificationsScreen() {
       
       console.log('Direct notification check result:', data);
       console.log('Number of notifications found:', data?.length || 0);
+      
+      // Check specifically for transaction notifications
+      const transactionNotifications = data?.filter(n => n.jenis === 'transaksi') || [];
+      console.log('Transaction notifications found:', transactionNotifications.length);
+      if (transactionNotifications.length > 0) {
+        console.log('First transaction notification:', JSON.stringify(transactionNotifications[0], null, 2));
+      }
       
       // If we have notifications but they're not showing up in the UI,
       // there might be an issue with the data context
@@ -134,13 +163,21 @@ export default function NotificationsScreen() {
       await markNotificationAsRead(notification.id);
       
       // Handle notification based on type
-      if (notification.jenis === 'transaksi' && notification.data?.transaction_id) {
-        // Navigate to transaction detail
-        router.push(`/activity/${notification.data.transaction_id}`);
-      } else {
-        // Navigate to notification detail screen
-        router.push(`/notifications/${notification.id}`);
+      if (notification.jenis === 'transaksi') {
+        // Check for transaksi_id (Indonesian) or transaction_id (English) in data
+        const transactionId = notification.data?.transaksi_id || notification.data?.transaction_id;
+        
+        if (transactionId) {
+          console.log('Navigating to transaction:', transactionId);
+          // Navigate to transaction detail
+          router.push(`/activity/${transactionId}`);
+          return;
+        }
       }
+      
+      // For all other notifications or if transaction ID not found
+      console.log('Navigating to notification detail:', notification.id);
+      router.push(`/notifications/${notification.id}`);
     } catch (error) {
       console.error('Error handling notification press:', error);
     }
@@ -182,6 +219,20 @@ export default function NotificationsScreen() {
   
   // Filter notifications based on active filter
   const filteredNotifications = useMemo(() => {
+    // Debug: Log notification types in the data
+    const types = {};
+    notifications.data.forEach(n => {
+      types[n.jenis] = (types[n.jenis] || 0) + 1;
+    });
+    console.log('Notification types in data:', types);
+    
+    // Debug: Check specifically for transaction notifications
+    const transactionNotifications = notifications.data.filter(n => n.jenis === 'transaksi');
+    console.log('Transaction notifications in data context:', transactionNotifications.length);
+    if (transactionNotifications.length > 0) {
+      console.log('Sample transaction notification:', JSON.stringify(transactionNotifications[0], null, 2));
+    }
+    
     if (activeFilter === 'all') {
       return notifications.data;
     } else if (activeFilter === 'unread') {
@@ -293,17 +344,31 @@ export default function NotificationsScreen() {
             </Text>
           </TouchableOpacity>
           
-          {Object.entries(NOTIFICATION_TYPES).map(([key, value]) => (
-            <TouchableOpacity 
-              key={key}
-              style={[styles.filterTab, activeFilter === key && styles.activeFilterTab]}
-              onPress={() => setActiveFilter(key as FilterType)}
-            >
-              <Text style={[styles.filterText, activeFilter === key && styles.activeFilterText]}>
-                {value.name}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {/* Transaction filter - explicitly add this first */}
+          <TouchableOpacity 
+            key="transaksi"
+            style={[styles.filterTab, activeFilter === 'transaksi' && styles.activeFilterTab]}
+            onPress={() => setActiveFilter('transaksi')}
+          >
+            <Text style={[styles.filterText, activeFilter === 'transaksi' && styles.activeFilterText]}>
+              Transaksi
+            </Text>
+          </TouchableOpacity>
+          
+          {/* Other notification types */}
+          {Object.entries(NOTIFICATION_TYPES)
+            .filter(([key]) => key !== 'transaksi') // Skip transaksi since we added it explicitly
+            .map(([key, value]) => (
+              <TouchableOpacity 
+                key={key}
+                style={[styles.filterTab, activeFilter === key && styles.activeFilterTab]}
+                onPress={() => setActiveFilter(key as FilterType)}
+              >
+                <Text style={[styles.filterText, activeFilter === key && styles.activeFilterText]}>
+                  {value.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
         </ScrollView>
       </View>
       

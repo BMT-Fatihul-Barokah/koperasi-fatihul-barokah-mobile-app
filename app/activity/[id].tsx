@@ -198,8 +198,10 @@ export default function TransactionDetailScreen() {
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Jenis Transaksi</Text>
             <Text style={styles.detailValue}>
-              {transaction.kategori.replace('_', ' ').charAt(0).toUpperCase() + 
-               transaction.kategori.replace('_', ' ').slice(1)}
+              {transaction.kategori 
+                ? transaction.kategori.replace(/_/g, ' ').split(' ').map(word => 
+                    word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+                : 'Tidak diketahui'}
             </Text>
           </View>
           

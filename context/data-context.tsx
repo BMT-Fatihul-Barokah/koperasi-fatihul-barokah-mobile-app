@@ -219,14 +219,56 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       // We'll assume the notifikasi table exists in your Supabase database
       // If it doesn't, you'll need to create it through the Supabase dashboard
       
-      // Now fetch notifications from the table - both personal and system notifications
-      // We need to fetch both personal notifications and system/announcement notifications
-      // that should be visible to all users
+      // Now fetch notifications from the table
+      // We need to fetch:
+      // 1. Personal notifications (including transactions) for this specific user
+      // 2. System/announcement notifications that should be visible to all users
+      console.log('Data Context: Fetching ALL notification types for member:', member.id);
+      
+      // Fetch all notifications including transaction notifications
+      // We need to make sure we get personal notifications (including transactions)
+      // as well as system-wide notifications
+      console.log('Data Context: Fetching notifications with explicit jenis check');
       const { data, error } = await supabase
-        .from('notifikasi') // Use lowercase table name
+        .from('notifikasi')
         .select('*')
         .or(`anggota_id.eq.${member.id},jenis.eq.sistem,jenis.eq.pengumuman`)
         .order('created_at', { ascending: false });
+      
+      // If we don't find transaction notifications, try a direct query
+      if (data && data.filter(n => n.jenis === 'transaksi').length === 0) {
+        console.log('Data Context: No transaction notifications found, trying direct query');
+        const { data: transactionData, error: transactionError } = await supabase
+          .from('notifikasi')
+          .select('*')
+          .eq('anggota_id', member.id)
+          .eq('jenis', 'transaksi')
+          .order('created_at', { ascending: false });
+          
+        if (!transactionError && transactionData && transactionData.length > 0) {
+          console.log(`Data Context: Found ${transactionData.length} transaction notifications in direct query`);
+          // Add transaction notifications to the data array
+          data.push(...transactionData);
+          // Re-sort by created_at
+          data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        }
+      }
+        
+      // Debug: Check what types of notifications we're getting
+      if (data && data.length > 0) {
+        const types = {};
+        data.forEach(n => {
+          types[n.jenis] = (types[n.jenis] || 0) + 1;
+        });
+        console.log('Data Context: Notification types fetched:', types);
+        
+        // Check specifically for transaction notifications
+        const transactionNotifications = data.filter(n => n.jenis === 'transaksi');
+        console.log('Data Context: Transaction notifications found:', transactionNotifications.length);
+        if (transactionNotifications.length > 0) {
+          console.log('Data Context: First transaction notification:', JSON.stringify(transactionNotifications[0], null, 2));
+        }
+      }
       
       if (error) {
         console.error('Data Context: Error fetching notifications:', error);

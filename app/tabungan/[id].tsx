@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, SectionList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -8,8 +8,9 @@ import { TabunganWithJenis } from '../../lib/database.types';
 import { TabunganService } from '../../services/tabungan.service';
 import { formatCurrency, formatDate } from '../../lib/format-utils';
 import { useColorScheme } from 'react-native';
-import { LinearGradient, LinearGradientProps } from 'expo-linear-gradient';
+import { LinearGradient } from 'expo-linear-gradient';
 import { TransactionHistory } from '../../components/tabungan/transaction-history';
+import { BackHeader } from '../../components/header/back-header';
 
 export default function TabunganDetailScreen() {
   const router = useRouter();
@@ -140,29 +141,11 @@ export default function TabunganDetailScreen() {
     }
   };
   
-  // Handle deposit button press
-  const handleDeposit = () => {
-    if (tabungan) {
-      router.push({
-        pathname: '/tabungan/transaction',
-        params: { id: tabungan.id, type: 'deposit' }
-      });
-    }
-  };
-  
-  // Handle withdrawal button press
-  const handleWithdrawal = () => {
-    if (tabungan) {
-      router.push({
-        pathname: '/tabungan/transaction',
-        params: { id: tabungan.id, type: 'withdrawal' }
-      });
-    }
-  };
+  // No deposit or withdrawal functionality as per requirements
   
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.loadingContainer} edges={['top']}>
+      <SafeAreaView style={styles.loadingContainer}>
         <StatusBar style={isDark ? 'light' : 'dark'} />
         <ActivityIndicator size="large" color="#007BFF" />
         <Text style={styles.loadingText}>Memuat data tabungan...</Text>
@@ -172,133 +155,151 @@ export default function TabunganDetailScreen() {
   
   if (!tabungan) {
     return (
-      <SafeAreaView style={styles.errorContainer} edges={['top']}>
-        <StatusBar style={isDark ? 'light' : 'dark'} />
-        <Text style={styles.errorText}>Tabungan tidak ditemukan</Text>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backButtonText}>Kembali</Text>
-        </TouchableOpacity>
+      <SafeAreaView style={styles.errorContainer}>
+        <BackHeader title="Error" />
+        <View style={styles.errorContentContainer}>
+          <Text style={styles.errorText}>Tabungan tidak ditemukan</Text>
+          <TouchableOpacity style={styles.errorBackButton} onPress={() => router.back()}>
+            <Text style={styles.backButtonText}>Kembali</Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     );
   }
   
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar style="light" />
+    <SafeAreaView style={styles.container}>
+      <StatusBar style="dark" />
       
       <Stack.Screen
         options={{
-          title: '',
-          headerTransparent: true,
-          headerTintColor: 'white',
-          headerBackTitle: 'Kembali',
+          headerShown: false,
         }}
       />
       
-      <ScrollView
+      <BackHeader title="Detail Tabungan" />
+      
+      <SectionList
+        sections={[
+          {
+            title: 'account-info',
+            data: [null],
+            renderItem: () => (
+              <View>
+                {/* Header Section */}
+                <LinearGradient
+                  colors={getGradientColors()}
+                  style={styles.header}
+                  start={[0, 0]}
+                  end={[1, 1]}
+                >
+                  <View style={styles.headerContent}>
+                    <Text style={styles.accountType}>{tabungan.jenis_tabungan.nama}</Text>
+                    <Text style={styles.accountNumber}>{tabungan.nomor_rekening}</Text>
+                    <Text style={styles.balanceLabel}>Saldo</Text>
+                    <Text style={styles.balanceAmount}>{formatCurrency(tabungan.saldo)}</Text>
+                  </View>
+                </LinearGradient>
+                
+                {/* Summary Card */}
+                <View style={styles.summaryCard}>
+                  <View style={styles.summaryItem}>
+                    <Ionicons name="calendar-outline" size={22} color="#007BFF" style={styles.summaryIcon} />
+                    <View>
+                      <Text style={styles.summaryLabel}>Tanggal Pembukaan</Text>
+                      <Text style={styles.summaryValue}>{formatDate(tabungan.tanggal_buka)}</Text>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.divider} />
+                  
+                  <View style={styles.summaryItem}>
+                    <Ionicons name="shield-checkmark-outline" size={22} color="#007BFF" style={styles.summaryIcon} />
+                    <View>
+                      <Text style={styles.summaryLabel}>Status</Text>
+                      <Text style={[styles.summaryValue, { color: tabungan.status === 'aktif' ? '#2ec27e' : '#e01b24' }]}>
+                        {tabungan.status === 'aktif' ? 'Aktif' : 'Tidak Aktif'}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+                
+                {/* Account Details */}
+                <View style={styles.detailsCard}>
+                  <Text style={styles.detailsTitle}>Informasi Rekening</Text>
+                  
+                  <View style={styles.detailItem}>
+                    <Text style={styles.detailLabel}>Jenis Tabungan</Text>
+                    <Text style={styles.detailValue}>{tabungan.jenis_tabungan.nama}</Text>
+                  </View>
+                  
+                  <View style={styles.detailItem}>
+                    <Text style={styles.detailLabel}>Nomor Rekening</Text>
+                    <Text style={styles.detailValue}>{tabungan.nomor_rekening}</Text>
+                  </View>
+                  
+                  <View style={styles.detailItem}>
+                    <Text style={styles.detailLabel}>Tanggal Pembukaan</Text>
+                    <Text style={styles.detailValue}>{formatDate(tabungan.tanggal_buka)}</Text>
+                  </View>
+                  
+                  {tabungan.tanggal_jatuh_tempo && (
+                    <View style={styles.detailItem}>
+                      <Text style={styles.detailLabel}>Jatuh Tempo</Text>
+                      <Text style={styles.detailValue}>{formatDate(tabungan.tanggal_jatuh_tempo)}</Text>
+                    </View>
+                  )}
+                  
+                  {tabungan.jenis_tabungan.bagi_hasil && (
+                    <View style={styles.detailItem}>
+                      <Text style={styles.detailLabel}>Bagi Hasil</Text>
+                      <Text style={styles.detailValue}>{tabungan.jenis_tabungan.bagi_hasil}%</Text>
+                    </View>
+                  )}
+                  
+                  <View style={styles.detailItem}>
+                    <Text style={styles.detailLabel}>Status</Text>
+                    <View style={styles.statusContainer}>
+                      <View 
+                        style={[
+                          styles.statusIndicator, 
+                          { backgroundColor: tabungan.status === 'aktif' ? '#2ec27e' : '#e01b24' }
+                        ]} 
+                      />
+                      <Text style={styles.statusText}>
+                        {tabungan.status === 'aktif' ? 'Aktif' : 'Tidak Aktif'}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+                
+                {/* Transaction History Title */}
+                <View style={styles.transactionSection}>
+                  <Text style={styles.transactionTitle}>Riwayat Transaksi</Text>
+                </View>
+              </View>
+            ),
+          },
+          {
+            title: 'transactions',
+            data: [null],
+            renderItem: () => (
+              <TransactionHistory
+                transactions={transactions}
+                isLoading={isTransactionsLoading}
+                onEndReached={handleLoadMoreTransactions}
+              />
+            ),
+          },
+        ]}
+        keyExtractor={(item, index) => index.toString()}
+        stickySectionHeadersEnabled={false}
+        renderSectionHeader={() => null}
         contentContainerStyle={styles.scrollContent}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
-      >
-        {/* Header Section */}
-        <LinearGradient
-          colors={getGradientColors()}
-          style={styles.header}
-          start={[0, 0]}
-          end={[1, 1]}
-        >
-          <View style={styles.headerContent}>
-            <Text style={styles.accountType}>{tabungan.jenis_tabungan.nama}</Text>
-            <Text style={styles.accountNumber}>{tabungan.nomor_rekening}</Text>
-            <Text style={styles.balanceLabel}>Saldo</Text>
-            <Text style={styles.balanceAmount}>{formatCurrency(tabungan.saldo)}</Text>
-          </View>
-        </LinearGradient>
-        
-        {/* Action Buttons */}
-        <View style={styles.actionButtons}>
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={handleDeposit}
-          >
-            <View style={[styles.actionIcon, { backgroundColor: '#2ec27e' }]}>
-              <Ionicons name="arrow-down" size={24} color="white" />
-            </View>
-            <Text style={styles.actionText}>Setor</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={handleWithdrawal}
-          >
-            <View style={[styles.actionIcon, { backgroundColor: '#e01b24' }]}>
-              <Ionicons name="arrow-up" size={24} color="white" />
-            </View>
-            <Text style={styles.actionText}>Tarik</Text>
-          </TouchableOpacity>
-        </View>
-        
-        {/* Account Details */}
-        <View style={styles.detailsCard}>
-          <Text style={styles.detailsTitle}>Informasi Rekening</Text>
-          
-          <View style={styles.detailItem}>
-            <Text style={styles.detailLabel}>Jenis Tabungan</Text>
-            <Text style={styles.detailValue}>{tabungan.jenis_tabungan.nama}</Text>
-          </View>
-          
-          <View style={styles.detailItem}>
-            <Text style={styles.detailLabel}>Nomor Rekening</Text>
-            <Text style={styles.detailValue}>{tabungan.nomor_rekening}</Text>
-          </View>
-          
-          <View style={styles.detailItem}>
-            <Text style={styles.detailLabel}>Tanggal Pembukaan</Text>
-            <Text style={styles.detailValue}>{formatDate(tabungan.tanggal_buka)}</Text>
-          </View>
-          
-          {tabungan.tanggal_jatuh_tempo && (
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Jatuh Tempo</Text>
-              <Text style={styles.detailValue}>{formatDate(tabungan.tanggal_jatuh_tempo)}</Text>
-            </View>
-          )}
-          
-          {tabungan.jenis_tabungan.bagi_hasil && (
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Bagi Hasil</Text>
-              <Text style={styles.detailValue}>{tabungan.jenis_tabungan.bagi_hasil}%</Text>
-            </View>
-          )}
-          
-          <View style={styles.detailItem}>
-            <Text style={styles.detailLabel}>Status</Text>
-            <View style={styles.statusContainer}>
-              <View 
-                style={[
-                  styles.statusIndicator, 
-                  { backgroundColor: tabungan.status === 'aktif' ? '#2ec27e' : '#e01b24' }
-                ]} 
-              />
-              <Text style={styles.statusText}>
-                {tabungan.status === 'aktif' ? 'Aktif' : 'Tidak Aktif'}
-              </Text>
-            </View>
-          </View>
-        </View>
-        
-        {/* Transaction History */}
-        <View style={styles.transactionSection}>
-          <Text style={styles.transactionTitle}>Riwayat Transaksi</Text>
-          
-          <TransactionHistory
-            transactions={transactions}
-            isLoading={isTransactionsLoading}
-            onEndReached={handleLoadMoreTransactions}
-          />
-        </View>
-      </ScrollView>
+      />
     </SafeAreaView>
   );
 }
@@ -321,9 +322,12 @@ const styles = StyleSheet.create({
   },
   errorContainer: {
     flex: 1,
+    backgroundColor: '#F8F9FA',
+  },
+  errorContentContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
     padding: 20,
   },
   errorText: {
@@ -331,7 +335,7 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 20,
   },
-  backButton: {
+  errorBackButton: {
     backgroundColor: '#007BFF',
     paddingVertical: 12,
     paddingHorizontal: 24,
@@ -345,9 +349,11 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   header: {
-    paddingTop: 100,
+    paddingTop: 20,
     paddingBottom: 40,
     paddingHorizontal: 24,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
   },
   headerContent: {
     alignItems: 'center',
@@ -372,54 +378,67 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
     fontSize: 36,
+    letterSpacing: 1,
+    textShadowColor: 'rgba(0, 0, 0, 0.1)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
-  actionButtons: {
+  summaryCard: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    backgroundColor: 'white',
+    borderRadius: 16,
     marginTop: -30,
     marginHorizontal: 24,
     marginBottom: 24,
-  },
-  actionButton: {
-    alignItems: 'center',
-    backgroundColor: 'white',
-    borderRadius: 12,
     padding: 16,
-    width: '45%',
-    elevation: 4,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  summaryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  summaryIcon: {
+    marginRight: 12,
+  },
+  summaryLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+  },
+  summaryValue: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  divider: {
+    width: 1,
+    height: '80%',
+    backgroundColor: '#EEEEEE',
+    marginHorizontal: 12,
+  },
+  detailsCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    marginHorizontal: 16,
+    marginBottom: 24,
+    padding: 20,
+    elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  actionIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  actionText: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  detailsCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    marginHorizontal: 16,
-    marginBottom: 24,
-    padding: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
   detailsTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 16,
+    color: '#333',
   },
   detailItem: {
     flexDirection: 'row',
@@ -457,5 +476,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 16,
+    color: '#333',
   },
 });

@@ -28,6 +28,7 @@ export function TransactionHistory({
 }: TransactionHistoryProps) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  
   if (isLoading && (!transactions || transactions.length === 0)) {
     return (
       <View style={[styles.loadingContainer, isDark && styles.loadingContainerDark]}>
@@ -227,6 +228,7 @@ const styles = StyleSheet.create({
   transactionDate: {
     fontSize: 12,
     color: '#666',
+    marginTop: 2,
   },
   transactionDateDark: {
     color: '#A0A0A0',
