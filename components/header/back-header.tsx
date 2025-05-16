@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, StatusBar, useColorScheme } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,6 +11,8 @@ interface BackHeaderProps {
 
 export function BackHeader({ title, onBackPress }: BackHeaderProps) {
   const insets = useSafeAreaInsets();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
   
   const handleBackPress = () => {
     if (onBackPress) {
@@ -23,16 +25,20 @@ export function BackHeader({ title, onBackPress }: BackHeaderProps) {
   return (
     <View style={[
       styles.container, 
-      { paddingTop: Math.max(insets.top, 16) }
+      { 
+        paddingTop: Math.max(insets.top, 16),
+        backgroundColor: isDark ? '#1a1a1a' : '#fff',
+        borderBottomColor: isDark ? '#333' : '#f0f0f0' 
+      }
     ]}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={isDark ? "#1a1a1a" : "#fff"} />
       <TouchableOpacity 
         style={styles.backButton} 
         onPress={handleBackPress}
       >
-        <Ionicons name="chevron-back" size={24} color="#000" />
+        <Ionicons name="chevron-back" size={24} color={isDark ? "#fff" : "#000"} />
       </TouchableOpacity>
-      <Text style={styles.title}>{title}</Text>
+      <Text style={[styles.title, { color: isDark ? '#fff' : '#000' }]}>{title}</Text>
     </View>
   );
 }
@@ -43,9 +49,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingBottom: 12,
-    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
   },
   backButton: {
     padding: 4,

@@ -8,6 +8,7 @@ import { TabunganWithJenis } from '../../lib/database.types';
 import { TabunganService } from '../../services/tabungan.service';
 import { TabunganCard } from '../../components/tabungan/tabungan-card';
 import { BottomNavBar } from '../../components/navigation/BottomNavBar';
+import { BackHeader } from '../../components/header/back-header';
 import { formatCurrency } from '../../lib/format-utils';
 import { useColorScheme } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -31,8 +32,8 @@ export default function TabunganScreen() {
   
   // Calculate number of columns based on screen width
   const numColumns = width > 600 ? 2 : 1;
-  // Add a bit more padding for better spacing
-  const cardWidth = width > 600 ? (width - 64) / numColumns : width - 32;
+  // Add appropriate padding for spacing
+  const cardWidth = width > 600 ? (width - 48) / numColumns : width - 32;
   
   // Fetch member ID and savings accounts
   useEffect(() => {
@@ -117,24 +118,11 @@ export default function TabunganScreen() {
       
       <Stack.Screen
         options={{
-          title: 'Detail Tabungan',
-          headerStyle: {
-            backgroundColor: isDark ? '#1a1a1a' : '#FFFFFF',
-          },
-          headerShadowVisible: false,
-          headerTitleStyle: {
-            fontWeight: 'bold',
-          },
-          headerRight: () => (
-            <TouchableOpacity 
-              style={styles.headerButton}
-              onPress={handleNewTabungan}
-            >
-              <Ionicons name="add-circle" size={24} color="#007BFF" />
-            </TouchableOpacity>
-          ),
+          headerShown: false
         }}
       />
+      
+      <BackHeader title="Tabungan" />
       
       {/* Summary Card */}
       <View style={styles.summaryCardContainer}>
@@ -200,8 +188,26 @@ const createStyles = (isDark: boolean) => StyleSheet.create({
     flex: 1,
     backgroundColor: isDark ? '#121212' : '#F8F9FA',
   },
+  headerActionsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: isDark ? '#1a1a1a' : '#FFFFFF',
+  },
   headerButton: {
-    padding: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: isDark ? '#2a2a2a' : '#f0f8ff',
+  },
+  headerButtonText: {
+    marginLeft: 4,
+    color: '#007BFF',
+    fontWeight: '600',
+    fontSize: 14,
   },
   summaryCardContainer: {
     paddingHorizontal: 16,
@@ -245,7 +251,7 @@ const createStyles = (isDark: boolean) => StyleSheet.create({
     justifyContent: 'space-between',
   },
   gridItem: {
-    marginBottom: 16,
+    marginBottom: 12,
   },
   itemSeparator: {
     height: 8,

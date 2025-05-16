@@ -96,33 +96,21 @@ export function TabunganCard({ tabungan, onPress, compact = false, showTarget = 
                 <Ionicons name="eye-outline" size={20} color="white" />
               </TouchableOpacity>
             </View>
-            
-            {showTarget && tabungan.target_saldo && tabungan.target_saldo > 0 && (
-              <View style={styles.targetContainer}>
-                <View style={styles.targetLabelRow}>
-                  <Text style={styles.targetLabel}>Target: {formatCurrency(tabungan.target_saldo)}</Text>
-                  <Text style={styles.targetPercentage}>{Math.round((tabungan.saldo / (tabungan.target_saldo || 1)) * 100)}%</Text>
-                </View>
-                <View style={styles.progressBarContainer}>
-                  <View 
-                    style={[styles.progressBar, { width: `${Math.min(100, Math.round((tabungan.saldo / (tabungan.target_saldo || 1)) * 100))}%` }]} 
-                  />
-                </View>
-              </View>
-            )}
-
-            {hasGoal && (
-              <View style={styles.goalContainer}>
-                <View style={styles.goalInfo}>
-                  <Text style={styles.goalText}>Target: {formatCurrency(tabungan.target_amount)}</Text>
-                  <Text style={styles.goalPercentage}>{tabungan.progress_percentage}%</Text>
-                </View>
-                <View style={styles.progressBarBackground}>
-                  <View style={[styles.progressBarFill, { width: `${tabungan.progress_percentage}%` }]} />
-                </View>
-              </View>
-            )}
           </View>
+          
+          {showTarget && tabungan.target_saldo && tabungan.target_saldo > 0 && (
+            <View style={styles.targetContainer}>
+              <View style={styles.targetLabelRow}>
+                <Text style={styles.targetLabel}>Target: {formatCurrency(tabungan.target_saldo)}</Text>
+                <Text style={styles.targetPercentage}>{Math.min(100, Math.round((tabungan.saldo / (tabungan.target_saldo || 1)) * 100))}%</Text>
+              </View>
+              <View style={styles.progressBarContainer}>
+                <View 
+                  style={[styles.progressBar, { width: `${Math.min(100, Math.round((tabungan.saldo / (tabungan.target_saldo || 1)) * 100))}%` }]} 
+                />
+              </View>
+            </View>
+          )}
 
           {!compact ? (
             <View style={styles.footer}>
@@ -156,77 +144,77 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.12,
     shadowRadius: 6,
-    height: 220,
+    height: 170, // Fixed height that works for all cards
   },
   compactContainer: {
-    height: 180, // Adjusted height to prevent content from being cut off
+    height: 160,
   },
   gradient: {
     borderRadius: 16,
     height: '100%',
   },
   content: {
-    padding: 20,
+    padding: 14,
     height: '100%',
     justifyContent: 'space-between',
   },
   compactContent: {
-    padding: 16,
+    padding: 12,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 18,
+    marginBottom: 10,
   },
   compactHeader: {
-    marginBottom: 12,
+    marginBottom: 8,
   },
   iconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
-  },
-  compactIconContainer: {
     width: 40,
     height: 40,
     borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 12,
+  },
+  compactIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginRight: 10,
   },
   titleContainer: {
     flex: 1,
   },
   title: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: 'white',
   },
   compactTitle: {
-    fontSize: 16,
+    fontSize: 14,
   },
   accountNumber: {
-    fontSize: 14,
+    fontSize: 12,
     color: 'rgba(255, 255, 255, 0.8)',
-    marginTop: 4,
+    marginTop: 2,
   },
   balanceContainer: {
-    marginBottom: 16,
+    marginBottom: 8,
   },
   compactBalanceContainer: {
-    marginBottom: 12,
+    marginBottom: 6,
   },
   balanceLabel: {
-    fontSize: 15,
+    fontSize: 14,
     color: 'rgba(255, 255, 255, 0.9)',
-    marginBottom: 8,
+    marginBottom: 4,
     fontWeight: '500',
   },
   compactBalanceLabel: {
-    fontSize: 14,
-    marginBottom: 6,
+    fontSize: 12,
+    marginBottom: 2,
   },
   balanceRow: {
     flexDirection: 'row',
@@ -234,21 +222,21 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   balance: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: 'bold',
     color: 'white',
   },
   compactBalance: {
-    fontSize: 22,
+    fontSize: 18,
   },
   targetContainer: {
-    marginTop: 8,
+    marginVertical: 4,
   },
   targetLabelRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   targetLabel: {
     fontSize: 12,
@@ -271,7 +259,7 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   eyeButton: {
-    padding: 5,
+    padding: 4,
   },
   goalContainer: {
     marginTop: 12,
