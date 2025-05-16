@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { supabase } from '../lib/supabase';
 import { useAuth } from './auth-context';
 import { Anggota } from '../lib/database.types';
+import { LoanNotificationService } from '../services/loan-notification.service';
 
 interface Transaction {
   id: string;
@@ -85,6 +86,22 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       clearCache();
     }
   }, [isAuthenticated]);
+
+  // Check for loan installments when the app loads
+  useEffect(() => {
+    if (isAuthenticated && member?.id) {
+      // Check loan installments for the member
+      LoanNotificationService.checkMemberLoanInstallments(member.id)
+        .then(() => {
+          console.log('Data Context: Loan installment check completed');
+          // Refresh notifications after checking loan installments
+          fetchNotifications(true);
+        })
+        .catch(error => {
+          console.error('Data Context: Error checking loan installments:', error);
+        });
+    }
+  }, [isAuthenticated, member?.id]);
 
   // Fetch transactions
   const fetchTransactions = useCallback(async (forceRefresh = false) => {
@@ -216,91 +233,87 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('Data Context: Fetching notifications from API for member:', member.id);
       
-      // We'll assume the notifikasi table exists in your Supabase database
-      // If it doesn't, you'll need to create it through the Supabase dashboard
-      
-      // Now fetch notifications from the table
-      // We need to fetch:
-      // 1. Personal notifications (including transactions) for this specific user
-      // 2. System/announcement notifications that should be visible to all users
-      console.log('Data Context: Fetching ALL notification types for member:', member.id);
-      
-      // Fetch all notifications including transaction notifications
-      // We need to make sure we get personal notifications (including transactions)
-      // as well as system-wide notifications
-      console.log('Data Context: Fetching notifications with explicit jenis check');
-      const { data, error } = await supabase
+      // COMPLETELY NEW APPROACH: Fetch all notifications in a single query
+      // First get general notifications
+      console.log('Data Context: Fetching general notifications for member:', member.id);
+      const { data: generalData, error: generalError } = await supabase
         .from('notifikasi')
         .select('*')
         .or(`anggota_id.eq.${member.id},jenis.eq.sistem,jenis.eq.pengumuman`)
         .order('created_at', { ascending: false });
+        
+      if (generalError) {
+        console.error('Data Context: Error fetching general notifications:', generalError);
+        throw generalError;
+      }
       
-      // If we don't find transaction notifications, try a direct query
-      if (data && data.filter(n => n.jenis === 'transaksi').length === 0) {
-        console.log('Data Context: No transaction notifications found, trying direct query');
-        const { data: transactionData, error: transactionError } = await supabase
+      // Then use our dedicated SQL function for jatuh_tempo notifications
+      console.log('Data Context: Using dedicated SQL function for jatuh_tempo notifications');
+      // Cast the result as any to handle the type mismatch between varchar and text
+      const { data: jatuhTempoData, error: jatuhTempoError } = await supabase
+        .rpc('get_jatuh_tempo_notifications', { member_id: member.id }) as {
+          data: any[] | null;
+          error: any;
+        };
+      
+      let allData = generalData || [];
+      let jatuhTempoFound = false;
+      
+      // First try using the RPC function
+      if (!jatuhTempoError && jatuhTempoData && jatuhTempoData.length > 0) {
+        console.log(`Data Context: Found ${jatuhTempoData.length} jatuh_tempo notifications via RPC function`);
+        jatuhTempoFound = true;
+        
+        // Add jatuh_tempo notifications from RPC function
+        jatuhTempoData.forEach(notification => {
+          if (!allData.some(n => n.id === notification.id)) {
+            allData.push(notification);
+          }
+        });
+      } else {
+        // If RPC function failed or returned no results, try direct query
+        console.log('Data Context: Falling back to direct query for jatuh_tempo notifications');
+        const { data: directJatuhTempoData, error: directJatuhTempoError } = await supabase
           .from('notifikasi')
           .select('*')
           .eq('anggota_id', member.id)
-          .eq('jenis', 'transaksi')
+          .eq('jenis', 'jatuh_tempo')
           .order('created_at', { ascending: false });
           
-        if (!transactionError && transactionData && transactionData.length > 0) {
-          console.log(`Data Context: Found ${transactionData.length} transaction notifications in direct query`);
-          // Add transaction notifications to the data array
-          data.push(...transactionData);
-          // Re-sort by created_at
-          data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-        }
-      }
-        
-      // Debug: Check what types of notifications we're getting
-      if (data && data.length > 0) {
-        const types = {};
-        data.forEach(n => {
-          types[n.jenis] = (types[n.jenis] || 0) + 1;
-        });
-        console.log('Data Context: Notification types fetched:', types);
-        
-        // Check specifically for transaction notifications
-        const transactionNotifications = data.filter(n => n.jenis === 'transaksi');
-        console.log('Data Context: Transaction notifications found:', transactionNotifications.length);
-        if (transactionNotifications.length > 0) {
-          console.log('Data Context: First transaction notification:', JSON.stringify(transactionNotifications[0], null, 2));
+        if (!directJatuhTempoError && directJatuhTempoData && directJatuhTempoData.length > 0) {
+          console.log(`Data Context: Found ${directJatuhTempoData.length} jatuh_tempo notifications via direct query`);
+          jatuhTempoFound = true;
+          
+          // Add jatuh_tempo notifications from direct query
+          directJatuhTempoData.forEach(notification => {
+            if (!allData.some(n => n.id === notification.id)) {
+              allData.push(notification);
+            }
+          });
+        } else {
+          console.log('Data Context: No jatuh_tempo notifications found via any method');
         }
       }
       
-      if (error) {
-        console.error('Data Context: Error fetching notifications:', error);
-        setState(prev => ({
-          ...prev,
-          notifications: {
-            ...prev.notifications,
-            isLoading: false,
-            error: error as Error,
-          }
-        }));
-        return;
-      }
+      // Sort by created_at
+      allData.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       
-      // If we successfully fetched data (even if empty), process it
-      const notificationsData = data || [];
-
-      console.log('Data Context: Successfully fetched notifications, count:', notificationsData?.length || 0);
-      if (notificationsData?.length > 0) {
-        console.log('Data Context: First notification:', JSON.stringify(notificationsData[0], null, 2));
-      } else {
-        console.log('Data Context: No notifications found for member:', member.id);
-      }
-
-      // Count unread notifications
-      const unreadCount = notificationsData?.filter((n: Notification) => !n.is_read).length || 0;
-      console.log('Data Context: Unread notifications count:', unreadCount);
+      // Count notification types for logging
+      const typeCount = {};
+      allData.forEach(n => {
+        typeCount[n.jenis] = (typeCount[n.jenis] || 0) + 1;
+      });
+      console.log('Data Context: Notification types after fetch:', typeCount);
+      console.log('Data Context: Jatuh tempo notifications found:', jatuhTempoFound);
       
+      // Calculate unread count
+      const unreadCount = allData.filter(n => !n.is_read).length;
+      
+      // Update state with the fetched notifications
       setState(prev => ({
         ...prev,
         notifications: {
-          data: notificationsData || [],
+          data: allData,
           unreadCount,
           lastFetched: now,
           isLoading: false,
@@ -318,23 +331,23 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         }
       }));
     }
-  }, [isAuthenticated, member]);  // Removed state dependencies to prevent infinite loops
-
+  }, [isAuthenticated, member]);
+  
   // Mark notification as read
-  const markNotificationAsRead = useCallback(async (notificationId: string) => {
+  const markNotificationAsRead = useCallback(async (id: string): Promise<boolean> => {
     if (!isAuthenticated || !member) {
       console.log('Data Context: Not authenticated or no member, cannot mark notification as read');
       return false;
     }
     
-    console.log(`Data Context: Marking notification ${notificationId} as read for member ${member.id}`);
+    console.log(`Data Context: Marking notification ${id} as read for member ${member.id}`);
     
     try {
       // First, verify the notification exists and get its current status
       const { data: checkData, error: checkError } = await supabase
         .from('notifikasi')
         .select('id, is_read, anggota_id, jenis')
-        .eq('id', notificationId)
+        .eq('id', id)
         .single();
       
       if (checkError) {
@@ -343,15 +356,15 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       }
       
       if (!checkData) {
-        console.error(`Data Context: Notification ${notificationId} not found`);
+        console.error(`Data Context: Notification ${id} not found`);
         return false;
       }
       
-      console.log(`Data Context: Found notification ${notificationId}, current read status:`, checkData.is_read);
+      console.log(`Data Context: Found notification ${id}, current read status:`, checkData.is_read);
       
       // If already read, no need to update
       if (checkData.is_read) {
-        console.log(`Data Context: Notification ${notificationId} is already marked as read`);
+        console.log(`Data Context: Notification ${id} is already marked as read`);
         return true;
       }
       
@@ -360,7 +373,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       const isSystemNotification = checkData.jenis === 'sistem' || checkData.jenis === 'pengumuman';
       
       if (!isUserNotification && !isSystemNotification) {
-        console.error(`Data Context: User ${member.id} does not have permission to mark notification ${notificationId} as read`);
+        console.error(`Data Context: User ${member.id} does not have permission to mark notification ${id} as read`);
         return false;
       }
       
@@ -371,19 +384,19 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           is_read: true,
           updated_at: new Date().toISOString() 
         })
-        .eq('id', notificationId);
+        .eq('id', id);
       
       if (error) {
         console.error('Data Context: Error marking notification as read in Supabase:', error);
         return false;
       }
       
-      console.log(`Data Context: Successfully marked notification ${notificationId} as read in Supabase`);
+      console.log(`Data Context: Successfully marked notification ${id} as read in Supabase`);
       
       // Update local state
       setState(prev => {
         const updatedNotifications = prev.notifications.data.map(n => 
-          n.id === notificationId ? { ...n, is_read: true } : n
+          n.id === id ? { ...n, is_read: true } : n
         );
         
         const unreadCount = updatedNotifications.filter(n => !n.is_read).length;

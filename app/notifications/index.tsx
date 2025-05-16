@@ -17,6 +17,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/auth-context';
 import { useData } from '../../context/data-context';
+import { JatuhTempoNotifications } from '../../components/jatuh-tempo-notifications';
 // Notification type is now imported from data-context
 import { format, parseISO, formatDistanceToNow } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
@@ -88,12 +89,78 @@ export default function NotificationsScreen() {
       
       // Fetch notifications directly from Supabase
       // Include both personal notifications and system/announcement notifications
-      // Make sure to include transaksi notifications
       const { data, error } = await supabase
         .from('notifikasi')
         .select('*')
         .or(`anggota_id.eq.${memberId},jenis.eq.sistem,jenis.eq.pengumuman`)
         .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Error fetching general notifications directly:', error);
+        return;
+      }
+      
+      // COMPLETELY NEW APPROACH: Use the dedicated SQL function for jatuh_tempo notifications
+      console.log('Using dedicated SQL function for jatuh_tempo notifications');
+      // Cast the result as any to handle the type mismatch between varchar and text
+      const { data: jatuhTempoData, error: jatuhTempoError } = await supabase
+        .rpc('get_jatuh_tempo_notifications', { member_id: memberId }) as {
+          data: any[] | null;
+          error: any;
+        };
+      
+      if (jatuhTempoError) {
+        console.error('Error calling get_jatuh_tempo_notifications function:', jatuhTempoError);
+      } else {
+        console.log(`Found ${jatuhTempoData?.length || 0} jatuh_tempo notifications via RPC function`);
+        
+        if (jatuhTempoData && jatuhTempoData.length > 0) {
+          console.log('First jatuh_tempo notification from RPC:', JSON.stringify(jatuhTempoData[0], null, 2));
+          
+          // Add jatuh_tempo notifications to the data array if they exist
+          if (data) {
+            // Add jatuh_tempo notifications, avoiding duplicates
+            jatuhTempoData.forEach(notification => {
+              if (!data.some(n => n.id === notification.id)) {
+                data.push(notification);
+              }
+            });
+            
+            // Re-sort by created_at
+            data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+          }
+        } else {
+          // Fallback to direct query if RPC returns no results
+          console.log('No results from RPC function, trying direct query for jatuh_tempo');
+          const { data: directJatuhTempoData, error: directJatuhTempoError } = await supabase
+            .from('notifikasi')
+            .select('*')
+            .eq('anggota_id', memberId)
+            .eq('jenis', 'jatuh_tempo')
+            .order('created_at', { ascending: false });
+          
+          if (directJatuhTempoError) {
+            console.error('Error with direct jatuh_tempo query:', directJatuhTempoError);
+          } else if (directJatuhTempoData && directJatuhTempoData.length > 0) {
+            console.log(`Found ${directJatuhTempoData.length} jatuh_tempo notifications via direct query`);
+            console.log('First direct jatuh_tempo notification:', JSON.stringify(directJatuhTempoData[0], null, 2));
+            
+            // Add these notifications to our data array
+            if (data) {
+              directJatuhTempoData.forEach(notification => {
+                if (!data.some(n => n.id === notification.id)) {
+                  data.push(notification);
+                }
+              });
+              
+              // Re-sort by created_at
+              data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+            }
+          } else {
+            console.log('No jatuh_tempo notifications found via direct query either');
+          }
+        }
+      }
         
       // If we don't find transaction notifications, try a direct query
       if (!error && data && data.filter(n => n.jenis === 'transaksi').length === 0) {
@@ -251,26 +318,16 @@ export default function NotificationsScreen() {
   
   // Filter notifications based on active filter
   const filteredNotifications = useMemo(() => {
-    // Debug: Log notification types in the data
-    const types = {};
-    notifications.data.forEach(n => {
-      types[n.jenis] = (types[n.jenis] || 0) + 1;
-    });
-    console.log('Notification types in data:', types);
-    
-    // Debug: Check specifically for transaction notifications
-    const transactionNotifications = notifications.data.filter(n => n.jenis === 'transaksi');
-    console.log('Transaction notifications in data context:', transactionNotifications.length);
-    if (transactionNotifications.length > 0) {
-      console.log('Sample transaction notification:', JSON.stringify(transactionNotifications[0], null, 2));
-    }
+    // Apply filters to notifications data
     
     if (activeFilter === 'all') {
       return notifications.data;
     } else if (activeFilter === 'unread') {
       return notifications.data.filter(item => !item.is_read);
     } else {
-      return notifications.data.filter(item => item.jenis === activeFilter);
+      const filtered = notifications.data.filter(item => item.jenis === activeFilter);
+      console.log(`Filtered ${filtered.length} notifications for type ${activeFilter}`);
+      return filtered;
     }
   }, [notifications.data, activeFilter]);
 
@@ -387,9 +444,20 @@ export default function NotificationsScreen() {
             </Text>
           </TouchableOpacity>
           
+          {/* Jatuh Tempo filter - explicitly add this */}
+          <TouchableOpacity 
+            key="jatuh_tempo"
+            style={[styles.filterTab, activeFilter === 'jatuh_tempo' && styles.activeFilterTab]}
+            onPress={() => setActiveFilter('jatuh_tempo')}
+          >
+            <Text style={[styles.filterText, activeFilter === 'jatuh_tempo' && styles.activeFilterText]}>
+              Jatuh Tempo
+            </Text>
+          </TouchableOpacity>
+          
           {/* Other notification types */}
           {Object.entries(NOTIFICATION_TYPES)
-            .filter(([key]) => key !== 'transaksi') // Skip transaksi since we added it explicitly
+            .filter(([key]) => key !== 'transaksi' && key !== 'jatuh_tempo') // Skip transaksi and jatuh_tempo since we added them explicitly
             .map(([key, value]) => (
               <TouchableOpacity 
                 key={key}
@@ -404,25 +472,36 @@ export default function NotificationsScreen() {
         </ScrollView>
       </View>
       
-      {notifications.isLoading ? (
+
+      
+      {/* Main content */}
+      {activeFilter === 'jatuh_tempo' ? (
+        // Show the dedicated JatuhTempoNotifications component when jatuh_tempo filter is active
+        <JatuhTempoNotifications />
+      ) : notifications.isLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007BFF" />
           <Text style={styles.loadingText}>Memuat notifikasi...</Text>
         </View>
       ) : notifications.error ? (
         <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={48} color="#dc3545" />
           <Text style={styles.errorText}>Gagal memuat notifikasi</Text>
-          <TouchableOpacity 
-            style={styles.retryButton}
-            onPress={() => fetchNotifications(true)}
-          >
+          <Text style={styles.errorDetail}>{notifications.error.message}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
             <Text style={styles.retryText}>Coba Lagi</Text>
           </TouchableOpacity>
         </View>
-      ) : notifications.data.length === 0 ? (
+      ) : filteredNotifications.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="notifications-off-outline" size={64} color="#cccccc" />
-          <Text style={styles.emptyText}>Tidak ada notifikasi</Text>
+          <Ionicons name="notifications-off-outline" size={48} color="#6c757d" />
+          <Text style={styles.emptyText}>
+            {activeFilter === 'all'
+              ? 'Tidak ada notifikasi'
+              : activeFilter === 'unread'
+              ? 'Tidak ada notifikasi yang belum dibaca'
+              : `Tidak ada notifikasi ${NOTIFICATION_TYPES[activeFilter]?.name || activeFilter}`}
+          </Text>
         </View>
       ) : (
         <FlatList
@@ -450,8 +529,9 @@ export default function NotificationsScreen() {
 const createStyles = (isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: isDark ? '#121212' : '#f5f5f5',
+    backgroundColor: isDark ? '#121212' : '#f8f9fa',
   },
+
   filterContainer: {
     backgroundColor: isDark ? '#1e1e1e' : '#ffffff',
     paddingVertical: 8,
@@ -575,8 +655,14 @@ const createStyles = (isDark: boolean) => StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
-    color: '#dc3545',
-    marginBottom: 16,
+    color: isDark ? '#f8f9fa' : '#333333',
+    marginTop: 10,
+    textAlign: 'center',
+  },
+  errorDetail: {
+    fontSize: 14,
+    color: isDark ? '#cccccc' : '#666666',
+    marginTop: 5,
     textAlign: 'center',
   },
   retryButton: {
