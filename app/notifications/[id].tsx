@@ -46,11 +46,12 @@ export default function NotificationDetailScreen() {
         console.log(`Fetching notification details for ID: ${id}`);
         
         // Fetch notification from Supabase
+        // Use maybeSingle instead of single to avoid PGRST116 error
         const { data, error } = await supabase
           .from('notifikasi')
           .select('*')
           .eq('id', id)
-          .single();
+          .maybeSingle();
         
         if (error) {
           console.error('Error fetching notification details:', error);
@@ -132,7 +133,7 @@ export default function NotificationDetailScreen() {
     };
     
     fetchNotificationDetails();
-  }, [id, member?.id, markNotificationAsRead]);
+  }, [id, member?.id]);
 
   // Format date
   const formatDate = useCallback((dateString: string) => {
@@ -346,6 +347,27 @@ export default function NotificationDetailScreen() {
           {/* Render specialized transaction details for transaction notifications */}
           {notification.jenis === 'transaksi' ? (
             renderTransactionDetails()
+          ) : notification.jenis === 'jatuh_tempo' ? (
+            /* For jatuh tempo notifications, show a simplified view */
+            <View style={styles.dataContainer}>
+              <Text style={styles.dataTitle}>Informasi Pembayaran:</Text>
+              <View style={styles.transactionDetail}>
+                <Text style={styles.dataKey}>Jenis:</Text>
+                <Text style={styles.dataValue}>Pembayaran Angsuran</Text>
+              </View>
+              {notification.data?.installmentAmount && (
+                <View style={styles.transactionDetail}>
+                  <Text style={styles.dataKey}>Jumlah:</Text>
+                  <Text style={styles.dataValue}>{formatCurrency(notification.data.installmentAmount)}</Text>
+                </View>
+              )}
+              {notification.data?.installmentDate && (
+                <View style={styles.transactionDetail}>
+                  <Text style={styles.dataKey}>Tanggal Jatuh Tempo:</Text>
+                  <Text style={styles.dataValue}>{formatDate(notification.data.installmentDate)}</Text>
+                </View>
+              )}
+            </View>
           ) : (
             /* For other notification types, show raw data if available */
             notification.data && Object.keys(notification.data).length > 0 && (

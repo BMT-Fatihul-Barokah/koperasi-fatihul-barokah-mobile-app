@@ -28,7 +28,7 @@ import { BottomNavBar } from '../../components/navigation/BottomNavBar';
 import { supabase } from '../../lib/supabase';
 
 // Filter type for notifications
-type FilterType = 'all' | 'unread' | 'transaksi' | 'pengumuman' | 'info' | 'sistem' | 'jatuh_tempo';
+type FilterType = 'all' | 'unread' | 'transaksi' | 'pengumuman' | 'sistem' | 'jatuh_tempo';
 
 export default function NotificationsScreen() {
   const { member } = useAuth();

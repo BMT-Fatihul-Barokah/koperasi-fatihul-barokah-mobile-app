@@ -5,7 +5,7 @@ export interface Notification {
   anggota_id: string;
   judul: string;
   pesan: string;
-  jenis: 'info' | 'transaksi' | 'sistem' | 'pengumuman' | 'jatuh_tempo';
+  jenis: 'transaksi' | 'sistem' | 'pengumuman' | 'jatuh_tempo';
   is_read: boolean;
   data?: any;
   created_at: string;
@@ -34,13 +34,6 @@ export const NOTIFICATION_TYPES: Record<string, NotificationTypeInfo> = {
     color: '#0066CC',
     isPushEnabled: false,
     isGlobal: true
-  },
-  info: {
-    name: 'Informasi',
-    icon: 'information-circle-outline',
-    color: '#007BFF',
-    isPushEnabled: false,
-    isGlobal: false
   },
   sistem: {
     name: 'Sistem',
