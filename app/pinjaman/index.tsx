@@ -81,6 +81,11 @@ export default function PinjamanScreen() {
     router.push(`/pinjaman/${loanId}`);
   };
 
+  // Navigate to loan history
+  const navigateToHistory = () => {
+    router.push('/pinjaman/history');
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
@@ -101,13 +106,6 @@ export default function PinjamanScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Pinjaman Aktif</Text>
-              <TouchableOpacity
-                onPress={() => router.push('/pinjaman/history')}
-                style={styles.viewAllButton}
-              >
-                <Text style={styles.viewAllText}>Lihat Riwayat</Text>
-                <Ionicons name="chevron-forward" size={16} color="#007BFF" />
-              </TouchableOpacity>
             </View>
 
             {/* Loading State */}
