@@ -35,14 +35,13 @@ interface Transaction {
   bank_name?: string;
 }
 
-// Tab type for filtering transactions
-type TabType = 'transaction' | 'others';
+// Previously had tab types, now simplified to just transactions
 
 export default function ActivityScreen() {
   const { isLoading: authLoading, isAuthenticated, member } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<TabType>('transaction');
+  // No longer using tabs, simplified to just show transactions
   const [refreshing, setRefreshing] = useState(false);
   const { width } = useWindowDimensions();
   const colorScheme = useColorScheme();
@@ -198,25 +197,7 @@ export default function ActivityScreen() {
         title="Aktivitas" 
         showBackButton={false}
       />
-      <View style={styles.tabsContainer}>
-        <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'transaction' && styles.activeTabButton]}
-          onPress={() => setActiveTab('transaction')}
-        >
-          <Text style={[styles.tabText, activeTab === 'transaction' && styles.activeTabText]}>
-            Transaksi
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'others' && styles.activeTabButton]}
-          onPress={() => setActiveTab('others')}
-        >
-          <Text style={[styles.tabText, activeTab === 'others' && styles.activeTabText]}>
-            Lainnya
-          </Text>
-        </TouchableOpacity>
-      </View>
+      {/* No header - clean minimal interface */}
       
       {isLoading ? (
         <View style={styles.loadingContainer}>
@@ -266,38 +247,7 @@ const createStyles = (isDark: boolean, width: number) => StyleSheet.create({
   containerDark: {
     backgroundColor: '#121212',
   },
-  tabsContainer: {
-    flexDirection: 'row',
-    marginHorizontal: 16,
-    marginTop: 8,
-    marginBottom: 16,
-    backgroundColor: isDark ? '#2A2A2A' : '#E8EEF4',
-    borderRadius: 12,
-    padding: 4,
-  },
-  tabButton: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 10,
-  },
-  activeTabButton: {
-    backgroundColor: isDark ? '#3A3A3A' : '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: isDark ? '#888' : '#888',
-  },
-  activeTabText: {
-    color: isDark ? '#FFFFFF' : '#333333',
-    fontWeight: '600',
-  },
+  // Styles for the activity page content
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
