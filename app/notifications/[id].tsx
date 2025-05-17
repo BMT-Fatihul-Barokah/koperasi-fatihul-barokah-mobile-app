@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -22,107 +22,113 @@ import { supabase } from '../../lib/supabase';
 
 export default function NotificationDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const notificationId = id as string;
   const { member } = useAuth();
-  const { markNotificationAsRead } = useData();
+  const { markNotificationAsRead, fetchNotifications } = useData();
   const [notification, setNotification] = useState<Notification | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+  const [markedAsRead, setMarkedAsRead] = useState(false);
+  const didAttemptMarkAsRead = useRef(false);
+
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
-  
+
   // Create styles with dynamic values based on theme
   const styles = useMemo(() => createStyles(isDark), [isDark]);
 
+  // Effect for refreshing notifications when navigating back from this screen
+  useEffect(() => {
+    return () => {
+      if (markedAsRead) {
+        console.log('Notification detail screen unmounting, refreshing notifications');
+        // Force refresh notifications when navigating away if we marked as read
+        fetchNotifications(true);
+      }
+    };
+  }, [markedAsRead, fetchNotifications]);
+
   // Fetch notification details
   useEffect(() => {
-    if (!id || !member?.id) return;
-    
+    if (!notificationId || !member?.id) return;
+
     const fetchNotificationDetails = async () => {
       try {
         setIsLoading(true);
         setError(null);
-        
-        console.log(`Fetching notification details for ID: ${id}`);
-        
-        // Fetch notification from Supabase
+
+        console.log(`Fetching notification details for ID: ${notificationId}`);
+
+        // Fetch notification from Supabase using maybeSingle to avoid errors
         const { data, error } = await supabase
           .from('notifikasi')
           .select('*')
-          .eq('id', id)
-          .single();
-        
+          .eq('id', notificationId)
+          .maybeSingle();
+
         if (error) {
           console.error('Error fetching notification details:', error);
           setError('Failed to fetch notification details');
           setIsLoading(false);
           return;
         }
-        
+
         if (!data) {
+          console.log(`Notification ${notificationId} not found in database, checking for jatuh_tempo notification`);
+
+          // For jatuh_tempo notifications, use the existing get_jatuh_tempo_notifications function as a fallback
+          try {
+            if (member?.id) {
+              const { data: jatuhTempoData, error: jatuhTempoError } = await supabase
+                .rpc('get_jatuh_tempo_notifications', { 
+                  member_id: member.id 
+                }) as {
+                  data: any[] | null;
+                  error: any;
+                };
+
+              if (jatuhTempoError) {
+                console.error('Error fetching jatuh_tempo notifications:', jatuhTempoError);
+                throw jatuhTempoError;
+              }
+
+              if (jatuhTempoData && jatuhTempoData.length > 0) {
+                // Find the specific notification by ID
+                const targetNotification = jatuhTempoData.find(notification => notification.id === notificationId);
+
+                if (targetNotification) {
+                  console.log('Found jatuh_tempo notification via get_jatuh_tempo_notifications');
+                  setNotification(targetNotification as Notification);
+                  setIsLoading(false);
+                  return;
+                } else {
+                  console.log(`Notification with ID ${notificationId} not found in jatuh_tempo notifications`);
+                }
+              }
+            }
+          } catch (fallbackError) {
+            console.error('Error in jatuh_tempo fallback:', fallbackError);
+          }
+
           setError('Notification not found');
           setIsLoading(false);
           return;
         }
-        
+
         // Check if this notification belongs to the current member
         if (data.anggota_id !== member.id) {
           // Check if it's a system notification that should be visible to all
           const isSystemNotification = data.jenis === 'sistem' || data.jenis === 'pengumuman';
-          
+
           if (!isSystemNotification) {
             setError('You do not have permission to view this notification');
             setIsLoading(false);
             return;
           }
         }
-        
+
         // Set notification data
         setNotification(data as Notification);
-        
-        // Mark as read if not already read
-        if (!data.is_read) {
-          console.log(`Marking notification ${id} as read, type: ${data.jenis}`);
-          
-          try {
-            // For transaction notifications, directly update using Supabase
-            if (data.jenis === 'transaksi') {
-              console.log('Using direct Supabase update for transaction notification');
-              const { error: updateError } = await supabase
-                .from('notifikasi')
-                .update({ 
-                  is_read: true,
-                  updated_at: new Date().toISOString() 
-                })
-                .eq('id', id);
-                
-              if (updateError) {
-                console.error('Error directly updating transaction notification:', updateError);
-                throw new Error('Failed to update transaction notification');
-              }
-              
-              console.log(`Successfully updated transaction notification ${id} directly`);
-              // Update local state to reflect the change
-              setNotification(prev => prev ? { ...prev, is_read: true } : null);
-            } else {
-              // For other notification types, use the context method
-              const success = await markNotificationAsRead(id);
-              
-              if (success) {
-                console.log(`Successfully marked notification ${id} as read`);
-                // Update local state to reflect the change
-                setNotification(prev => prev ? { ...prev, is_read: true } : null);
-              } else {
-                console.error(`Failed to mark notification ${id} as read`);
-              }
-            }
-          } catch (error) {
-            console.error('Error marking notification as read:', error);
-          }
-        } else {
-          console.log(`Notification ${id} is already marked as read`);
-        }
-        
         setIsLoading(false);
       } catch (error) {
         console.error('Error in fetchNotificationDetails:', error);
@@ -130,9 +136,133 @@ export default function NotificationDetailScreen() {
         setIsLoading(false);
       }
     };
-    
+
     fetchNotificationDetails();
-  }, [id, member?.id, markNotificationAsRead]);
+  }, [notificationId, member?.id]);
+
+  // Mark notification as read after it's loaded
+  useEffect(() => {
+    // Skip if already attempted to mark as read, no notification, or already loading
+    if (didAttemptMarkAsRead.current || !notification || isLoading) {
+      return;
+    }
+
+    const markAsRead = async () => {
+      didAttemptMarkAsRead.current = true;
+
+      // If already read, no need to mark again
+      if (notification.is_read) {
+        console.log(`Notification ${notificationId} is already marked as read`);
+        return;
+      }
+
+      console.log(`Marking notification ${notificationId} as read, type: ${notification.jenis}`);
+
+      try {
+        // For transaction notifications, directly update using Supabase
+        if (notification.jenis === 'transaksi') {
+          console.log('Using direct Supabase update for transaction notification');
+          const { error: updateError } = await supabase
+            .from('notifikasi')
+            .update({ 
+              is_read: true,
+              updated_at: new Date().toISOString() 
+            })
+            .eq('id', notificationId);
+
+          if (updateError) {
+            console.error('Error directly updating transaction notification:', updateError);
+            throw new Error('Failed to update transaction notification');
+          }
+
+          console.log(`Successfully updated transaction notification ${notificationId} directly`);
+          // Update local state to reflect the change
+          setNotification(prev => prev ? { ...prev, is_read: true } : null);
+          setMarkedAsRead(true);
+        } else if (notification.jenis === 'jatuh_tempo') {
+          console.log('Using enhanced approach for jatuh_tempo notification');
+          // For jatuh_tempo notifications, use our specialized RPC function
+
+          // 1. First try the specialized RPC function
+          try {
+            console.log(`Using mark_jatuh_tempo_notification_as_read RPC function for ${notificationId}`);
+            const { data: updateResult, error: updateError } = await supabase
+              .rpc('mark_jatuh_tempo_notification_as_read', {
+                notification_id: notificationId,
+                member_id: member.id
+              }) as {
+                data: boolean | null;
+                error: any;
+              };
+            
+            if (updateError) {
+              console.error(`Error using mark_jatuh_tempo_notification_as_read for ${notificationId}:`, updateError);
+              
+              // Fall back to direct DB update if RPC function fails
+              try {
+                console.log(`Falling back to direct update for jatuh_tempo notification ${notificationId}`);
+                const { error } = await supabase
+                  .from('notifikasi')
+                  .update({ 
+                    is_read: true,
+                    updated_at: new Date().toISOString() 
+                  })
+                  .eq('id', notificationId);
+                  
+                if (error) {
+                  console.log('Direct update failed for jatuh_tempo notification, this is expected:', error);
+                } else {
+                  console.log('Direct update succeeded for jatuh_tempo notification');
+                }
+              } catch (directError) {
+                console.log('Error in direct update for jatuh_tempo notification:', directError);
+              }
+            } else {
+              if (updateResult === true) {
+                console.log(`Successfully marked jatuh_tempo notification ${notificationId} as read via RPC`);
+              } else {
+                console.log(`RPC function returned false for ${notificationId}, notification might not exist in DB`);
+              }
+            }
+          } catch (rpcError) {
+            console.error(`Error calling mark_jatuh_tempo_notification_as_read RPC for ${notificationId}:`, rpcError);
+          }
+
+          // 2. Also use the context method which will update local state
+          const success = await markNotificationAsRead(notificationId);
+
+          if (success) {
+            console.log(`Successfully marked jatuh_tempo notification ${notificationId} as read via context`);
+          } else {
+            console.log(`Context method may have failed for jatuh_tempo ${notificationId}, updating UI locally`);
+          }
+
+          // 3. Always update local state in this component
+          setNotification(prev => prev ? { ...prev, is_read: true } : null);
+          setMarkedAsRead(true);
+
+          // 4. Force refresh notifications to ensure consistency
+          fetchNotifications(true);
+        } else {
+          // For other notification types, use the context method
+          const success = await markNotificationAsRead(notificationId);
+
+          if (success) {
+            console.log(`Successfully marked notification ${notificationId} as read`);
+            // Update local state to reflect the change
+            setNotification(prev => prev ? { ...prev, is_read: true } : null);
+            setMarkedAsRead(true);
+          } else {
+            console.error(`Failed to mark notification ${notificationId} as read`);
+          }
+        }
+      } catch (error) {
+        console.error('Error marking notification as read:', error);
+      }
+    };
+
+    markAsRead();
+  }, [notification, isLoading, notificationId, markNotificationAsRead, fetchNotifications]);
 
   // Format date
   const formatDate = useCallback((dateString: string) => {

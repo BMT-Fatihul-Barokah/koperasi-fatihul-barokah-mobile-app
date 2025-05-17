@@ -344,11 +344,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     
     try {
       // First, verify the notification exists and get its current status
+      // Use maybeSingle() instead of single() to avoid error when notification isn't found
       const { data: checkData, error: checkError } = await supabase
         .from('notifikasi')
         .select('id, is_read, anggota_id, jenis')
         .eq('id', id)
-        .single();
+        .maybeSingle();
       
       if (checkError) {
         console.error('Data Context: Error checking notification before marking as read:', checkError);
@@ -356,8 +357,86 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       }
       
       if (!checkData) {
-        console.error(`Data Context: Notification ${id} not found`);
-        return false;
+        console.log(`Data Context: Notification ${id} not found in database, checking local state`);
+        
+        // Check if notification exists in local state
+        const localNotification = state.notifications.data.find(n => n.id === id);
+        if (!localNotification) {
+          console.error(`Data Context: Notification ${id} not found in local state either`);
+          return false;
+        }
+        
+        console.log(`Data Context: Found notification ${id} in local state, type: ${localNotification.jenis}`);
+        
+        // For jatuh_tempo notifications, we need special handling
+        if (localNotification.jenis === 'jatuh_tempo') {
+          console.log(`Data Context: Handling jatuh_tempo notification ${id}`);
+          
+          // Use the specialized RPC function to mark jatuh_tempo notifications as read
+          try {
+            console.log(`Data Context: Using mark_jatuh_tempo_notification_as_read RPC function for ${id}`);
+            const { data: updateResult, error: updateError } = await supabase
+              .rpc('mark_jatuh_tempo_notification_as_read', {
+                notification_id: id,
+                member_id: member.id
+              }) as {
+                data: boolean | null;
+                error: any;
+              };
+            
+            if (updateError) {
+              console.error(`Data Context: Error using mark_jatuh_tempo_notification_as_read for ${id}:`, updateError);
+              
+              // Fall back to the regular update if the RPC function fails
+              try {
+                console.log(`Data Context: Falling back to regular update for jatuh_tempo notification ${id}`);
+                const { error } = await supabase
+                  .from('notifikasi')
+                  .update({ 
+                    is_read: true,
+                    updated_at: new Date().toISOString() 
+                  })
+                  .eq('id', id);
+                  
+                if (error) {
+                  console.error(`Data Context: Error with fallback update for jatuh_tempo ${id}:`, error);
+                } else {
+                  console.log(`Data Context: Fallback update successful for jatuh_tempo ${id}`);
+                }
+              } catch (fallbackError) {
+                console.error(`Data Context: Error in fallback update for jatuh_tempo ${id}:`, fallbackError);
+              }
+            } else {
+              if (updateResult === true) {
+                console.log(`Data Context: Successfully marked jatuh_tempo notification ${id} as read via RPC`);
+              } else {
+                console.log(`Data Context: RPC function returned false for ${id}, notification might not exist in DB`);
+              }
+            }
+          } catch (error) {
+            console.error(`Data Context: Error handling jatuh_tempo notification ${id}:`, error);
+          }
+        }
+        
+        // Always update local state
+        setState(prev => {
+          const updatedNotifications = prev.notifications.data.map(n => 
+            n.id === id ? { ...n, is_read: true } : n
+          );
+          
+          const unreadCount = updatedNotifications.filter(n => !n.is_read).length;
+          
+          return {
+            ...prev,
+            notifications: {
+              ...prev.notifications,
+              data: updatedNotifications,
+              unreadCount,
+            }
+          };
+        });
+        
+        return true;
       }
       
       console.log(`Data Context: Found notification ${id}, current read status:`, checkData.is_read);
