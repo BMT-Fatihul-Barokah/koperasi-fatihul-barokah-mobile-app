@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/auth-context';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
+import { Ionicons } from '@expo/vector-icons';
 
 interface JatuhTempoNotification {
   id: string;
@@ -24,7 +25,7 @@ interface JatuhTempoNotification {
 }
 
 export function JatuhTempoNotifications() {
-  const { session, member } = useAuth();
+  const { member } = useAuth();
   const [notifications, setNotifications] = useState<JatuhTempoNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -91,6 +92,61 @@ export function JatuhTempoNotifications() {
       return dateString;
     }
   }
+  
+  // Function to mark a notification as read
+  async function markNotificationAsRead(notificationId: string) {
+    try {
+      console.log(`Marking jatuh tempo notification ${notificationId} as read`);
+      
+      // First check if the notification exists to avoid the PGRST116 error
+      const { data: checkData, error: checkError } = await supabase
+        .from('notifikasi')
+        .select('id')
+        .eq('id', notificationId);
+      
+      if (checkError || !checkData || checkData.length === 0) {
+        console.log('Notification not found or error checking:', checkError);
+        // Still update local state even if the server update fails
+        setNotifications(prev => 
+          prev.map(notification => 
+            notification.id === notificationId 
+              ? { ...notification, is_read: true } 
+              : notification
+          )
+        );
+        return;
+      }
+      
+      // Update the notification
+      const { error } = await supabase
+        .from('notifikasi')
+        .update({ is_read: true, updated_at: new Date().toISOString() })
+        .eq('id', notificationId);
+      
+      if (error) {
+        console.error('Error marking notification as read:', error);
+      }
+      
+      // Update local state regardless of server result
+      setNotifications(prev => 
+        prev.map(notification => 
+          notification.id === notificationId 
+            ? { ...notification, is_read: true } 
+            : notification
+        )
+      );
+    } catch (err) {
+      console.error('Error in markNotificationAsRead:', err);
+      // Still update local state even if there's an exception
+      setNotifications(prev => 
+        prev.map(notification => 
+          notification.id === notificationId 
+            ? { ...notification, is_read: true } 
+            : notification
+        )
+      );
+    }
+  }
 
   if (loading) {
     return (
@@ -119,46 +175,44 @@ export function JatuhTempoNotifications() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Jatuh Tempo Notifications</Text>
-      <Text style={styles.subtitle}>
-        {notifications.length} notification{notifications.length !== 1 ? 's' : ''} found
-      </Text>
-      
       <FlatList
         data={notifications}
         keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContainer}
         renderItem={({ item }) => (
-          <View style={[styles.notificationCard, item.is_read ? styles.readCard : styles.unreadCard]}>
-            <Text style={styles.notificationTitle}>{item.judul}</Text>
-            <Text style={styles.notificationDate}>
-              {formatDate(item.created_at)}
-            </Text>
-            <Text style={styles.notificationMessage}>{item.pesan}</Text>
-            
-            {item.data && (
-              <View style={styles.notificationDetails}>
-                <Text style={styles.detailLabel}>Loan Type:</Text>
-                <Text style={styles.detailValue}>{item.data.loanType}</Text>
-                
-                <Text style={styles.detailLabel}>Installment Date:</Text>
-                <Text style={styles.detailValue}>{formatDate(item.data.installmentDate)}</Text>
-                
-                <Text style={styles.detailLabel}>Installment Amount:</Text>
-                <Text style={styles.detailValue}>Rp {formatCurrency(item.data.installmentAmount)}</Text>
-                
-                <Text style={styles.detailLabel}>Total Payment:</Text>
-                <Text style={styles.detailValue}>Rp {formatCurrency(item.data.totalPayment)}</Text>
-                
-                <Text style={styles.detailLabel}>Remaining Payment:</Text>
-                <Text style={styles.detailValue}>Rp {formatCurrency(item.data.remainingPayment)}</Text>
-              </View>
-            )}
-            
-            <View style={styles.statusContainer}>
-              <View style={[styles.statusIndicator, item.is_read ? styles.readIndicator : styles.unreadIndicator]} />
-              <Text style={styles.statusText}>{item.is_read ? 'Read' : 'Unread'}</Text>
+          <TouchableOpacity
+            style={[
+              styles.notificationItem,
+              !item.is_read && styles.unreadNotification
+            ]}
+            onPress={() => {
+              // Mark notification as read when pressed
+              markNotificationAsRead(item.id);
+            }}
+          >
+            <View style={styles.notificationIconContainer}>
+              <Ionicons 
+                name="calendar-outline" 
+                size={24} 
+                color="#dc3545" 
+              />
             </View>
-          </View>
+            
+            <View style={styles.notificationContent}>
+              <View style={styles.notificationHeader}>
+                <Text style={styles.notificationTitle}>{item.judul}</Text>
+                {!item.is_read && <View style={styles.unreadDot} />}
+              </View>
+              
+              <Text style={styles.notificationMessage} numberOfLines={2}>
+                {item.pesan}
+              </Text>
+              
+              <Text style={styles.notificationTime}>
+                {formatDate(item.created_at)}
+              </Text>
+            </View>
+          </TouchableOpacity>
         )}
       />
     </View>
@@ -168,12 +222,16 @@ export function JatuhTempoNotifications() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#f8f9fa',
+  },
+  listContainer: {
     padding: 16,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
   },
   loadingText: {
     marginTop: 10,
@@ -199,88 +257,62 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     textAlign: 'center',
-    color: '#666',
+    color: '#6c757d',
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 16,
-  },
-  notificationCard: {
-    borderRadius: 8,
+  notificationItem: {
+    flexDirection: 'row',
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 1,
+    elevation: 1,
   },
-  readCard: {
+  unreadNotification: {
     backgroundColor: '#f8f9fa',
     borderLeftWidth: 4,
-    borderLeftColor: '#6c757d',
+    borderLeftColor: '#007BFF',
   },
-  unreadCard: {
-    backgroundColor: '#fff',
-    borderLeftWidth: 4,
-    borderLeftColor: '#007bff',
+  notificationIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(220, 53, 69, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
-  notificationTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  notificationContent: {
+    flex: 1,
+  },
+  notificationHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 4,
   },
-  notificationDate: {
-    fontSize: 14,
-    color: '#6c757d',
-    marginBottom: 8,
+  notificationTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    flex: 1,
+    marginRight: 8,
+  },
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#007BFF',
   },
   notificationMessage: {
-    fontSize: 16,
-    marginBottom: 12,
-  },
-  notificationDetails: {
-    backgroundColor: '#f8f9fa',
-    padding: 12,
-    borderRadius: 6,
-    marginTop: 8,
-  },
-  detailLabel: {
     fontSize: 14,
-    color: '#495057',
-    fontWeight: 'bold',
-    marginTop: 4,
-  },
-  detailValue: {
-    fontSize: 14,
-    color: '#212529',
+    color: '#555555',
     marginBottom: 8,
   },
-  statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 12,
-  },
-  statusIndicator: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginRight: 6,
-  },
-  readIndicator: {
-    backgroundColor: '#6c757d',
-  },
-  unreadIndicator: {
-    backgroundColor: '#007bff',
-  },
-  statusText: {
-    fontSize: 14,
+  notificationTime: {
+    fontSize: 12,
     color: '#6c757d',
   },
 });
