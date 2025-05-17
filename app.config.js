@@ -11,6 +11,7 @@ export default {
   orientation: "portrait",
   icon: "./assets/icon.png",
   userInterfaceStyle: "light",
+  scheme: "kfb",
   splash: {
     image: "./assets/splash.png",
     resizeMode: "contain",
@@ -47,5 +48,6 @@ export default {
         },
       },
     ],
+    "expo-secure-store",
   ],
 };

@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from './auth-context';
 import { Anggota } from '../lib/database.types';
 import { LoanNotificationService } from '../services/loan-notification.service';
+import { Logger } from '../lib/logger';
 
 interface Transaction {
   id: string;
@@ -80,39 +81,52 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const { member, isAuthenticated } = useAuth();
   const [state, setState] = useState<DataState>(initialState);
 
-  // Clear cache function
-  const clearCache = useCallback(() => {
-    setState(initialState);
-    console.log('Data Context: Cache cleared');
-  }, []);
-
   // Clear cache when user logs out
   useEffect(() => {
     if (!isAuthenticated) {
       clearCache();
     }
-  }, [isAuthenticated, clearCache]);
+  }, [isAuthenticated]);
 
-  // Check for loan installments when the app loads
+  // In-memory cache for the current session
+  const [sessionFlags, setSessionFlags] = useState<Record<string, boolean>>({});
+
+  // Check for loan installments when the app loads - but only once per session
   useEffect(() => {
     if (isAuthenticated && member?.id) {
-      // Check loan installments for the member
-      LoanNotificationService.checkMemberLoanInstallments(member.id)
-        .then(() => {
-          console.log('Data Context: Loan installment check completed');
-          // Refresh notifications after checking loan installments
-          fetchNotifications(true);
-        })
-        .catch(error => {
-          console.error('Data Context: Error checking loan installments:', error);
-        });
+      // Use a session flag to prevent multiple checks
+      const loanCheckKey = `loan_check_${member.id}`;
+      
+      // Check if we've already done this in the current session
+      if (!sessionFlags[loanCheckKey]) {
+        Logger.info('Data', 'Checking loan installments', { memberId: member.id });
+        
+        // Check loan installments for the member
+        LoanNotificationService.checkMemberLoanInstallments(member.id)
+          .then(() => {
+            Logger.debug('Data', 'Loan installment check completed');
+            // Set flag to prevent repeated checks in this session
+            setSessionFlags(prev => ({
+              ...prev,
+              [loanCheckKey]: true
+            }));
+            // Refresh notifications after checking loan installments
+            fetchNotifications(true);
+          })
+          .catch(error => {
+            Logger.error('Data', 'Error checking loan installments', error);
+          });
+      }
     }
-  }, [isAuthenticated, member?.id]);
+  }, [isAuthenticated, member?.id, sessionFlags]);
 
   // Fetch transactions
   const fetchTransactions = useCallback(async (forceRefresh = false) => {
     // If not authenticated or no member, return
-    if (!isAuthenticated || !member) return;
+    if (!isAuthenticated || !member) {
+      Logger.debug('Data', 'Not authenticated or no member, skipping transaction fetch');
+      return;
+    }
     
     // Check if cache is valid and we're not forcing a refresh
     const now = Date.now();
@@ -123,7 +137,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       (now - lastFetched < CACHE_EXPIRATION);
     
     if (isCacheValid && !forceRefresh && dataLength > 0) {
-      console.log('Data Context: Using cached transactions data');
+      Logger.debug('Data', 'Using cached transactions data', { count: dataLength });
       return;
     }
     
@@ -137,7 +151,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }));
     
     try {
-      console.log('Data Context: Fetching transactions from API');
+      Logger.info('Data', 'Fetching transactions', { memberId: member.id });
       const { data, error } = await supabase
         .from('transaksi')
         .select('*')
@@ -145,7 +159,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Data Context: Error fetching transactions:', error);
+        Logger.error('Data', 'Error fetching transactions', error);
         setState(prev => ({
           ...prev,
           transactions: {
@@ -191,7 +205,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         }
       }));
     } catch (error) {
-      console.error('Data Context: Error in transaction fetch:', error);
+      Logger.error('Data', 'Error in transaction fetch', error);
       setState(prev => ({
         ...prev,
         transactions: {
@@ -201,224 +215,276 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         }
       }));
     }
-  }, [isAuthenticated, member]);  // Removed state dependencies to prevent infinite loops
+  }, [isAuthenticated, member]);
+
   // Fetch notifications
-const fetchNotifications = useCallback(async (forceRefresh = false) => {
-  // If not authenticated or no member, return
-  if (!isAuthenticated || !member) return;
-  
-  // Check if cache is valid and we're not forcing a refresh
-  const now = Date.now();
-  const lastFetched = state.notifications.lastFetched;
-  const dataLength = state.notifications.data.length;
-  
-  const isCacheValid = lastFetched && 
-    (now - lastFetched < CACHE_EXPIRATION);
-  
-  if (isCacheValid && !forceRefresh && dataLength > 0) {
-    console.log('Data Context: Using cached notifications data');
-    return;
-  }
-  
-  setState(prev => ({
-    ...prev,
-    notifications: {
-      ...prev.notifications,
-      isLoading: true,
-      error: null,
+  const fetchNotifications = useCallback(async (forceRefresh = false) => {
+    // If not authenticated or no member, return
+    if (!isAuthenticated || !member) {
+      Logger.debug('Data', 'Not authenticated or no member, skipping notification fetch');
+      return;
     }
-  }));
-  
-  try {
-    console.log('Data Context: Fetching notifications from API');
     
-    // Fetch regular notifications
-    const { data: notificationsData, error: notificationsError } = await supabase
-      .from('notifikasi')
-      .select('*')
-      .or(`anggota_id.eq.${member.id},jenis.eq.sistem,jenis.eq.pengumuman`)
-      .order('created_at', { ascending: false });
+    // Check if cache is valid and we're not forcing a refresh
+    const now = Date.now();
+    const lastFetched = state.notifications.lastFetched;
+    const dataLength = state.notifications.data.length;
     
-    if (notificationsError) {
-      console.error('Data Context: Error fetching notifications:', notificationsError);
+    const isCacheValid = lastFetched && 
+      (now - lastFetched < CACHE_EXPIRATION);
+    
+    if (isCacheValid && !forceRefresh && dataLength > 0) {
+      Logger.debug('Data', 'Using cached notifications data', { count: dataLength });
+      return;
+    }
+    
+    setState(prev => ({
+      ...prev,
+      notifications: {
+        ...prev.notifications,
+        isLoading: true,
+        error: null,
+      }
+    }));
+    
+    try {
+      Logger.info('Data', 'Fetching notifications', { memberId: member.id });
+      
+      // Fetch all notifications in a single query
+      const { data: generalData, error: generalError } = await supabase
+        .from('notifikasi')
+        .select('*')
+        .or(`anggota_id.eq.${member.id},jenis.eq.sistem,jenis.eq.pengumuman`)
+        .order('created_at', { ascending: false });
+        
+      if (generalError) {
+        Logger.error('Data', 'Error fetching general notifications', generalError);
+        throw generalError;
+      }
+      
+      // Then use our dedicated SQL function for jatuh_tempo notifications
+      Logger.debug('Data', 'Fetching due date notifications');
+      // Cast the result as any to handle the type mismatch between varchar and text
+      const { data: jatuhTempoData, error: jatuhTempoError } = await supabase
+        .rpc('get_jatuh_tempo_notifications', { member_id: member.id }) as {
+          data: any[] | null;
+          error: any;
+        };
+      
+      let allData = generalData || [];
+      let jatuhTempoFound = false;
+      
+      // First try using the RPC function
+      if (!jatuhTempoError && jatuhTempoData && jatuhTempoData.length > 0) {
+        Logger.debug('Data', 'Found due date notifications via RPC', { count: jatuhTempoData.length });
+        jatuhTempoFound = true;
+        
+        // Add jatuh_tempo notifications from RPC function
+        jatuhTempoData.forEach(notification => {
+          if (!allData.some(n => n.id === notification.id)) {
+            allData.push(notification);
+          }
+        });
+      } else {
+        // If RPC function failed or returned no results, try direct query
+        Logger.debug('Data', 'Falling back to direct query for due date notifications');
+        const { data: directJatuhTempoData, error: directJatuhTempoError } = await supabase
+          .from('notifikasi')
+          .select('*')
+          .eq('anggota_id', member.id)
+          .eq('jenis', 'jatuh_tempo')
+          .order('created_at', { ascending: false });
+          
+        if (!directJatuhTempoError && directJatuhTempoData && directJatuhTempoData.length > 0) {
+          Logger.debug('Data', 'Found due date notifications via direct query', { count: directJatuhTempoData.length });
+          jatuhTempoFound = true;
+          
+          // Add jatuh_tempo notifications from direct query
+          directJatuhTempoData.forEach(notification => {
+            if (!allData.some(n => n.id === notification.id)) {
+              allData.push(notification);
+            }
+          });
+        } else {
+          Logger.debug('Data', 'No due date notifications found');
+        }
+      }
+      
+      // Sort by created_at
+      allData.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      
+      // Count notification types for logging
+      const typeCount = {};
+      allData.forEach(n => {
+        typeCount[n.jenis] = (typeCount[n.jenis] || 0) + 1;
+      });
+      Logger.debug('Data', 'Notification summary', { types: typeCount, hasDueDateNotifications: jatuhTempoFound });
+      
+      // Calculate unread count
+      const unreadCount = allData.filter(n => !n.is_read).length;
+      
+      // Update state with the fetched notifications
+      setState(prev => ({
+        ...prev,
+        notifications: {
+          data: allData,
+          unreadCount,
+          lastFetched: now,
+          isLoading: false,
+          error: null,
+        }
+      }));
+    } catch (error) {
+      Logger.error('Data', 'Error in notifications fetch', error);
       setState(prev => ({
         ...prev,
         notifications: {
           ...prev.notifications,
           isLoading: false,
-          error: notificationsError as Error,
+          error: error as Error,
         }
       }));
-      return;
+    }
+  }, [isAuthenticated, member]);
+  
+  // Mark notification as read
+  const markNotificationAsRead = useCallback(async (id: string): Promise<boolean> => {
+    if (!isAuthenticated || !member) {
+      console.log('Data Context: Not authenticated or no member, cannot mark notification as read');
+      return false;
     }
     
-    // Check for jatuh tempo notifications
-    let jatuhTempoFound = false;
-    const { data: loanData, error: loanError } = await supabase
-      .from('pinjaman')
-      .select('id, anggota_id, tanggal_jatuh_tempo, jumlah_angsuran, status')
-      .eq('anggota_id', member.id)
-      .eq('status', 'aktif');
+    console.log(`Data Context: Marking notification ${id} as read for member ${member.id}`);
     
-    if (loanError) {
-      console.error('Data Context: Error fetching loan data for jatuh tempo notifications:', loanError);
-    }
-    
-    // Process loan data to create jatuh tempo notifications if needed
-    const jatuhTempoNotifications: Notification[] = [];
-    
-    if (loanData && loanData.length > 0) {
-      jatuhTempoFound = true;
-      // Create a notification for each active loan with upcoming payment
-      loanData.forEach(loan => {
-        // Check if there's already a notification for this loan's jatuh tempo
-        const existingNotification = notificationsData?.find(n => 
-          n.jenis === 'jatuh_tempo' && 
-          n.data?.pinjaman_id === loan.id
-        );
+    try {
+      // First, verify the notification exists and get its current status
+      // Use maybeSingle() instead of single() to avoid error when notification isn't found
+      const { data: checkData, error: checkError } = await supabase
+        .from('notifikasi')
+        .select('id, is_read, anggota_id, jenis')
+        .eq('id', id)
+        .maybeSingle();
+      
+      if (checkError) {
+        console.error('Data Context: Error checking notification before marking as read:', checkError);
+        return false;
+      }
+      
+      if (!checkData) {
+        console.log(`Data Context: Notification ${id} not found in database, checking local state`);
         
-        if (!existingNotification) {
-          // Create a new notification for this loan
-          const jatuhTempoNotification: Notification = {
-            id: `jt_${loan.id}`,
-            anggota_id: member.id,
-            judul: 'Pengingat Pembayaran Angsuran',
-            pesan: `Pembayaran angsuran pinjaman Anda akan jatuh tempo dalam waktu dekat. Jumlah yang harus dibayar: Rp ${loan.jumlah_angsuran.toLocaleString('id-ID')}`,
-            jenis: 'jatuh_tempo',
-            is_read: false,
-            data: {
-              pinjaman_id: loan.id,
-              tanggal_jatuh_tempo: loan.tanggal_jatuh_tempo,
-              jumlah_angsuran: loan.jumlah_angsuran
-            },
-            created_at: new Date().toISOString()
-          };
-          
-          jatuhTempoNotifications.push(jatuhTempoNotification);
+        // Check if notification exists in local state
+        const localNotification = state.notifications.data.find(n => n.id === id);
+        if (!localNotification) {
+          console.error(`Data Context: Notification ${id} not found in local state either`);
+          return false;
         }
-      });
-    }
-    
-    // Combine all notifications
-    const allData = [...(notificationsData || []), ...jatuhTempoNotifications];
-    
-    // Sort by created_at (newest first)
-    allData.sort((a, b) => {
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    });
-    
-    // Count notification types for logging
-    const typeCount = {};
-    allData.forEach(n => {
-      typeCount[n.jenis] = (typeCount[n.jenis] || 0) + 1;
-    });
-    
-    // Calculate unread count
-    const unreadCount = allData.filter(n => !n.is_read).length;
-    
-    // Update state with the fetched notifications
-    setState(prev => ({
-      ...prev,
-      notifications: {
-        data: allData,
-        unreadCount,
-        lastFetched: now,
-        isLoading: false,
-        error: null,
-      }
-    }));
-  } catch (error) {
-    console.error('Data Context: Error in notifications fetch:', error);
-    setState(prev => ({
-      ...prev,
-      notifications: {
-        ...prev.notifications,
-        isLoading: false,
-        error: error as Error,
-      }
-    }));
-  }
-}, [isAuthenticated, member, state.notifications.data.length, state.notifications.lastFetched]);
-
-// Mark notification as read
-const markNotificationAsRead = useCallback(async (id: string): Promise<boolean> => {
-  if (!isAuthenticated || !member) {
-    console.log('Data Context: Not authenticated or no member, cannot mark notification as read');
-    return false;
-  }
-  
-  console.log(`Data Context: Marking notification ${id} as read for member ${member.id}`);
-  
-  try {
-    // First, verify the notification exists and get its current status
-    // Use maybeSingle instead of single to avoid PGRST116 error
-    const { data: checkData, error: checkError } = await supabase
-      .from('notifikasi')
-      .select('id, is_read, anggota_id, jenis')
-      .eq('id', id)
-      .maybeSingle();
-    
-    if (checkError) {
-      console.error('Data Context: Error checking notification before marking as read:', checkError);
-      return false;
-    }
-    
-    // If notification doesn't exist, just update local state and return success
-    if (!checkData) {
-      console.log(`Data Context: Notification ${id} not found, updating local state only`);
-      // Update local state even if the notification doesn't exist in the database
-      setState(prev => {
-        const updatedNotifications = prev.notifications.data.map(n => 
-          n.id === id ? { ...n, is_read: true } : n
-        );
         
-        // Calculate new unread count
-        const newUnreadCount = updatedNotifications.filter(n => !n.is_read).length;
+        console.log(`Data Context: Found notification ${id} in local state, type: ${localNotification.jenis}`);
         
-        return {
-          ...prev,
-          notifications: {
-            ...prev.notifications,
-            data: updatedNotifications,
-            unreadCount: newUnreadCount
+        // For jatuh_tempo notifications, we need special handling
+        if (localNotification.jenis === 'jatuh_tempo') {
+          console.log(`Data Context: Handling jatuh_tempo notification ${id}`);
+          
+          // Use the specialized RPC function to mark jatuh_tempo notifications as read
+          try {
+            console.log(`Data Context: Using mark_jatuh_tempo_notification_as_read RPC function for ${id}`);
+            const { data: updateResult, error: updateError } = await supabase
+              .rpc('mark_jatuh_tempo_notification_as_read', {
+                notification_id: id,
+                member_id: member.id
+              }) as {
+                data: boolean | null;
+                error: any;
+              };
+            
+            if (updateError) {
+              console.error(`Data Context: Error using mark_jatuh_tempo_notification_as_read for ${id}:`, updateError);
+              
+              // Fall back to the regular update if the RPC function fails
+              try {
+                console.log(`Data Context: Falling back to regular update for jatuh_tempo notification ${id}`);
+                const { error } = await supabase
+                  .from('notifikasi')
+                  .update({ 
+                    is_read: true,
+                    updated_at: new Date().toISOString() 
+                  })
+                  .eq('id', id);
+                  
+                if (error) {
+                  console.error(`Data Context: Error with fallback update for jatuh_tempo ${id}:`, error);
+                } else {
+                  console.log(`Data Context: Fallback update successful for jatuh_tempo ${id}`);
+                }
+              } catch (fallbackError) {
+                console.error(`Data Context: Error in fallback update for jatuh_tempo ${id}:`, fallbackError);
+              }
+            } else {
+              if (updateResult === true) {
+                console.log(`Data Context: Successfully marked jatuh_tempo notification ${id} as read via RPC`);
+              } else {
+                console.log(`Data Context: RPC function returned false for ${id}, notification might not exist in DB`);
+              }
+            }
+          } catch (error) {
+            console.error(`Data Context: Error handling jatuh_tempo notification ${id}:`, error);
           }
-        };
-      });
-      return true;
-    }
-    
-    console.log(`Data Context: Found notification ${id}, current read status:`, checkData.is_read);
-    
-    // If already read, no need to update database but still update local state
-    if (checkData.is_read) {
-      console.log(`Data Context: Notification ${id} is already marked as read`);
-      return true;
-    }
-    
-    // Check if this is the user's notification or a system notification
-    const isUserNotification = checkData.anggota_id === member.id;
-    const isSystemNotification = checkData.jenis === 'sistem' || checkData.jenis === 'pengumuman';
-    
-    if (!isUserNotification && !isSystemNotification) {
-      console.error(`Data Context: User ${member.id} does not have permission to mark notification ${id} as read`);
-      return false;
-    }
-    
-    // Update the notification in Supabase with updated timestamp
-    const { error } = await supabase
-      .from('notifikasi')
-      .update({ 
-        is_read: true,
-        updated_at: new Date().toISOString() 
-      })
-      .eq('id', id);
-    
-    if (error) {
-      console.error('Data Context: Error marking notification as read in Supabase:', error);
-      return false;
-    }
-    
-    console.log(`Data Context: Successfully marked notification ${id} as read in Supabase`);
+        }
+        
+        // Always update local state
+        setState(prev => {
+          const updatedNotifications = prev.notifications.data.map(n => 
+            n.id === id ? { ...n, is_read: true } : n
+          );
+          
+          const unreadCount = updatedNotifications.filter(n => !n.is_read).length;
+          
+          return {
+            ...prev,
+            notifications: {
+              ...prev.notifications,
+              data: updatedNotifications,
+              unreadCount,
+            }
+          };
+        });
+        
+        return true;
+      }
+      
+      console.log(`Data Context: Found notification ${id}, current read status:`, checkData.is_read);
+      
+      // If already read, no need to update
+      if (checkData.is_read) {
+        console.log(`Data Context: Notification ${id} is already marked as read`);
+        return true;
+      }
+      
+      // Check if this is the user's notification or a system notification
+      const isUserNotification = checkData.anggota_id === member.id;
+      const isSystemNotification = checkData.jenis === 'sistem' || checkData.jenis === 'pengumuman';
+      
+      if (!isUserNotification && !isSystemNotification) {
+        console.error(`Data Context: User ${member.id} does not have permission to mark notification ${id} as read`);
+        return false;
+      }
+      
+      // Update the notification in Supabase with updated timestamp
+      const { error } = await supabase
+        .from('notifikasi')
+        .update({ 
+          is_read: true,
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', id);
+      
+      if (error) {
+        console.error('Data Context: Error marking notification as read in Supabase:', error);
+        return false;
+      }
+      
+      console.log(`Data Context: Successfully marked notification ${id} as read in Supabase`);
       
       // Update local state
       setState(prev => {
@@ -426,96 +492,97 @@ const markNotificationAsRead = useCallback(async (id: string): Promise<boolean> 
           n.id === id ? { ...n, is_read: true } : n
         );
         
-        // Calculate new unread count
-        const newUnreadCount = updatedNotifications.filter(n => !n.is_read).length;
+        const unreadCount = updatedNotifications.filter(n => !n.is_read).length;
         
         return {
           ...prev,
           notifications: {
             ...prev.notifications,
             data: updatedNotifications,
-            unreadCount: newUnreadCount
+            unreadCount,
           }
         };
       });
       
       return true;
-  } catch (error) {
-    console.error('Data Context: Error in markNotificationAsRead:', error);
-    return false;
-  }
-}, [isAuthenticated, member]);
+    } catch (error) {
+      console.error('Data Context: Error marking notification as read:', error);
+      return false;
+    }
+  }, [isAuthenticated, member]);
 
-// Mark all notifications as read
-const markAllNotificationsAsRead = useCallback(async (): Promise<boolean> => {
-  if (!isAuthenticated || !member) {
-    console.log('Data Context: Not authenticated or no member, cannot mark all notifications as read');
-    return false;
-  }
-  
-  console.log(`Data Context: Marking all unread notifications as read for member ${member.id}`);
-  
-  try {
-    // First, check if there are any unread notifications
-    const { data: unreadData, error: checkError } = await supabase
-      .from('notifikasi')
-      .select('id')
-      .eq('anggota_id', member.id)
-      .eq('is_read', false);
-    
-    if (checkError) {
-      console.error('Data Context: Error checking unread notifications:', checkError);
+  // Mark all notifications as read
+  const markAllNotificationsAsRead = useCallback(async () => {
+    if (!isAuthenticated || !member) {
+      console.log('Data Context: Not authenticated or no member, cannot mark all notifications as read');
       return false;
     }
     
-    const unreadCount = unreadData?.length || 0;
-    console.log(`Data Context: Found ${unreadCount} unread notifications for member ${member.id}`);
+    console.log(`Data Context: Marking all unread notifications as read for member ${member.id}`);
     
-    if (unreadCount === 0) {
-      console.log('Data Context: No unread notifications to mark as read');
-      return true; // No need to update anything
-    }
-    
-    // Update all unread notifications in Supabase
-    const { error } = await supabase
-      .from('notifikasi')
-      .update({ 
-        is_read: true,
-        updated_at: new Date().toISOString() 
-      })
-      .eq('anggota_id', member.id)
-      .eq('is_read', false);
-    
-    if (error) {
-      console.error('Data Context: Error marking all notifications as read in Supabase:', error);
-      return false;
-    }
-    
-    console.log(`Data Context: Successfully marked ${unreadCount} notifications as read in Supabase`);
-    
-    // Update local state
-    setState(prev => {
-      // Update all notifications that belong to this member
-      const updatedNotifications = prev.notifications.data.map(n => 
-        n.anggota_id === member.id ? { ...n, is_read: true } : n
-      );
+    try {
+      // First, check if there are any unread notifications
+      const { data: unreadData, error: checkError } = await supabase
+        .from('notifikasi')
+        .select('id')
+        .eq('anggota_id', member.id)
+        .eq('is_read', false);
       
-      return {
-        ...prev,
-        notifications: {
-          ...prev.notifications,
-          data: updatedNotifications,
-          unreadCount: 0,
-        }
-      };
-    });
-    
-    return true;
-  } catch (error) {
-    console.error('Data Context: Error marking all notifications as read:', error);
-    return false;
-  }
-}, [isAuthenticated, member]);
+      if (checkError) {
+        console.error('Data Context: Error checking unread notifications:', checkError);
+        return false;
+      }
+      
+      const unreadCount = unreadData?.length || 0;
+      console.log(`Data Context: Found ${unreadCount} unread notifications for member ${member.id}`);
+      
+      if (unreadCount === 0) {
+        console.log('Data Context: No unread notifications to mark as read');
+        return true; // No need to update anything
+      }
+      
+      // Update all unread notifications in Supabase
+      const { error } = await supabase
+        .from('notifikasi')
+        .update({ is_read: true })
+        .eq('anggota_id', member.id)
+        .eq('is_read', false);
+      
+      if (error) {
+        console.error('Data Context: Error marking all notifications as read in Supabase:', error);
+        return false;
+      }
+      
+      console.log(`Data Context: Successfully marked ${unreadCount} notifications as read in Supabase`);
+      
+      // Update local state
+      setState(prev => {
+        // Update all notifications that belong to this member
+        const updatedNotifications = prev.notifications.data.map(n => 
+          n.anggota_id === member.id ? { ...n, is_read: true } : n
+        );
+        
+        return {
+          ...prev,
+          notifications: {
+            ...prev.notifications,
+            data: updatedNotifications,
+            unreadCount: 0,
+          }
+        };
+      });
+      
+      return true;
+    } catch (error) {
+      console.error('Data Context: Error marking all notifications as read:', error);
+      return false;
+    }
+  }, [isAuthenticated, member]);
+
+  // Clear cache
+  const clearCache = useCallback(() => {
+    setState(initialState);
+  }, []);
 
   // Data context value
   const contextValue: DataContextType = {

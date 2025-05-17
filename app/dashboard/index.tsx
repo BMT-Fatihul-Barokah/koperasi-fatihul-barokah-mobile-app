@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { Logger } from '../../lib/logger';
 import { 
   View, 
   Text, 
@@ -13,37 +14,35 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import { useAuth } from '../../context/auth-context';
-import { useData } from '../../context/data-context';
 import { format, parseISO, formatDistanceToNow } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { TabunganWithJenis } from '../../lib/database.types';
-import { TabunganService } from '../../services/tabungan.service';
 import { TabunganCarousel } from '../../components/tabungan/tabungan-carousel';
 import { BottomNavBar } from '../../components/navigation/BottomNavBar';
 import { formatCurrency as formatCurrencyUtil } from '../../lib/format-utils';
 import { useColorScheme } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { NOTIFICATION_TYPES } from '../../services/notification.service';
+import { useTransactions } from '../../hooks/useTransactions';
+import { useNotifications } from '../../hooks/useNotifications';
+import { useTabungan } from '../../hooks/useTabungan';
 
 export default function DashboardScreen() {
-  const { isLoading, isAuthenticated, member, balance, refreshUserData } = useAuth();
-  const { transactions, notifications, fetchTransactions, fetchNotifications } = useData();
+  const { isLoading: authLoading, isAuthenticated, member, balance, refreshUserData } = useAuth();
+  const { transactions, isLoading: transactionsLoading, refetch: refetchTransactions } = useTransactions();
+  const { notifications, isLoading: notificationsLoading, refetch: refetchNotifications } = useNotifications();
+  const { tabunganList, isLoading: tabunganLoading, refetch: refetchTabungan } = useTabungan();
   const { width } = useWindowDimensions();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
-  
-  // State for tabungan data
-  const [tabunganList, setTabunganList] = useState<TabunganWithJenis[]>([]);
-  const [isTabunganLoading, setIsTabunganLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   
   // Filtered announcements from notifications
   const announcements = useMemo(() => {
-    return notifications.data
+    return notifications
       .filter(notification => notification.jenis === 'pengumuman')
       .slice(0, 3); // Limit to 3 announcements for the dashboard
-  }, [notifications.data]);
+  }, [notifications]);
   
   // Create styles with dynamic values based on theme and dimensions
   const styles = useMemo(() => createStyles(isDark, width), [isDark, width]);
@@ -51,13 +50,10 @@ export default function DashboardScreen() {
   // Loan balance is still mock data for now
   const loanBalance = 2000000;
   
-  // Refresh user data when dashboard loads
+  // Redirect to login if not authenticated
   useEffect(() => {
-    if (isAuthenticated) {
-      console.log('Dashboard: User is authenticated, refreshing user data');
-      refreshUserData();
-    } else {
-      console.log('Dashboard: User is not authenticated, redirecting to login');
+    if (!isAuthenticated) {
+      Logger.info('Dashboard', 'User is not authenticated, redirecting to login');
       // Use setTimeout to ensure the Root Layout is mounted before navigation
       // This helps prevent the "Attempted to navigate before mounting the Root Layout component" error in web
       const timer = setTimeout(() => {
@@ -66,38 +62,32 @@ export default function DashboardScreen() {
       
       return () => clearTimeout(timer);
     }
-  }, [isAuthenticated]); // Remove refreshUserData from dependencies
+  }, [isAuthenticated]);
   
-  // Fetch tabungan data when member changes
+  // Log member data for debugging in development only
   useEffect(() => {
-    if (member?.id) {
-      fetchTabunganData(member.id);
+    if (member) {
+      Logger.debug('Dashboard', 'Member data loaded', {
+        id: member.id,
+        nama: member.nama,
+        nomor_rekening: member.nomor_rekening
+      });
+      Logger.debug('Dashboard', 'Balance loaded', { balance });
     }
-  }, [member?.id]);
-  
-  // Fetch tabungan data
-  const fetchTabunganData = async (anggotaId: string) => {
-    try {
-      setIsTabunganLoading(true);
-      const tabunganData = await TabunganService.getTabunganByAnggota(anggotaId);
-      setTabunganList(tabunganData);
-    } catch (error) {
-      console.error('Error fetching tabungan data:', error);
-    } finally {
-      setIsTabunganLoading(false);
-    }
-  };
+  }, [member, balance]);
   
   // Handle refresh
   const handleRefresh = async () => {
     setRefreshing(true);
-    refreshUserData();
-    fetchTransactions();
-    fetchNotifications();
+    Logger.info('Dashboard', 'Manual refresh triggered');
     
-    if (member?.id) {
-      await fetchTabunganData(member.id);
-    }
+    // Refresh all data in parallel
+    await Promise.all([
+      refreshUserData(),
+      refetchTransactions(),
+      refetchNotifications(),
+      refetchTabungan()
+    ]);
     
     setRefreshing(false);
   };
@@ -106,28 +96,6 @@ export default function DashboardScreen() {
   const handleViewAllTabungan = () => {
     router.push('/tabungan');
   };
-  
-  // Log member data for debugging
-  useEffect(() => {
-    if (member) {
-      console.log('Dashboard: Member data loaded:', {
-        id: member.id,
-        nama: member.nama,
-        saldo: member.saldo,
-        nomor_rekening: member.nomor_rekening
-      });
-      console.log('Dashboard: Balance:', balance);
-    }
-  }, [member, balance]);
-  
-  // Fetch recent transactions and notifications when dashboard loads
-  useEffect(() => {
-    if (isAuthenticated && member) {
-      console.log('Dashboard: Fetching transactions and notifications');
-      fetchTransactions();
-      fetchNotifications();
-    }
-  }, [isAuthenticated, member, fetchTransactions, fetchNotifications]);
   
   // Format date for display
   const formatTransactionDate = (dateString: string) => {
@@ -150,9 +118,8 @@ export default function DashboardScreen() {
   
   // Handle refresh action
   const handleRefreshAction = () => {
-    console.log('Dashboard: Manual refresh triggered');
-    refreshUserData();
-    fetchTransactions(true); // Force refresh
+    Logger.info('Dashboard', 'Manual refresh triggered');
+    handleRefresh();
   };
   
   // Get appropriate icon based on announcement title or content
@@ -200,7 +167,7 @@ export default function DashboardScreen() {
     return 'bullhorn';
   };
 
-  if (isLoading) {
+  if (authLoading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007BFF" />
@@ -243,68 +210,85 @@ export default function DashboardScreen() {
         
         {/* Tabungan Carousel Section */}
         <View style={styles.carouselSection}>
-          {isTabunganLoading ? (
+          {tabunganLoading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#0066CC" />
               <Text style={styles.loadingText}>Memuat data tabungan...</Text>
             </View>
-          ) : (
+          ) : tabunganList.length > 0 ? (
             <TabunganCarousel 
               tabunganList={tabunganList}
               onViewAllPress={handleViewAllTabungan}
             />
+          ) : (
+            <View style={styles.emptyTransactions}>
+              <MaterialCommunityIcons name="piggy-bank" size={48} color={isDark ? "#555" : "#CCC"} />
+              <Text style={styles.emptyTransactionsText}>
+                Belum ada tabungan
+              </Text>
+              <TouchableOpacity 
+                style={styles.viewAllButton}
+                onPress={() => router.push('/tabungan/new')}
+              >
+                <Text style={styles.viewAllText}>+ Buka Tabungan</Text>
+              </TouchableOpacity>
+            </View>
           )}
         </View>
-        
 
-        
-        {/* Recent Transactions */}
+        {/* Recent Transactions Section */}
         <View style={styles.transactionsSection}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Transaksi Terbaru</Text>
-            <TouchableOpacity 
-              style={styles.viewAllButton}
-              onPress={() => router.push('/activity')}
-            >
+            <TouchableOpacity onPress={() => router.push('/activity')}>
               <Text style={styles.viewAllText}>Lihat Semua</Text>
-              <Ionicons name="chevron-forward" size={16} color={isDark ? "#FFFFFF" : "#007BFF"} />
             </TouchableOpacity>
           </View>
           
-          {transactions.data.length === 0 ? (
-            <View style={styles.emptyTransactions}>
-              <MaterialCommunityIcons name="cash" size={48} color={isDark ? "#555" : "#CCC"} />
-              <Text style={styles.emptyTransactionsText}>Belum ada transaksi</Text>
+          {transactionsLoading ? (
+            <ActivityIndicator size="small" color="#007BFF" style={{ marginVertical: 20 }} />
+          ) : transactions.length > 0 ? (
+            <View>
+              {transactions.slice(0, 3).map((transaction) => (
+                <TouchableOpacity 
+                  key={transaction.id} 
+                  style={styles.transactionItem}
+                  onPress={() => router.push(`/activity/${transaction.id}`)}
+                >
+                  <View style={[styles.transactionIconContainer, {
+                    backgroundColor: transaction.tipe_transaksi === 'masuk' ? '#4CAF50' : '#F44336'
+                  }]}>
+                    <MaterialCommunityIcons 
+                      name={transaction.tipe_transaksi === 'masuk' ? 'arrow-down' : 'arrow-up'} 
+                      size={20} 
+                      color="white" 
+                    />
+                  </View>
+                  <View style={styles.transactionInfo}>
+                    <Text style={styles.transactionTitle} numberOfLines={1}>
+                      {transaction.deskripsi || transaction.kategori}
+                    </Text>
+                    <Text style={styles.transactionDate}>
+                      {formatTransactionDate(transaction.created_at)}
+                    </Text>
+                  </View>
+                  <Text 
+                    style={[styles.transactionAmount, {
+                      color: transaction.tipe_transaksi === 'masuk' ? '#4CAF50' : '#F44336'
+                    }]}
+                  >
+                    {transaction.tipe_transaksi === 'masuk' ? '+' : '-'} {formatCurrency(transaction.jumlah)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
           ) : (
-            transactions.data.slice(0, 5).map((transaction, index) => (
-              <TouchableOpacity 
-                key={transaction.id} 
-                style={styles.transactionItem}
-                onPress={() => router.push(`/activity/${transaction.id}`)}
-              >
-                <View style={styles.transactionIconContainer}>
-                  <MaterialCommunityIcons 
-                    name={transaction.tipe_transaksi === 'masuk' ? 'cash-plus' : 'cash-minus'} 
-                    size={24} 
-                    color={transaction.tipe_transaksi === 'masuk' ? '#4CAF50' : '#F44336'} 
-                  />
-                </View>
-                <View style={styles.transactionInfo}>
-                  <Text style={styles.transactionTitle}>
-                    {transaction.tipe_transaksi === 'masuk' ? 'Setoran' : 'Penarikan'}
-                  </Text>
-                  <Text style={styles.transactionDate}>
-                    {formatTransactionDate(transaction.created_at)}
-                  </Text>
-                </View>
-                <Text style={[styles.transactionAmount, 
-                  {color: transaction.tipe_transaksi === 'masuk' ? '#4CAF50' : '#F44336'}]}>
-                  {transaction.tipe_transaksi === 'masuk' ? '+ ' : '- '}
-                  {formatCurrency(transaction.jumlah)}
-                </Text>
-              </TouchableOpacity>
-            ))
+            <View style={styles.emptyTransactions}>
+              <MaterialCommunityIcons name="cash" size={48} color={isDark ? "#555" : "#CCC"} />
+              <Text style={styles.emptyTransactionsText}>
+                Belum ada transaksi
+              </Text>
+            </View>
           )}
         </View>
         
@@ -321,7 +305,7 @@ export default function DashboardScreen() {
             </TouchableOpacity>
           </View>
           
-          {notifications.isLoading ? (
+          {notificationsLoading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#007BFF" />
               <Text style={styles.loadingText}>Memuat pengumuman...</Text>

@@ -3,6 +3,7 @@ import { Akun, Anggota } from '../lib/database.types';
 import { DatabaseService } from '../lib/database.service';
 import { router } from 'expo-router';
 import { storage } from '../lib/storage';
+import { Logger } from '../lib/logger';
 
 interface AuthState {
   isLoading: boolean;
@@ -48,21 +49,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           isLoading: true
         });
         
-        console.log('Auth: Checking for existing session');
+        Logger.info('Auth', 'Checking for existing session');
         const accountId = await storage.getItem(AUTH_STORAGE_KEY);
         
         if (accountId) {
-          console.log(`Auth: Found stored account ID: ${accountId}`);
+          Logger.debug('Auth', 'Found stored account ID', { accountId });
           const success = await login(accountId);
           if (!success) {
-            console.log('Auth: Login failed, removing stored account ID');
+            Logger.warn('Auth', 'Login failed, removing stored account ID');
             await storage.removeItem(AUTH_STORAGE_KEY);
           }
         } else {
-          console.log('Auth: No stored account ID found');
+          Logger.debug('Auth', 'No stored account ID found');
         }
       } catch (error) {
-        console.error('Auth: Error loading auth session:', error);
+        Logger.error('Auth', 'Error loading auth session', error);
         setState(prev => ({ ...prev, error: error as Error }));
       } finally {
         setState(prev => ({ ...prev, isLoading: false }));
@@ -80,11 +81,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     
     try {
-      console.log(`Auth: Attempting to login with account ID: ${accountId}`);
+      Logger.info('Auth', 'Attempting to login with account ID', { accountId });
       const accountDetails = await DatabaseService.getAccountDetails(accountId);
       
       if (!accountDetails) {
-        console.error('Auth: Account not found during login');
+        Logger.error('Auth', 'Account not found during login');
         setState({
           ...initialState,
           isLoading: false,
@@ -93,11 +94,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
       
-      console.log(`Auth: Login successful for account ID: ${accountId}`);
-      console.log('Auth: Member details:', {
-        id: accountDetails.member.id,
-        nama: accountDetails.member.nama,
-        nomor_rekening: accountDetails.member.nomor_rekening
+      Logger.info('Auth', 'Login successful', {
+        accountId,
+        memberId: accountDetails.member.id,
+        memberName: accountDetails.member.nama
       });
       
       // Store account ID in secure storage
@@ -115,7 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       return true;
     } catch (error) {
-      console.error('Auth: Error during login:', error);
+      Logger.error('Auth', 'Error during login', error);
       setState({
         ...initialState,
         isLoading: false,
@@ -142,7 +142,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       router.replace('/');
     } catch (error) {
-      console.error('Error during logout:', error);
+      Logger.error('Auth', 'Error during logout', error);
       setState(prev => ({ 
         ...prev, 
         isLoading: false, 
@@ -153,18 +153,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshUserData = async () => {
     if (!state.account?.id) {
-      console.log('Auth: Cannot refresh user data - no account ID');
+      Logger.debug('Auth', 'Cannot refresh user data - no account ID');
       return;
     }
     
-    console.log(`Auth: Refreshing user data for account ID: ${state.account.id}`);
+    Logger.debug('Auth', 'Refreshing user data', { accountId: state.account.id });
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     
     try {
       const accountDetails = await DatabaseService.getAccountDetails(state.account.id);
       
       if (!accountDetails) {
-        console.error('Auth: Failed to get account details');
+        Logger.error('Auth', 'Failed to get account details');
         setState(prev => ({ 
           ...prev, 
           isLoading: false,
@@ -173,11 +173,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       
-      console.log('Auth: Account details retrieved successfully:', {
+      Logger.debug('Auth', 'Account details retrieved successfully', {
         accountId: accountDetails.account.id,
         memberId: accountDetails.member.id,
-        memberName: accountDetails.member.nama,
-        balance: accountDetails.balance
+        memberName: accountDetails.member.nama
       });
       
       setState(prev => ({
@@ -189,7 +188,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         error: null
       }));
     } catch (error) {
-      console.error('Auth: Error refreshing user data:', error);
+      Logger.error('Auth', 'Error refreshing user data', error);
       setState(prev => ({ 
         ...prev, 
         isLoading: false, 

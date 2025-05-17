@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -21,10 +21,12 @@ import { BottomNavBar } from '../../components/navigation/BottomNavBar';
 import { id as idLocale } from 'date-fns/locale';
 import { format, parseISO } from 'date-fns';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useProfile } from '../../hooks/useProfile';
 
 export default function ProfileScreen() {
-  const { isLoading, member, account, logout, refreshUserData } = useAuth();
+  const { logout } = useAuth();
   const { clearCache } = useData();
+  const { profileData, member, account, isLoading, refetchProfile } = useProfile();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -32,15 +34,10 @@ export default function ProfileScreen() {
   
   // Create styles with dynamic values based on theme and screen width
   const styles = useMemo(() => createStyles(isDark, width), [isDark, width]);
-
-  // Refresh user data when profile loads
-  useEffect(() => {
-    refreshUserData();
-  }, []);
   
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await refreshUserData();
+    await refetchProfile();
     setIsRefreshing(false);
   };
   

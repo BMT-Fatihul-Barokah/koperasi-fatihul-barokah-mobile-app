@@ -18,7 +18,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/auth-context';
 import { useData } from '../../context/data-context';
 import { JatuhTempoNotifications } from '../../components/jatuh-tempo-notifications';
-// Notification type is now imported from data-context
+// Import Notification type from our custom types file
+import { Notification } from '../../lib/notification.types';
 import { format, parseISO, formatDistanceToNow } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -39,6 +40,7 @@ export default function NotificationsScreen() {
     markAllNotificationsAsRead 
   } = useData();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isProcessingNotification, setIsProcessingNotification] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -237,38 +239,95 @@ export default function NotificationsScreen() {
   }, [notifications.unreadCount, markAllNotificationsAsRead]);
 
   // Handle notification press
-  const handleNotificationPress = useCallback(async (notification) => {
+  const handleNotificationPress = useCallback(async (notification: Notification) => {
     try {
-      console.log(`Handling press for notification ${notification.id}, type: ${notification.jenis}`);
+      setIsProcessingNotification(true);
+      console.log(`Notification Index: Pressed notification ID ${notification.id}, type ${notification.jenis}`);
+
+      // For all notification types, use the context method
+      // The context method now has special handling for jatuh_tempo notifications using RPC
+      console.log(`Notification Index: Marking notification ${notification.id} as read via context method`);
+      const result = await markNotificationAsRead(notification.id);
       
-      // For transaction notifications, directly update using Supabase
+      if (result) {
+        console.log(`Notification Index: Successfully marked notification ${notification.id} as read`);
+      } else {
+        console.warn(`Notification Index: Failed to mark notification ${notification.id} as read through context method`);
+        
+        // If context method fails for jatuh_tempo notification, try direct database update as fallback
+        if (notification.jenis === 'jatuh_tempo') {
+          console.log(`Notification Index: Attempting direct database update for jatuh_tempo ${notification.id}`);
+          try {
+            const { error } = await supabase
+              .from('notifikasi')
+              .update({ 
+                is_read: true,
+                updated_at: new Date().toISOString() 
+              })
+              .eq('id', notification.id);
+            
+            if (error) {
+              console.error(`Notification Index: Direct database update failed for ${notification.id}:`, error);
+            } else {
+              console.log(`Notification Index: Direct database update successful for ${notification.id}`);
+            }
+          } catch (dbError) {
+            console.error(`Notification Index: Error in direct database update for ${notification.id}:`, dbError);
+          }
+        }
+      }
+
+      // Navigate to transaction detail
       if (notification.jenis === 'transaksi') {
-        console.log('Using direct Supabase update for transaction notification');
-        const { error: updateError } = await supabase
-          .from('notifikasi')
-          .update({ 
-            is_read: true,
-            updated_at: new Date().toISOString() 
-          })
-          .eq('id', notification.id);
+        console.log('Navigating to transaction:', notification.data?.transaksi_id || notification.data?.transaction_id);
+        router.push(`/activity/${notification.data?.transaksi_id || notification.data?.transaction_id}`);
+        return;
+      } else if (notification.jenis === 'jatuh_tempo') {
+        
+        // Force mark as read in both database and local state
+        // 1. Try direct update first
+        try {
+          console.log('Attempting direct database update for jatuh_tempo notification');
+          const { error: directUpdateError } = await supabase
+            .from('notifikasi')
+            .update({ 
+              is_read: true,
+              updated_at: new Date().toISOString() 
+            })
+            .eq('id', notification.id);
           
-        if (updateError) {
-          console.error('Error directly updating transaction notification:', updateError);
-        } else {
-          console.log(`Successfully updated transaction notification ${notification.id} directly`);
-          // Update local state
-          await fetchNotifications(true);
+          if (directUpdateError) {
+            console.log('Direct update attempt failed, expected for some jatuh_tempo notifications');
+          } else {
+            console.log('Direct update succeeded for jatuh_tempo notification');
+          }
+        } catch (directError) {
+          console.log('Error in direct update attempt:', directError);
         }
         
-        // Check for transaksi_id (Indonesian) or transaction_id (English) in data
-        const transactionId = notification.data?.transaksi_id || notification.data?.transaction_id;
+        // 2. Update in local state using context method
+        await markNotificationAsRead(notification.id);
         
-        if (transactionId) {
-          console.log('Navigating to transaction:', transactionId);
-          // Navigate to transaction detail
-          router.push(`/activity/${transactionId}`);
-          return;
-        }
+        // 3. Update the UI forcefully by refreshing notifications
+        await fetchNotifications(true);
+        
+        // For jatuh_tempo notifications, force multiple refresh attempts
+        // to ensure the read status is properly updated in the UI
+        setTimeout(() => {
+          console.log('Delayed refresh for jatuh_tempo notification');
+          fetchNotifications(true);
+          
+          // Add another delayed refresh for extra reliability
+          setTimeout(() => {
+            console.log('Final refresh for jatuh_tempo notification');
+            fetchNotifications(true);
+          }, 500);
+        }, 200);
+        
+        // Navigate to notification detail
+        console.log('Navigating to jatuh_tempo notification detail:', notification.id);
+        router.push(`/notifications/${notification.id}`);
+        return;
       } else {
         // For other notification types, use the context method
         await markNotificationAsRead(notification.id);
@@ -279,8 +338,10 @@ export default function NotificationsScreen() {
       router.push(`/notifications/${notification.id}`);
     } catch (error) {
       console.error('Error handling notification press:', error);
+    } finally {
+      setIsProcessingNotification(false);
     }
-  }, [markNotificationAsRead, fetchNotifications]);
+  }, [markNotificationAsRead, fetchNotifications, router]);
 
   // Format relative time
   const formatRelativeTime = useCallback((dateString: string) => {

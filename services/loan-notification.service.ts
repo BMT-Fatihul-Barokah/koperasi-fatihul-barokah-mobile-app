@@ -3,6 +3,7 @@ import { NotificationService } from './notification.service';
 import { Pinjaman } from './pinjaman.service';
 import { format, addMonths, isWithinInterval, addDays, isSameDay } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
+import { Logger } from '../lib/logger';
 
 /**
  * Service for handling loan due date notifications
@@ -14,7 +15,7 @@ export const LoanNotificationService = {
    */
   async checkAndCreateDueDateNotifications(): Promise<void> {
     try {
-      console.log('Checking for upcoming loan installments...');
+      Logger.debug('Loan', 'Checking for upcoming loan installments');
       
       // Get all active loans
       const { data: activeLoans, error } = await supabase
@@ -23,16 +24,16 @@ export const LoanNotificationService = {
         .eq('status', 'aktif');
       
       if (error) {
-        console.error('Error fetching active loans:', error);
+        Logger.error('Loan', 'Error fetching active loans', error);
         return;
       }
       
       if (!activeLoans || activeLoans.length === 0) {
-        console.log('No active loans found');
+        Logger.debug('Loan', 'No active loans found');
         return;
       }
       
-      console.log(`Found ${activeLoans.length} active loans`);
+      Logger.debug('Loan', `Found ${activeLoans.length} active loans`);
       
       // Get current date
       const now = new Date();
@@ -42,9 +43,9 @@ export const LoanNotificationService = {
         await this.processLoanInstallments(loan, now);
       }
       
-      console.log('Finished checking for upcoming loan installments');
+      Logger.debug('Loan', 'Finished checking for upcoming loan installments');
     } catch (error) {
-      console.error('Error in checkAndCreateDueDateNotifications:', error);
+      Logger.error('Loan', 'Error in checkAndCreateDueDateNotifications', error);
     }
   },
   
@@ -71,7 +72,7 @@ export const LoanNotificationService = {
       // Calculate number of months between start date and due date
       const loanTermMonths = (dueYear - startYear) * 12 + (dueMonth - startMonth);
       
-      console.log(`Loan term calculated as ${loanTermMonths} months for loan ${loan.id}`);
+      Logger.debug('Loan', `Loan term calculated as ${loanTermMonths} months`, { loanId: loan.id });
       
       // Calculate all installment dates
       const installmentDates: Date[] = [];
@@ -82,10 +83,7 @@ export const LoanNotificationService = {
         installmentDates.push(installmentDate);
       }
       
-      console.log(`Generated ${installmentDates.length} installment dates for loan ${loan.id}`);
-      installmentDates.forEach((date, index) => {
-        console.log(`Installment ${index + 1}: ${format(date, 'yyyy-MM-dd')}`);
-      });
+      Logger.debug('Loan', `Generated ${installmentDates.length} installment dates`, { loanId: loan.id });
       
       // Check for upcoming installments (within 3 days)
       const upcomingInstallments = installmentDates.filter(date => 
@@ -100,7 +98,11 @@ export const LoanNotificationService = {
         isSameDay(date, currentDate)
       );
       
-      console.log(`Found ${upcomingInstallments.length} upcoming installments and ${todayInstallment ? '1' : '0'} today installment for loan ${loan.id}`);
+      Logger.debug('Loan', 'Found installments', { 
+        loanId: loan.id, 
+        upcomingCount: upcomingInstallments.length, 
+        hasTodayInstallment: !!todayInstallment 
+      });
       
       // Check for existing notifications for this loan in the last 3 days
       // to avoid duplicate notifications
@@ -113,7 +115,7 @@ export const LoanNotificationService = {
         .gte('created_at', threeDaysAgo);
       
       if (error) {
-        console.error('Error checking existing notifications:', error);
+        Logger.error('Loan', 'Error checking existing notifications', error);
         return;
       }
       
@@ -128,7 +130,7 @@ export const LoanNotificationService = {
           // Check if this notification is for the current loan
           return data && data.loanId === loan.id;
         } catch (e) {
-          console.log('Error parsing notification data:', e);
+          Logger.error('Loan', 'Error parsing notification data', e);
           return false;
         }
       }) : [];
@@ -177,7 +179,7 @@ export const LoanNotificationService = {
         }
       }
     } catch (error) {
-      console.error('Error processing loan installments:', error);
+      Logger.error('Loan', 'Error processing loan installments', error);
     }
   },
   
@@ -195,7 +197,7 @@ export const LoanNotificationService = {
     message: string
   ): Promise<boolean> {
     try {
-      console.log(`Creating due date notification for loan ${loan.id}`);
+      Logger.debug('Loan', 'Creating due date notification', { loanId: loan.id });
       
       const formattedDate = format(installmentDate, 'dd MMMM yyyy', { locale: idLocale });
       
@@ -252,38 +254,39 @@ export const LoanNotificationService = {
    */
   async checkMemberLoanInstallments(memberId: string): Promise<void> {
     try {
-      console.log(`Checking loan installments for member ${memberId}`);
+      Logger.info('Loan', 'Checking loan installments for member', { memberId });
       
-      // Get all active loans for the member
-      const { data: memberLoans, error } = await supabase
+      // Get all active loans for this member
+      const { data: activeLoans, error } = await supabase
         .from('pinjaman')
         .select('*')
         .eq('anggota_id', memberId)
         .eq('status', 'aktif');
       
       if (error) {
-        console.error(`Error fetching loans for member ${memberId}:`, error);
+        Logger.error('Loan', 'Error fetching active loans for member', error);
         return;
       }
       
-      if (!memberLoans || memberLoans.length === 0) {
-        console.log(`No active loans found for member ${memberId}`);
+      if (!activeLoans || activeLoans.length === 0) {
+        Logger.debug('Loan', 'No active loans found for member', { memberId });
         return;
       }
       
-      console.log(`Found ${memberLoans.length} active loans for member ${memberId}`);
+      Logger.debug('Loan', 'Found active loans for member', { memberId, count: activeLoans.length });
       
       // Get current date
       const now = new Date();
       
       // Check each loan for upcoming installments
-      for (const loan of memberLoans) {
+      for (const loan of activeLoans) {
         await this.processLoanInstallments(loan, now);
       }
       
-      console.log(`Finished checking loan installments for member ${memberId}`);
+      Logger.debug('Loan', 'Finished checking loan installments for member', { memberId });
     } catch (error) {
-      console.error(`Error checking loan installments for member ${memberId}:`, error);
+      Logger.error('Loan', 'Error checking loan installments for member', error);
+      throw error;
     }
   }
 };

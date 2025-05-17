@@ -92,9 +92,6 @@ export function TabunganCard({ tabungan, onPress, compact = false, showTarget = 
             <Text style={[styles.balanceLabel, compact && styles.compactBalanceLabel]}>Saldo Aktif</Text>
             <View style={styles.balanceRow}>
               <Text style={[styles.balance, compact && styles.compactBalance]}>{formatCurrency(tabungan.saldo)}</Text>
-              <TouchableOpacity style={styles.eyeButton}>
-                <Ionicons name="eye-outline" size={20} color="white" />
-              </TouchableOpacity>
             </View>
           </View>
           
