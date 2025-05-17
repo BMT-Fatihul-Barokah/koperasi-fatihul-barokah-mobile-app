@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   View, 
   Text, 
-  StyleSheet, 
+  StyleSheet,
   FlatList, 
   TouchableOpacity, 
   ActivityIndicator,
@@ -13,35 +13,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import { useAuth } from '../../context/auth-context';
-import { format, parseISO } from 'date-fns';
-import { supabase } from '../../lib/supabase';
 import { TransactionCard } from '../../components/transaction/TransactionCard';
 import { DashboardHeader } from '../../components/header/dashboard-header';
 import { BottomNavBar } from '../../components/navigation/BottomNavBar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useColorScheme } from 'react-native';
-
-// Define transaction interface based on the database schema
-interface Transaction {
-  id: string;
-  anggota_id: string;
-  tipe_transaksi: 'masuk' | 'keluar';
-  kategori: string;
-  deskripsi: string;
-  reference_number?: string;
-  jumlah: number;
-  created_at: string;
-  recipient_name?: string;
-  bank_name?: string;
-}
+import { useTransactions, Transaction } from '../../hooks/useTransactions';
 
 // Previously had tab types, now simplified to just transactions
 
 export default function ActivityScreen() {
-  const { isLoading: authLoading, isAuthenticated, member } = useAuth();
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  // No longer using tabs, simplified to just show transactions
+  const { isAuthenticated, member } = useAuth();
+  const { transactions, isLoading, refetch } = useTransactions();
   const [refreshing, setRefreshing] = useState(false);
   const { width } = useWindowDimensions();
   const colorScheme = useColorScheme();
@@ -50,101 +33,15 @@ export default function ActivityScreen() {
   // Create styles with dynamic values based on theme and dimensions
   const styles = useMemo(() => createStyles(isDark, width), [isDark, width]);
 
-  // Fetch transactions from Supabase
-  useEffect(() => {
-    if (!isAuthenticated || !member) {
-      // Redirect to login if not authenticated
-      router.replace('/');
-      return;
-    }
-
-    fetchTransactions();
-  }, [isAuthenticated, member]);
-  
-  const fetchTransactions = async () => {
-    setIsLoading(true);
-    try {
-      // Log member info for debugging
-      console.log('Current member info:', { 
-        memberId: member?.id,
-        memberName: member?.nama,
-        isAuthenticated
-      });
-      
-      if (!member?.id) {
-        console.warn('Member ID is undefined, cannot fetch transactions');
-        setIsLoading(false);
-        return;
-      }
-      
-      // Directly fetch transactions for this member
-      const { data, error } = await supabase
-        .from('transaksi')
-        .select('*')
-        .eq('anggota_id', member.id)
-        .order('created_at', { ascending: false })
-        .limit(20);
-
-      if (error) {
-        console.error('Error fetching transactions:', error);
-        setIsLoading(false);
-        return;
-      }
-      
-      console.log(`Found ${data?.length || 0} transactions for member ID: ${member.id}`);
-      
-      // If no transactions found, try fetching a sample for debugging
-      if (!data || data.length === 0) {
-        console.log('No transactions found for this member, fetching sample for debugging...');
-        const { data: sampleData, error: sampleError } = await supabase
-          .from('transaksi')
-          .select('id, anggota_id, tipe_transaksi, kategori, jumlah')
-          .limit(5);
-          
-        if (!sampleError && sampleData && sampleData.length > 0) {
-          console.log('Sample transactions:', sampleData);
-        } else if (sampleError) {
-          console.error('Error fetching sample transactions:', sampleError);
-        }
-      }
-
-      // Add mock recipient data for demo purposes
-      // In a real app, this would come from the database
-      const transactionsWithRecipients = (data || []).map(tx => {
-        let recipientName, bankName;
-        
-        if (tx.kategori === 'transfer') {
-          if (tx.deskripsi?.includes('BLU')) {
-            recipientName = 'NOVANDRA ANUGRAH';
-            bankName = 'BLU BY BCA DIGITAL';
-          } else if (tx.deskripsi?.includes('SHOPEE')) {
-            recipientName = 'SHOPEE - nXXXXXXXX9';
-            bankName = 'BCA Virtual Account';
-          } else if (tx.deskripsi?.includes('OVO')) {
-            recipientName = 'NOVANDRA ANUGRAH';
-            bankName = 'OVO';
-          }
-        }
-        
-        return {
-          ...tx,
-          recipient_name: recipientName,
-          bank_name: bankName
-        };
-      });
-      
-      setTransactions(transactionsWithRecipients);
-    } catch (error) {
-      console.error('Error in transaction fetch:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // Redirect to login if not authenticated
+  if (!isAuthenticated && !member) {
+    router.replace('/');
+  }
   
   // Handle refresh
   const handleRefresh = async () => {
     setRefreshing(true);
-    await fetchTransactions();
+    await refetch();
     setRefreshing(false);
   };
 
@@ -212,22 +109,12 @@ export default function ActivityScreen() {
           contentContainerStyle={[styles.transactionList, transactions.length === 0 && styles.emptyList]}
           showsVerticalScrollIndicator={false}
           ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
-          ListEmptyComponent={renderEmptyState}
-          removeClippedSubviews={false}
-          initialNumToRender={10}
-          maxToRenderPerBatch={10}
-          windowSize={5}
-          getItemLayout={(data, index) => ({
-            length: 80, // Fixed item height (72px card + 8px separator)
-            offset: 80 * index,
-            index,
-          })}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
               colors={['#007BFF']}
-              tintColor={isDark ? '#fff' : '#007BFF'}
+              tintColor={isDark ? '#FFFFFF' : '#007BFF'}
             />
           }
         />
