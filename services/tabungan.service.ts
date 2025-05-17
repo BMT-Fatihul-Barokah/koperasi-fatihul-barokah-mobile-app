@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { JenisTabungan, Tabungan, TabunganWithJenis } from '../lib/database.types';
+import { Logger } from '../lib/logger';
 
 /**
  * Service for managing savings accounts (tabungan)
@@ -10,7 +11,7 @@ export const TabunganService = {
    */
   async getJenisTabungan(): Promise<JenisTabungan[]> {
     try {
-      console.log('Fetching jenis tabungan...');
+      Logger.debug('Tabungan', 'Fetching savings account types');
       const { data, error } = await supabase
         .from('jenis_tabungan')
         .select('*')
@@ -18,14 +19,14 @@ export const TabunganService = {
         .order('nama');
       
       if (error) {
-        console.error('Error fetching jenis tabungan:', error);
+        Logger.error('Tabungan', 'Error fetching savings account types', error);
         throw error;
       }
       
-      console.log(`Successfully fetched ${data?.length || 0} jenis tabungan`);
+      Logger.debug('Tabungan', `Successfully fetched savings account types`, { count: data?.length || 0 });
       return data as JenisTabungan[];
     } catch (error) {
-      console.error('Error in getJenisTabungan:', error);
+      Logger.error('Tabungan', 'Error in getJenisTabungan', error);
       throw error;
     }
   },
@@ -35,7 +36,7 @@ export const TabunganService = {
    */
   async getJenisTabunganByKode(kode: string): Promise<JenisTabungan | null> {
     try {
-      console.log(`Fetching jenis tabungan with kode: ${kode}`);
+      Logger.debug('Tabungan', 'Fetching savings account type', { kode });
       const { data, error } = await supabase
         .from('jenis_tabungan')
         .select('*')
@@ -43,14 +44,14 @@ export const TabunganService = {
         .single();
       
       if (error) {
-        console.error(`Error fetching jenis tabungan with kode ${kode}:`, error);
+        Logger.error('Tabungan', 'Error fetching savings account type', { kode, error });
         return null;
       }
       
-      console.log('Successfully fetched jenis tabungan:', data);
+      Logger.debug('Tabungan', 'Successfully fetched savings account type', { kode });
       return data as JenisTabungan;
     } catch (error) {
-      console.error('Error in getJenisTabunganByKode:', error);
+      Logger.error('Tabungan', 'Error in getJenisTabunganByKode', error);
       return null;
     }
   },
@@ -60,7 +61,7 @@ export const TabunganService = {
    */
   async getTabunganByAnggota(anggotaId: string): Promise<TabunganWithJenis[]> {
     try {
-      console.log(`Fetching tabungan for anggota ID: ${anggotaId}`);
+      Logger.debug('Tabungan', 'Fetching savings accounts', { anggotaId });
       
       // Try using the tabungan_display_view which has RLS policies configured
       const { data: viewData, error: viewError } = await supabase
@@ -70,7 +71,7 @@ export const TabunganService = {
         .order('display_order', { ascending: true });
       
       if (viewError) {
-        console.error(`Error fetching from tabungan_display_view: ${viewError.message}`);
+        Logger.warn('Tabungan', 'Error fetching from view, falling back to direct query', { error: viewError.message });
         
         // Fallback to direct query
         const { data: tabunganData, error: tabunganError } = await supabase
@@ -83,12 +84,12 @@ export const TabunganService = {
           .eq('status', 'aktif');
         
         if (tabunganError) {
-          console.error(`Error fetching tabungan: ${tabunganError.message}`);
+          Logger.error('Tabungan', 'Error fetching savings accounts', { error: tabunganError.message });
           throw tabunganError;
         }
         
         if (!tabunganData || tabunganData.length === 0) {
-          console.log('No tabungan found for this anggota');
+          Logger.debug('Tabungan', 'No savings accounts found', { anggotaId });
           return [];
         }
         

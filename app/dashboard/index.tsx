@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { Logger } from '../../lib/logger';
 import { 
   View, 
   Text, 
@@ -54,10 +55,10 @@ export default function DashboardScreen() {
   // Refresh user data when dashboard loads
   useEffect(() => {
     if (isAuthenticated) {
-      console.log('Dashboard: User is authenticated, refreshing user data');
+      Logger.info('Dashboard', 'User is authenticated, refreshing data');
       refreshUserData();
     } else {
-      console.log('Dashboard: User is not authenticated, redirecting to login');
+      Logger.info('Dashboard', 'User is not authenticated, redirecting to login');
       // Use setTimeout to ensure the Root Layout is mounted before navigation
       // This helps prevent the "Attempted to navigate before mounting the Root Layout component" error in web
       const timer = setTimeout(() => {
@@ -79,10 +80,11 @@ export default function DashboardScreen() {
   const fetchTabunganData = async (anggotaId: string) => {
     try {
       setIsTabunganLoading(true);
+      Logger.debug('Dashboard', 'Fetching tabungan data', { anggotaId });
       const tabunganData = await TabunganService.getTabunganByAnggota(anggotaId);
       setTabunganList(tabunganData);
     } catch (error) {
-      console.error('Error fetching tabungan data:', error);
+      Logger.error('Dashboard', 'Error fetching tabungan data', error);
     } finally {
       setIsTabunganLoading(false);
     }
@@ -107,23 +109,22 @@ export default function DashboardScreen() {
     router.push('/tabungan');
   };
   
-  // Log member data for debugging
+  // Log member data for debugging in development only
   useEffect(() => {
     if (member) {
-      console.log('Dashboard: Member data loaded:', {
+      Logger.debug('Dashboard', 'Member data loaded', {
         id: member.id,
         nama: member.nama,
-        saldo: member.saldo,
         nomor_rekening: member.nomor_rekening
       });
-      console.log('Dashboard: Balance:', balance);
+      Logger.debug('Dashboard', 'Balance loaded', { balance });
     }
   }, [member, balance]);
   
   // Fetch recent transactions and notifications when dashboard loads
   useEffect(() => {
     if (isAuthenticated && member) {
-      console.log('Dashboard: Fetching transactions and notifications');
+      Logger.debug('Dashboard', 'Fetching transactions and notifications');
       fetchTransactions();
       fetchNotifications();
     }
@@ -150,9 +151,10 @@ export default function DashboardScreen() {
   
   // Handle refresh action
   const handleRefreshAction = () => {
-    console.log('Dashboard: Manual refresh triggered');
+    Logger.info('Dashboard', 'Manual refresh triggered');
     refreshUserData();
     fetchTransactions(true); // Force refresh
+    fetchNotifications(true); // Force refresh
   };
   
   // Get appropriate icon based on announcement title or content

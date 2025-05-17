@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from './auth-context';
 import { Anggota } from '../lib/database.types';
 import { LoanNotificationService } from '../services/loan-notification.service';
+import { Logger } from '../lib/logger';
 
 interface Transaction {
   id: string;
@@ -87,26 +88,45 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isAuthenticated]);
 
-  // Check for loan installments when the app loads
+  // In-memory cache for the current session
+  const [sessionFlags, setSessionFlags] = useState<Record<string, boolean>>({});
+
+  // Check for loan installments when the app loads - but only once per session
   useEffect(() => {
     if (isAuthenticated && member?.id) {
-      // Check loan installments for the member
-      LoanNotificationService.checkMemberLoanInstallments(member.id)
-        .then(() => {
-          console.log('Data Context: Loan installment check completed');
-          // Refresh notifications after checking loan installments
-          fetchNotifications(true);
-        })
-        .catch(error => {
-          console.error('Data Context: Error checking loan installments:', error);
-        });
+      // Use a session flag to prevent multiple checks
+      const loanCheckKey = `loan_check_${member.id}`;
+      
+      // Check if we've already done this in the current session
+      if (!sessionFlags[loanCheckKey]) {
+        Logger.info('Data', 'Checking loan installments', { memberId: member.id });
+        
+        // Check loan installments for the member
+        LoanNotificationService.checkMemberLoanInstallments(member.id)
+          .then(() => {
+            Logger.debug('Data', 'Loan installment check completed');
+            // Set flag to prevent repeated checks in this session
+            setSessionFlags(prev => ({
+              ...prev,
+              [loanCheckKey]: true
+            }));
+            // Refresh notifications after checking loan installments
+            fetchNotifications(true);
+          })
+          .catch(error => {
+            Logger.error('Data', 'Error checking loan installments', error);
+          });
+      }
     }
-  }, [isAuthenticated, member?.id]);
+  }, [isAuthenticated, member?.id, sessionFlags]);
 
   // Fetch transactions
   const fetchTransactions = useCallback(async (forceRefresh = false) => {
     // If not authenticated or no member, return
-    if (!isAuthenticated || !member) return;
+    if (!isAuthenticated || !member) {
+      Logger.debug('Data', 'Not authenticated or no member, skipping transaction fetch');
+      return;
+    }
     
     // Check if cache is valid and we're not forcing a refresh
     const now = Date.now();
@@ -117,7 +137,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       (now - lastFetched < CACHE_EXPIRATION);
     
     if (isCacheValid && !forceRefresh && dataLength > 0) {
-      console.log('Data Context: Using cached transactions data');
+      Logger.debug('Data', 'Using cached transactions data', { count: dataLength });
       return;
     }
     
@@ -131,7 +151,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }));
     
     try {
-      console.log('Data Context: Fetching transactions from API');
+      Logger.info('Data', 'Fetching transactions', { memberId: member.id });
       const { data, error } = await supabase
         .from('transaksi')
         .select('*')
@@ -139,7 +159,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Data Context: Error fetching transactions:', error);
+        Logger.error('Data', 'Error fetching transactions', error);
         setState(prev => ({
           ...prev,
           transactions: {
@@ -185,7 +205,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         }
       }));
     } catch (error) {
-      console.error('Data Context: Error in transaction fetch:', error);
+      Logger.error('Data', 'Error in transaction fetch', error);
       setState(prev => ({
         ...prev,
         transactions: {
@@ -195,21 +215,18 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         }
       }));
     }
-  }, [isAuthenticated, member]);  // Removed state dependencies to prevent infinite loops
+  }, [isAuthenticated, member]);
 
   // Fetch notifications
   const fetchNotifications = useCallback(async (forceRefresh = false) => {
     // If not authenticated or no member, return
     if (!isAuthenticated || !member) {
-      console.log('Data Context: Not authenticated or no member, skipping notification fetch');
+      Logger.debug('Data', 'Not authenticated or no member, skipping notification fetch');
       return;
     }
     
-    console.log('Data Context: Member ID for notifications:', member.id);
-    
     // Check if cache is valid and we're not forcing a refresh
     const now = Date.now();
-    // Get current state values to avoid dependency on state object
     const lastFetched = state.notifications.lastFetched;
     const dataLength = state.notifications.data.length;
     
@@ -217,7 +234,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       (now - lastFetched < CACHE_EXPIRATION);
     
     if (isCacheValid && !forceRefresh && dataLength > 0) {
-      console.log('Data Context: Using cached notifications data, count:', dataLength);
+      Logger.debug('Data', 'Using cached notifications data', { count: dataLength });
       return;
     }
     
@@ -231,11 +248,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }));
     
     try {
-      console.log('Data Context: Fetching notifications from API for member:', member.id);
+      Logger.info('Data', 'Fetching notifications', { memberId: member.id });
       
-      // COMPLETELY NEW APPROACH: Fetch all notifications in a single query
-      // First get general notifications
-      console.log('Data Context: Fetching general notifications for member:', member.id);
+      // Fetch all notifications in a single query
       const { data: generalData, error: generalError } = await supabase
         .from('notifikasi')
         .select('*')
@@ -243,12 +258,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         .order('created_at', { ascending: false });
         
       if (generalError) {
-        console.error('Data Context: Error fetching general notifications:', generalError);
+        Logger.error('Data', 'Error fetching general notifications', generalError);
         throw generalError;
       }
       
       // Then use our dedicated SQL function for jatuh_tempo notifications
-      console.log('Data Context: Using dedicated SQL function for jatuh_tempo notifications');
+      Logger.debug('Data', 'Fetching due date notifications');
       // Cast the result as any to handle the type mismatch between varchar and text
       const { data: jatuhTempoData, error: jatuhTempoError } = await supabase
         .rpc('get_jatuh_tempo_notifications', { member_id: member.id }) as {
@@ -261,7 +276,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       
       // First try using the RPC function
       if (!jatuhTempoError && jatuhTempoData && jatuhTempoData.length > 0) {
-        console.log(`Data Context: Found ${jatuhTempoData.length} jatuh_tempo notifications via RPC function`);
+        Logger.debug('Data', 'Found due date notifications via RPC', { count: jatuhTempoData.length });
         jatuhTempoFound = true;
         
         // Add jatuh_tempo notifications from RPC function
@@ -272,7 +287,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         });
       } else {
         // If RPC function failed or returned no results, try direct query
-        console.log('Data Context: Falling back to direct query for jatuh_tempo notifications');
+        Logger.debug('Data', 'Falling back to direct query for due date notifications');
         const { data: directJatuhTempoData, error: directJatuhTempoError } = await supabase
           .from('notifikasi')
           .select('*')
@@ -281,7 +296,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           .order('created_at', { ascending: false });
           
         if (!directJatuhTempoError && directJatuhTempoData && directJatuhTempoData.length > 0) {
-          console.log(`Data Context: Found ${directJatuhTempoData.length} jatuh_tempo notifications via direct query`);
+          Logger.debug('Data', 'Found due date notifications via direct query', { count: directJatuhTempoData.length });
           jatuhTempoFound = true;
           
           // Add jatuh_tempo notifications from direct query
@@ -291,7 +306,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             }
           });
         } else {
-          console.log('Data Context: No jatuh_tempo notifications found via any method');
+          Logger.debug('Data', 'No due date notifications found');
         }
       }
       
@@ -303,8 +318,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       allData.forEach(n => {
         typeCount[n.jenis] = (typeCount[n.jenis] || 0) + 1;
       });
-      console.log('Data Context: Notification types after fetch:', typeCount);
-      console.log('Data Context: Jatuh tempo notifications found:', jatuhTempoFound);
+      Logger.debug('Data', 'Notification summary', { types: typeCount, hasDueDateNotifications: jatuhTempoFound });
       
       // Calculate unread count
       const unreadCount = allData.filter(n => !n.is_read).length;
@@ -321,7 +335,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         }
       }));
     } catch (error) {
-      console.error('Data Context: Error in notifications fetch:', error);
+      Logger.error('Data', 'Error in notifications fetch', error);
       setState(prev => ({
         ...prev,
         notifications: {
