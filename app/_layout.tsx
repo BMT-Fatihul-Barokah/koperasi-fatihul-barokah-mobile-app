@@ -19,6 +19,8 @@ export default function RootLayout() {
                 contentStyle: {
                   backgroundColor: colorScheme === 'dark' ? '#121212' : '#FFFFFF',
                 },
+                animation: 'none', // Disable animations completely
+                // You can also use 'fade' or 'slide_from_right' for simpler transitions
               }}
             />
           </DataProvider>

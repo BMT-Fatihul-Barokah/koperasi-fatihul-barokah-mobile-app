@@ -94,6 +94,7 @@ export default function ProfileScreen() {
       <DashboardHeader 
         title="Profil Anggota" 
         showBackButton={false}
+        gradientColors={['#003D82', '#0066CC']}
       />
       
       <ScrollView 
@@ -325,10 +326,11 @@ function createStyles(isDark: boolean, width: number) {
     },
     contentContainer: {
       paddingHorizontal: 16,
+      paddingTop: 8,
       paddingBottom: 24,
     },
     profileCard: {
-      marginTop: -20,
+      marginTop: 16,
       borderRadius: 16,
       overflow: 'hidden',
       elevation: 4,

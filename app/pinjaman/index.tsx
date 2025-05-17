@@ -87,9 +87,12 @@ export default function PinjamanScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar style={isDark ? 'light' : 'dark'} />
-      <DashboardHeader title="Pinjaman" showBackButton={false} />
+    <SafeAreaView style={styles.container} edges={['bottom']}>
+      <DashboardHeader 
+        title="Pinjaman" 
+        showBackButton={false}
+        gradientColors={['#003D82', '#0066CC']}
+      />
       <ScrollView
         style={styles.scrollView}
         refreshControl={
