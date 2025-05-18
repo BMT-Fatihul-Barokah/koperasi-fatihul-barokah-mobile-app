@@ -10,7 +10,7 @@ interface JatuhTempoNotification {
   id: string;
   anggota_id: string;
   judul: string;
-  pesan: string;
+  pesan: string; 
   jenis: string;
   is_read: boolean;
   data?: {
@@ -25,7 +25,7 @@ interface JatuhTempoNotification {
 }
 
 export function JatuhTempoNotifications() {
-  const { session, member } = useAuth();
+  const { member } = useAuth();
   const [notifications, setNotifications] = useState<JatuhTempoNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

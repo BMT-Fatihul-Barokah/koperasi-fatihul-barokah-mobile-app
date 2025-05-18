@@ -19,6 +19,7 @@ import { useAuth } from '../../context/auth-context';
 import { useData } from '../../context/data-context';
 import { Notification, NOTIFICATION_TYPES, NotificationService } from '../../services/notification.service';
 import { supabase } from '../../lib/supabase';
+import { Logger, LogCategory } from '../../lib/logger';
 
 export default function NotificationDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -37,18 +38,21 @@ export default function NotificationDetailScreen() {
   // Create styles with dynamic values based on theme
   const styles = useMemo(() => createStyles(isDark), [isDark]);
 
-  // Effect for refreshing notifications when navigating back from this screen
+  // Log when component mounts and handle cleanup
   useEffect(() => {
+    Logger.debug(LogCategory.NOTIFICATIONS, 'Notification detail screen loaded', { notificationId });
+    
+    // Cleanup when unmounting
     return () => {
       if (markedAsRead) {
-        console.log('Notification detail screen unmounting, refreshing notifications');
+        Logger.debug(LogCategory.NOTIFICATIONS, 'Notification detail screen unmounting, refreshing notifications');
         // Force refresh notifications when navigating away if we marked as read
         fetchNotifications(true);
       }
     };
-  }, [markedAsRead, fetchNotifications]);
+  }, [markedAsRead, fetchNotifications, notificationId]);
 
-  // Fetch notification details
+  // Fetch notification details - only run once when component mounts
   useEffect(() => {
     if (!notificationId || !member?.id) return;
 
@@ -57,7 +61,7 @@ export default function NotificationDetailScreen() {
         setIsLoading(true);
         setError(null);
 
-        console.log(`Fetching notification details for ID: ${notificationId}`);
+        Logger.debug(LogCategory.NOTIFICATIONS, `Fetching notification details for ID: ${notificationId}`);
 
         // Fetch notification from Supabase using maybeSingle to avoid errors
         const { data, error } = await supabase
@@ -67,14 +71,14 @@ export default function NotificationDetailScreen() {
           .maybeSingle();
 
         if (error) {
-          console.error('Error fetching notification details:', error);
+          Logger.error(LogCategory.NOTIFICATIONS, 'Error fetching notification details:', error);
           setError('Failed to fetch notification details');
           setIsLoading(false);
           return;
         }
 
         if (!data) {
-          console.log(`Notification ${notificationId} not found in database, checking for jatuh_tempo notification`);
+          Logger.debug(LogCategory.NOTIFICATIONS, `Notification ${notificationId} not found in database, checking for jatuh_tempo notification`);
 
           // For jatuh_tempo notifications, use the existing get_jatuh_tempo_notifications function as a fallback
           try {
@@ -88,7 +92,7 @@ export default function NotificationDetailScreen() {
                 };
 
               if (jatuhTempoError) {
-                console.error('Error fetching jatuh_tempo notifications:', jatuhTempoError);
+                Logger.error(LogCategory.NOTIFICATIONS, 'Error fetching jatuh_tempo notifications:', jatuhTempoError);
                 throw jatuhTempoError;
               }
 
@@ -97,17 +101,17 @@ export default function NotificationDetailScreen() {
                 const targetNotification = jatuhTempoData.find(notification => notification.id === notificationId);
 
                 if (targetNotification) {
-                  console.log('Found jatuh_tempo notification via get_jatuh_tempo_notifications');
+                  Logger.debug(LogCategory.NOTIFICATIONS, 'Found jatuh_tempo notification via get_jatuh_tempo_notifications');
                   setNotification(targetNotification as Notification);
                   setIsLoading(false);
                   return;
                 } else {
-                  console.log(`Notification with ID ${notificationId} not found in jatuh_tempo notifications`);
+                  Logger.debug(LogCategory.NOTIFICATIONS, `Notification with ID ${notificationId} not found in jatuh_tempo notifications`);
                 }
               }
             }
           } catch (fallbackError) {
-            console.error('Error in jatuh_tempo fallback:', fallbackError);
+            Logger.error(LogCategory.NOTIFICATIONS, 'Error in jatuh_tempo fallback:', fallbackError);
           }
 
           setError('Notification not found');
@@ -131,7 +135,7 @@ export default function NotificationDetailScreen() {
         setNotification(data as Notification);
         setIsLoading(false);
       } catch (error) {
-        console.error('Error in fetchNotificationDetails:', error);
+        Logger.error(LogCategory.NOTIFICATIONS, 'Error in fetchNotificationDetails:', error);
         setError('An error occurred while fetching notification details');
         setIsLoading(false);
       }
@@ -140,7 +144,7 @@ export default function NotificationDetailScreen() {
     fetchNotificationDetails();
   }, [notificationId, member?.id]);
 
-  // Mark notification as read after it's loaded
+  // Mark notification as read after it's loaded - only run once when notification is available
   useEffect(() => {
     // Skip if already attempted to mark as read, no notification, or already loading
     if (didAttemptMarkAsRead.current || !notification || isLoading) {
@@ -152,16 +156,16 @@ export default function NotificationDetailScreen() {
 
       // If already read, no need to mark again
       if (notification.is_read) {
-        console.log(`Notification ${notificationId} is already marked as read`);
+        Logger.debug(LogCategory.NOTIFICATIONS, `Notification ${notificationId} is already marked as read`);
         return;
       }
 
-      console.log(`Marking notification ${notificationId} as read, type: ${notification.jenis}`);
+      Logger.debug(LogCategory.NOTIFICATIONS, `Marking notification ${notificationId} as read, type: ${notification.jenis}`);
 
       try {
         // For transaction notifications, directly update using Supabase
         if (notification.jenis === 'transaksi') {
-          console.log('Using direct Supabase update for transaction notification');
+          Logger.debug(LogCategory.NOTIFICATIONS, 'Using direct Supabase update for transaction notification');
           const { error: updateError } = await supabase
             .from('notifikasi')
             .update({ 
@@ -171,21 +175,21 @@ export default function NotificationDetailScreen() {
             .eq('id', notificationId);
 
           if (updateError) {
-            console.error('Error directly updating transaction notification:', updateError);
+            Logger.error(LogCategory.NOTIFICATIONS, 'Error directly updating transaction notification:', updateError);
             throw new Error('Failed to update transaction notification');
           }
 
-          console.log(`Successfully updated transaction notification ${notificationId} directly`);
+          Logger.debug(LogCategory.NOTIFICATIONS, `Successfully updated transaction notification ${notificationId} directly`);
           // Update local state to reflect the change
           setNotification(prev => prev ? { ...prev, is_read: true } : null);
           setMarkedAsRead(true);
         } else if (notification.jenis === 'jatuh_tempo') {
-          console.log('Using enhanced approach for jatuh_tempo notification');
+          Logger.debug(LogCategory.NOTIFICATIONS, 'Using enhanced approach for jatuh_tempo notification');
           // For jatuh_tempo notifications, use our specialized RPC function
 
           // 1. First try the specialized RPC function
           try {
-            console.log(`Using mark_jatuh_tempo_notification_as_read RPC function for ${notificationId}`);
+            Logger.debug(LogCategory.NOTIFICATIONS, `Using mark_jatuh_tempo_notification_as_read RPC function for ${notificationId}`);
             const { data: updateResult, error: updateError } = await supabase
               .rpc('mark_jatuh_tempo_notification_as_read', {
                 notification_id: notificationId,
@@ -196,11 +200,11 @@ export default function NotificationDetailScreen() {
               };
             
             if (updateError) {
-              console.error(`Error using mark_jatuh_tempo_notification_as_read for ${notificationId}:`, updateError);
+              Logger.error(LogCategory.NOTIFICATIONS, `Error using mark_jatuh_tempo_notification_as_read for ${notificationId}:`, updateError);
               
               // Fall back to direct DB update if RPC function fails
               try {
-                console.log(`Falling back to direct update for jatuh_tempo notification ${notificationId}`);
+                Logger.debug(LogCategory.NOTIFICATIONS, `Falling back to direct update for jatuh_tempo notification ${notificationId}`);
                 const { error } = await supabase
                   .from('notifikasi')
                   .update({ 
@@ -210,31 +214,31 @@ export default function NotificationDetailScreen() {
                   .eq('id', notificationId);
                   
                 if (error) {
-                  console.log('Direct update failed for jatuh_tempo notification, this is expected:', error);
+                  Logger.debug(LogCategory.NOTIFICATIONS, 'Direct update failed for jatuh_tempo notification, this is expected:', error);
                 } else {
-                  console.log('Direct update succeeded for jatuh_tempo notification');
+                  Logger.debug(LogCategory.NOTIFICATIONS, 'Direct update succeeded for jatuh_tempo notification');
                 }
               } catch (directError) {
-                console.log('Error in direct update for jatuh_tempo notification:', directError);
+                Logger.debug(LogCategory.NOTIFICATIONS, 'Error in direct update for jatuh_tempo notification:', directError);
               }
             } else {
               if (updateResult === true) {
-                console.log(`Successfully marked jatuh_tempo notification ${notificationId} as read via RPC`);
+                Logger.debug(LogCategory.NOTIFICATIONS, `Successfully marked jatuh_tempo notification ${notificationId} as read via RPC`);
               } else {
-                console.log(`RPC function returned false for ${notificationId}, notification might not exist in DB`);
+                Logger.debug(LogCategory.NOTIFICATIONS, `RPC function returned false for ${notificationId}, notification might not exist in DB`);
               }
             }
           } catch (rpcError) {
-            console.error(`Error calling mark_jatuh_tempo_notification_as_read RPC for ${notificationId}:`, rpcError);
+            Logger.error(LogCategory.NOTIFICATIONS, `Error calling mark_jatuh_tempo_notification_as_read RPC for ${notificationId}:`, rpcError);
           }
 
           // 2. Also use the context method which will update local state
           const success = await markNotificationAsRead(notificationId);
 
           if (success) {
-            console.log(`Successfully marked jatuh_tempo notification ${notificationId} as read via context`);
+            Logger.debug(LogCategory.NOTIFICATIONS, `Successfully marked jatuh_tempo notification ${notificationId} as read via context`);
           } else {
-            console.log(`Context method may have failed for jatuh_tempo ${notificationId}, updating UI locally`);
+            Logger.debug(LogCategory.NOTIFICATIONS, `Context method may have failed for jatuh_tempo ${notificationId}, updating UI locally`);
           }
 
           // 3. Always update local state in this component
@@ -248,16 +252,16 @@ export default function NotificationDetailScreen() {
           const success = await markNotificationAsRead(notificationId);
 
           if (success) {
-            console.log(`Successfully marked notification ${notificationId} as read`);
+            Logger.debug(LogCategory.NOTIFICATIONS, `Successfully marked notification ${notificationId} as read`);
             // Update local state to reflect the change
             setNotification(prev => prev ? { ...prev, is_read: true } : null);
             setMarkedAsRead(true);
           } else {
-            console.error(`Failed to mark notification ${notificationId} as read`);
+            Logger.error(LogCategory.NOTIFICATIONS, `Failed to mark notification ${notificationId} as read`);
           }
         }
       } catch (error) {
-        console.error('Error marking notification as read:', error);
+        Logger.error(LogCategory.NOTIFICATIONS, 'Error marking notification as read:', error);
       }
     };
 
@@ -291,7 +295,7 @@ export default function NotificationDetailScreen() {
         
         if (transactionId) {
           // Navigate to transaction detail
-          console.log('Navigating to transaction detail:', transactionId);
+          Logger.debug(LogCategory.NOTIFICATIONS, 'Navigating to transaction detail:', transactionId);
           router.push(`/activity/${transactionId}`);
           return;
         }
@@ -306,7 +310,7 @@ export default function NotificationDetailScreen() {
         Alert.alert('Info', 'Tidak ada tindakan terkait untuk notifikasi ini');
       }
     } catch (error) {
-      console.error('Error handling related action:', error);
+      Logger.error(LogCategory.NOTIFICATIONS, 'Error handling related action:', error);
       Alert.alert('Error', 'Gagal menjalankan tindakan terkait');
     }
   }, [notification]);

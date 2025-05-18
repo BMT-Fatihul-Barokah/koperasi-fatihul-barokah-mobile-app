@@ -236,21 +236,20 @@ export default function NotificationsScreen() {
   const handleNotificationPress = useCallback(async (notification: Notification) => {
     try {
       setIsProcessingNotification(true);
-      console.log(`Notification Index: Pressed notification ID ${notification.id}, type ${notification.jenis}`);
+      Logger.debug(LogCategory.NOTIFICATIONS, `Pressed notification ID ${notification.id}`, { type: notification.jenis });
 
       // For all notification types, use the context method
       // The context method now has special handling for jatuh_tempo notifications using RPC
-      console.log(`Notification Index: Marking notification ${notification.id} as read via context method`);
       const result = await markNotificationAsRead(notification.id);
       
       if (result) {
-        console.log(`Notification Index: Successfully marked notification ${notification.id} as read`);
+        Logger.debug(LogCategory.NOTIFICATIONS, `Successfully marked notification ${notification.id} as read`);
       } else {
-        console.warn(`Notification Index: Failed to mark notification ${notification.id} as read through context method`);
+        Logger.warn(LogCategory.NOTIFICATIONS, `Failed to mark notification ${notification.id} as read through context method`);
         
         // If context method fails for jatuh_tempo notification, try direct database update as fallback
         if (notification.jenis === 'jatuh_tempo') {
-          console.log(`Notification Index: Attempting direct database update for jatuh_tempo ${notification.id}`);
+          Logger.debug(LogCategory.NOTIFICATIONS, `Attempting direct database update for jatuh_tempo`, { id: notification.id });
           try {
             const { error } = await supabase
               .from('notifikasi')
@@ -261,77 +260,42 @@ export default function NotificationsScreen() {
               .eq('id', notification.id);
             
             if (error) {
-              console.error(`Notification Index: Direct database update failed for ${notification.id}:`, error);
+              Logger.error(LogCategory.NOTIFICATIONS, `Direct database update failed`, { id: notification.id, error });
             } else {
-              console.log(`Notification Index: Direct database update successful for ${notification.id}`);
+              Logger.debug(LogCategory.NOTIFICATIONS, `Direct database update successful`, { id: notification.id });
             }
           } catch (dbError) {
-            console.error(`Notification Index: Error in direct database update for ${notification.id}:`, dbError);
+            Logger.error(LogCategory.NOTIFICATIONS, `Error in direct database update`, { id: notification.id, error: dbError });
           }
         }
       }
 
       // Navigate to transaction detail
       if (notification.jenis === 'transaksi') {
-        console.log('Navigating to transaction:', notification.data?.transaksi_id || notification.data?.transaction_id);
+        Logger.debug(LogCategory.NOTIFICATIONS, 'Navigating to transaction:', notification.data?.transaksi_id || notification.data?.transaction_id);
         router.push(`/activity/${notification.data?.transaksi_id || notification.data?.transaction_id}`);
         return;
       } else if (notification.jenis === 'jatuh_tempo') {
-        
-        // Force mark as read in both database and local state
-        // 1. Try direct update first
-        try {
-          console.log('Attempting direct database update for jatuh_tempo notification');
-          const { error: directUpdateError } = await supabase
-            .from('notifikasi')
-            .update({ 
-              is_read: true,
-              updated_at: new Date().toISOString() 
-            })
-            .eq('id', notification.id);
-          
-          if (directUpdateError) {
-            console.log('Direct update attempt failed, expected for some jatuh_tempo notifications');
-          } else {
-            console.log('Direct update succeeded for jatuh_tempo notification');
-          }
-        } catch (directError) {
-          console.log('Error in direct update attempt:', directError);
-        }
-        
-        // 2. Update in local state using context method
-        await markNotificationAsRead(notification.id);
-        
-        // 3. Update the UI forcefully by refreshing notifications
-        await fetchNotifications(true);
-        
-        // For jatuh_tempo notifications, force multiple refresh attempts
-        // to ensure the read status is properly updated in the UI
-        setTimeout(() => {
-          console.log('Delayed refresh for jatuh_tempo notification');
-          fetchNotifications(true);
-          
-          // Add another delayed refresh for extra reliability
-          setTimeout(() => {
-            console.log('Final refresh for jatuh_tempo notification');
-            fetchNotifications(true);
-          }, 500);
-        }, 200);
-        
-        // Navigate to notification detail
-        console.log('Navigating to jatuh_tempo notification detail:', notification.id);
-        router.push(`/notifications/${notification.id}`);
-        return;
+        // For jatuh_tempo notifications, we've already marked it as read above
+        // The data context handles both RPC and direct database updates
+        // No need for additional direct updates here
       } else {
         // For other notification types, use the context method
         await markNotificationAsRead(notification.id);
       }
       
-      // For all other notifications or if transaction ID not found
-      console.log('Navigating to notification detail:', notification.id);
+      // For jatuh_tempo notifications, log navigation separately
+      if (notification.jenis === 'jatuh_tempo') {
+        Logger.debug(LogCategory.NOTIFICATIONS, 'Navigating to jatuh_tempo notification detail', { id: notification.id });
+      } else {
+        // For all other notifications
+        Logger.debug(LogCategory.NOTIFICATIONS, 'Navigating to notification detail', { id: notification.id });
+      }
+      
+      // Navigate to the notification detail screen
       router.push(`/notifications/${notification.id}`);
     } catch (error) {
-      console.error('Error handling notification press:', error);
+      Logger.error(LogCategory.NOTIFICATIONS, 'Error handling notification press:', error);
     } finally {
       setIsProcessingNotification(false);
     }
@@ -381,7 +345,7 @@ export default function NotificationsScreen() {
       return notifications.data.filter(item => !item.is_read);
     } else {
       const filtered = notifications.data.filter(item => item.jenis === activeFilter);
-      console.log(`Filtered ${filtered.length} notifications for type ${activeFilter}`);
+      Logger.debug(LogCategory.NOTIFICATIONS, `Filtered ${filtered.length} notifications for type ${activeFilter}`);
       return filtered;
     }
   }, [notifications.data, activeFilter]);
