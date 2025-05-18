@@ -168,7 +168,7 @@ export default function TabunganDetailScreen() {
   }
   
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
       <StatusBar style="dark" />
       
       <Stack.Screen
