@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/auth-context';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
+import { Logger, LogCategory } from '../lib/logger';
 
 interface JatuhTempoNotification {
   id: string;
@@ -32,24 +33,24 @@ export function JatuhTempoNotifications() {
   useEffect(() => {
     async function fetchJatuhTempoNotifications() {
       if (!member?.id) {
-        console.log('No member ID available, skipping jatuh tempo notifications fetch');
+        Logger.debug(LogCategory.NOTIFICATIONS, 'No member ID available, skipping jatuh tempo notifications fetch');
         setLoading(false);
         return;
       }
 
       try {
-        console.log('Fetching jatuh tempo notifications for member:', member.id);
+        Logger.debug(LogCategory.NOTIFICATIONS, 'Fetching jatuh tempo notifications', { memberId: member.id });
         
         // Try using the RPC function first
         const { data: rpcData, error: rpcError } = await supabase
           .rpc('get_jatuh_tempo_notifications', { member_id: member.id });
           
         if (!rpcError && rpcData && rpcData.length > 0) {
-          console.log(`Found ${rpcData.length} jatuh tempo notifications via RPC`);
+          Logger.info(LogCategory.NOTIFICATIONS, 'Found jatuh tempo notifications via RPC', { count: rpcData.length });
           setNotifications(rpcData);
         } else {
           // Fallback to direct query
-          console.log('RPC failed or returned no results, trying direct query');
+          Logger.debug(LogCategory.NOTIFICATIONS, 'RPC failed or returned no results, trying direct query');
           const { data, error } = await supabase
             .from('notifikasi')
             .select('*')
@@ -58,18 +59,18 @@ export function JatuhTempoNotifications() {
             .order('created_at', { ascending: false });
             
           if (error) {
-            console.error('Error fetching jatuh tempo notifications:', error);
+            Logger.error(LogCategory.NOTIFICATIONS, 'Error fetching jatuh tempo notifications', error);
             setError('Failed to load notifications');
           } else if (data && data.length > 0) {
-            console.log(`Found ${data.length} jatuh tempo notifications via direct query`);
+            Logger.info(LogCategory.NOTIFICATIONS, 'Found jatuh tempo notifications via direct query', { count: data.length });
             setNotifications(data);
           } else {
-            console.log('No jatuh tempo notifications found');
+            Logger.info(LogCategory.NOTIFICATIONS, 'No jatuh tempo notifications found');
             setNotifications([]);
           }
         }
       } catch (err) {
-        console.error('Exception in jatuh tempo notifications fetch:', err);
+        Logger.error(LogCategory.NOTIFICATIONS, 'Exception in jatuh tempo notifications fetch', err);
         setError('An unexpected error occurred');
       } finally {
         setLoading(false);

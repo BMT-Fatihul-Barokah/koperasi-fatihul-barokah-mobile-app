@@ -1,92 +1,52 @@
 /**
  * Centralized logging utility for the Koperasi Fatihul Barokah mobile app
- * Provides consistent logging with context and log levels
+ * Provides consistent logging with context and categories
  */
 
-// Log levels
-export enum LogLevel {
-  DEBUG = 0,
-  INFO = 1,
-  WARN = 2,
-  ERROR = 3,
-  NONE = 4 // Use this to disable all logging
-}
-
-// Current log level - can be adjusted based on environment
-// In production, this should be set to INFO or higher
-const currentLogLevel = __DEV__ ? LogLevel.DEBUG : LogLevel.INFO;
-
-// Modules that should be logged even in production
-const criticalModules = ['Auth', 'API', 'Database', 'Error'];
-
-interface LogOptions {
-  // Force logging regardless of log level
-  force?: boolean;
-  // Additional data to log
-  data?: any;
+// Log categories for better organization
+export enum LogCategory {
+  AUTH = 'Auth',
+  DATABASE = 'Database',
+  NOTIFICATIONS = 'Notifications',
+  TRANSACTIONS = 'Transactions',
+  LOAN = 'Loan',
+  TABUNGAN = 'Tabungan',
+  DASHBOARD = 'Dashboard',
+  DATA = 'Data',
+  SYSTEM = 'System'
 }
 
 /**
- * Log a message with the given level and module
+ * Logger utility class with static methods for different log levels
  */
-function log(level: LogLevel, module: string, message: string, options?: LogOptions): void {
-  // Skip logging if level is below current level and not forced
-  if (level < currentLogLevel && !options?.force && !criticalModules.includes(module)) {
-    return;
+export class Logger {
+  /**
+   * Log debug level message
+   */
+  static debug(module: string | LogCategory, message: string, data?: any): void {
+    if (__DEV__) {
+      console.log(`[${module}] ${message}`, data || '');
+    }
   }
-
-  const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
-  const prefix = `[${timestamp}][${module}]`;
   
-  switch (level) {
-    case LogLevel.DEBUG:
-      if (options?.data) {
-        console.log(`${prefix} ${message}`, options.data);
-      } else {
-        console.log(`${prefix} ${message}`);
-      }
-      break;
-    case LogLevel.INFO:
-      if (options?.data) {
-        console.log(`${prefix} ${message}`, options.data);
-      } else {
-        console.log(`${prefix} ${message}`);
-      }
-      break;
-    case LogLevel.WARN:
-      if (options?.data) {
-        console.warn(`${prefix} ${message}`, options.data);
-      } else {
-        console.warn(`${prefix} ${message}`);
-      }
-      break;
-    case LogLevel.ERROR:
-      if (options?.data) {
-        console.error(`${prefix} ${message}`, options.data);
-      } else {
-        console.error(`${prefix} ${message}`);
-      }
-      break;
+  /**
+   * Log info level message
+   */
+  static info(module: string | LogCategory, message: string, data?: any): void {
+    console.log(`[${module}] ${message}`, data || '');
+  }
+  
+  /**
+   * Log warning level message
+   */
+  static warn(module: string | LogCategory, message: string, data?: any): void {
+    console.warn(`[${module}] ${message}`, data || '');
+  }
+  
+  /**
+   * Log error level message
+   */
+  static error(module: string | LogCategory, message: string, error?: any): void {
+    console.error(`[${module}] ${message}`, error || '');
   }
 }
-
-/**
- * Logger utility with methods for different log levels
- */
-export const Logger = {
-  debug: (module: string, message: string, data?: any) => 
-    log(LogLevel.DEBUG, module, message, { data }),
-  
-  info: (module: string, message: string, data?: any) => 
-    log(LogLevel.INFO, module, message, { data }),
-  
-  warn: (module: string, message: string, data?: any) => 
-    log(LogLevel.WARN, module, message, { data }),
-  
-  error: (module: string, message: string, error?: any) => 
-    log(LogLevel.ERROR, module, message, { data: error }),
-  
-  // Force logging regardless of level
-  critical: (module: string, message: string, data?: any) => 
-    log(LogLevel.ERROR, module, message, { force: true, data }),
-};

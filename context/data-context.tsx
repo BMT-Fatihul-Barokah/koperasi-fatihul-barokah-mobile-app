@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from './auth-context';
 import { Anggota } from '../lib/database.types';
 import { LoanNotificationService } from '../services/loan-notification.service';
-import { Logger } from '../lib/logger';
+import { Logger, LogCategory } from '../lib/logger';
 
 interface Transaction {
   id: string;
@@ -221,7 +221,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const fetchNotifications = useCallback(async (forceRefresh = false) => {
     // If not authenticated or no member, return
     if (!isAuthenticated || !member) {
-      Logger.debug('Data', 'Not authenticated or no member, skipping notification fetch');
+      Logger.debug(LogCategory.DATA, 'Not authenticated or no member, skipping notification fetch');
       return;
     }
     
@@ -234,7 +234,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       (now - lastFetched < CACHE_EXPIRATION);
     
     if (isCacheValid && !forceRefresh && dataLength > 0) {
-      Logger.debug('Data', 'Using cached notifications data', { count: dataLength });
+      Logger.debug(LogCategory.DATA, 'Using cached notifications data', { count: dataLength });
       return;
     }
     
@@ -248,7 +248,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }));
     
     try {
-      Logger.info('Data', 'Fetching notifications', { memberId: member.id });
+      Logger.info(LogCategory.NOTIFICATIONS, 'Fetching notifications', { memberId: member.id });
       
       // Fetch all notifications in a single query
       const { data: generalData, error: generalError } = await supabase
@@ -258,12 +258,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         .order('created_at', { ascending: false });
         
       if (generalError) {
-        Logger.error('Data', 'Error fetching general notifications', generalError);
+        Logger.error(LogCategory.NOTIFICATIONS, 'Error fetching general notifications', generalError);
         throw generalError;
       }
       
       // Then use our dedicated SQL function for jatuh_tempo notifications
-      Logger.debug('Data', 'Fetching due date notifications');
+      Logger.debug(LogCategory.NOTIFICATIONS, 'Fetching due date notifications');
       // Cast the result as any to handle the type mismatch between varchar and text
       const { data: jatuhTempoData, error: jatuhTempoError } = await supabase
         .rpc('get_jatuh_tempo_notifications', { member_id: member.id }) as {
@@ -276,7 +276,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       
       // First try using the RPC function
       if (!jatuhTempoError && jatuhTempoData && jatuhTempoData.length > 0) {
-        Logger.debug('Data', 'Found due date notifications via RPC', { count: jatuhTempoData.length });
+        Logger.debug(LogCategory.NOTIFICATIONS, 'Found due date notifications via RPC', { count: jatuhTempoData.length });
         jatuhTempoFound = true;
         
         // Add jatuh_tempo notifications from RPC function
@@ -287,7 +287,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         });
       } else {
         // If RPC function failed or returned no results, try direct query
-        Logger.debug('Data', 'Falling back to direct query for due date notifications');
+        Logger.debug(LogCategory.NOTIFICATIONS, 'Falling back to direct query for due date notifications');
         const { data: directJatuhTempoData, error: directJatuhTempoError } = await supabase
           .from('notifikasi')
           .select('*')
@@ -296,7 +296,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           .order('created_at', { ascending: false });
           
         if (!directJatuhTempoError && directJatuhTempoData && directJatuhTempoData.length > 0) {
-          Logger.debug('Data', 'Found due date notifications via direct query', { count: directJatuhTempoData.length });
+          Logger.debug(LogCategory.NOTIFICATIONS, 'Found due date notifications via direct query', { count: directJatuhTempoData.length });
           jatuhTempoFound = true;
           
           // Add jatuh_tempo notifications from direct query
@@ -306,7 +306,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             }
           });
         } else {
-          Logger.debug('Data', 'No due date notifications found');
+          Logger.debug(LogCategory.NOTIFICATIONS, 'No due date notifications found');
         }
       }
       
@@ -318,7 +318,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       allData.forEach(n => {
         typeCount[n.jenis] = (typeCount[n.jenis] || 0) + 1;
       });
-      Logger.debug('Data', 'Notification summary', { types: typeCount, hasDueDateNotifications: jatuhTempoFound });
+      Logger.debug(LogCategory.NOTIFICATIONS, 'Notification summary', { types: typeCount, hasDueDateNotifications: jatuhTempoFound });
       
       // Calculate unread count
       const unreadCount = allData.filter(n => !n.is_read).length;
@@ -335,7 +335,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         }
       }));
     } catch (error) {
-      Logger.error('Data', 'Error in notifications fetch', error);
+      Logger.error(LogCategory.NOTIFICATIONS, 'Error in notifications fetch', error);
       setState(prev => ({
         ...prev,
         notifications: {
