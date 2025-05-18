@@ -7,9 +7,10 @@ import { Ionicons } from '@expo/vector-icons';
 interface BackHeaderProps {
   title: string;
   onBackPress?: () => void;
+  rightComponent?: React.ReactNode;
 }
 
-export function BackHeader({ title, onBackPress }: BackHeaderProps) {
+export function BackHeader({ title, onBackPress, rightComponent }: BackHeaderProps) {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -26,7 +27,7 @@ export function BackHeader({ title, onBackPress }: BackHeaderProps) {
     <View style={[
       styles.container, 
       { 
-        paddingTop: Math.max(insets.top, 16),
+        paddingTop: insets.top > 0 ? Math.max(insets.top, 8) : 8,
         backgroundColor: isDark ? '#1a1a1a' : '#fff',
         borderBottomColor: isDark ? '#333' : '#f0f0f0' 
       }
@@ -39,6 +40,11 @@ export function BackHeader({ title, onBackPress }: BackHeaderProps) {
         <Ionicons name="chevron-back" size={24} color={isDark ? "#fff" : "#000"} />
       </TouchableOpacity>
       <Text style={[styles.title, { color: isDark ? '#fff' : '#000' }]}>{title}</Text>
+      {rightComponent && (
+        <View style={styles.rightComponentContainer}>
+          {rightComponent}
+        </View>
+      )}
     </View>
   );
 }
@@ -57,6 +63,10 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginLeft: 16,
+    marginLeft: 8,
+    flex: 1,
+  },
+  rightComponentContainer: {
+    marginLeft: 'auto',
   },
 });

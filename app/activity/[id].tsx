@@ -14,7 +14,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../../context/auth-context';
 import { format, parseISO } from 'date-fns';
 import { supabase } from '../../lib/supabase';
-import { DashboardHeader } from '../../components/header/dashboard-header';
+import { BackHeader } from '../../components/header/back-header';
 import { Ionicons } from '@expo/vector-icons';
 
 // Define transaction interface based on the database schema
@@ -158,9 +158,8 @@ export default function TransactionDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
-      <DashboardHeader 
+      <BackHeader 
         title="Detail Transaksi"
-        showBackButton={true}
         rightComponent={
           <TouchableOpacity 
             style={styles.shareButton}

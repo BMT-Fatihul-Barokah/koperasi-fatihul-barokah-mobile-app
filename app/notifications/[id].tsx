@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { format, parseISO } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
 import { Ionicons } from '@expo/vector-icons';
-import { DashboardHeader } from '../../components/header/dashboard-header';
+import { BackHeader } from '../../components/header/back-header';
 import { useAuth } from '../../context/auth-context';
 import { useData } from '../../context/data-context';
 import { Notification, NOTIFICATION_TYPES, NotificationService } from '../../services/notification.service';
@@ -319,10 +319,7 @@ export default function NotificationDetailScreen() {
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
-        <DashboardHeader 
-          title="Detail Notifikasi" 
-          showBackButton={true}
-        />
+        <BackHeader title="Detail Notifikasi" />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007BFF" />
           <Text style={styles.loadingText}>Memuat detail notifikasi...</Text>
@@ -335,10 +332,7 @@ export default function NotificationDetailScreen() {
   if (error) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
-        <DashboardHeader 
-          title="Detail Notifikasi" 
-          showBackButton={true}
-        />
+        <BackHeader title="Detail Notifikasi" />
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={64} color="#dc3545" />
           <Text style={styles.errorText}>{error}</Text>
@@ -357,10 +351,7 @@ export default function NotificationDetailScreen() {
   if (!notification) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
-        <DashboardHeader 
-          title="Detail Notifikasi" 
-          showBackButton={true}
-        />
+        <BackHeader title="Detail Notifikasi" />
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={64} color="#dc3545" />
           <Text style={styles.errorText}>Notifikasi tidak ditemukan</Text>
@@ -447,10 +438,7 @@ export default function NotificationDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <DashboardHeader 
-        title="Detail Notifikasi" 
-        showBackButton={true}
-      />
+      <BackHeader title="Detail Notifikasi" />
       
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
         {/* Notification header */}
