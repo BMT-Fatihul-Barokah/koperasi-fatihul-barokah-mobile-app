@@ -14,13 +14,14 @@ import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { DashboardHeader } from '../../components/header/dashboard-header';
+import { BackHeader } from '../../components/header/back-header';
 import { useAuth } from '../../context/auth-context';
 import { useData } from '../../context/data-context';
 import { BottomNavBar } from '../../components/navigation/BottomNavBar';
 import * as Linking from 'expo-linking';
 import * as Application from 'expo-application';
 import * as Device from 'expo-device';
+import Constants from 'expo-constants';
 
 export default function SettingsScreen() {
   const { logout } = useAuth();
@@ -31,15 +32,14 @@ export default function SettingsScreen() {
   
   // Settings state
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [autoSyncEnabled, setAutoSyncEnabled] = useState(true);
   
   // Create styles with dynamic values based on theme and screen width
   const styles = useMemo(() => createStyles(isDark, width), [isDark, width]);
 
   // Get app version
-  const appVersion = Application.nativeApplicationVersion || '1.0.0';
-  const buildNumber = Application.nativeBuildVersion || '1';
+  const appVersion = Constants.expoConfig?.version || '0.9.0';
+  const buildNumber = Constants.expoConfig?.ios?.buildNumber || Constants.expoConfig?.android?.versionCode || '1';
   
   const handleLogout = () => {
     Alert.alert(
@@ -100,10 +100,7 @@ export default function SettingsScreen() {
     // Here you would implement the actual notification toggle logic
   };
   
-  const handleToggleBiometric = (value: boolean) => {
-    setBiometricEnabled(value);
-    // Here you would implement the actual biometric authentication toggle logic
-  };
+
   
   const handleToggleAutoSync = (value: boolean) => {
     setAutoSyncEnabled(value);
@@ -112,9 +109,8 @@ export default function SettingsScreen() {
   
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
-      <DashboardHeader 
-        title="Pengaturan" 
-        showBackButton={true}
+      <BackHeader 
+        title="Pengaturan"
       />
       
       <ScrollView 
@@ -154,21 +150,7 @@ export default function SettingsScreen() {
           </View>
           
           <View style={styles.settingCard}>
-            <View style={styles.settingRow}>
-              <View style={styles.settingInfo}>
-                <Text style={styles.settingLabel}>Autentikasi Biometrik</Text>
-                <Text style={styles.settingDescription}>Gunakan sidik jari atau Face ID untuk login</Text>
-              </View>
-              <Switch
-                trackColor={{ false: "#D1D1D6", true: "#007BFF" }}
-                thumbColor="#FFFFFF"
-                ios_backgroundColor="#D1D1D6"
-                onValueChange={handleToggleBiometric}
-                value={biometricEnabled}
-              />
-            </View>
-            
-            <View style={styles.divider} />
+
             
             <TouchableOpacity 
               style={styles.settingButton}

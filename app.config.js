@@ -7,7 +7,7 @@ const env = dotenv.config({ path: path.resolve(__dirname, '.env') }).parsed || {
 export default {
   name: "Koperasi Fatihul Barokah",
   slug: "koperasi-fatihul-barokah-mobile-apps",
-  version: "1.0.0",
+  version: "0.9.0",
   orientation: "portrait",
   icon: "./assets/icon.png",
   userInterfaceStyle: "light",

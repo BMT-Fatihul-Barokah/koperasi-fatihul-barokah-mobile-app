@@ -27,7 +27,7 @@ export function BackHeader({ title, onBackPress, rightComponent }: BackHeaderPro
     <View style={[
       styles.container, 
       { 
-        paddingTop: insets.top > 0 ? Math.max(insets.top, 8) : 8,
+        paddingTop: insets.top > 0 ? Math.min(insets.top + 4, 16) : 8,
         backgroundColor: isDark ? '#1a1a1a' : '#fff',
         borderBottomColor: isDark ? '#333' : '#f0f0f0' 
       }
@@ -54,17 +54,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingBottom: 10,
     borderBottomWidth: 1,
+    height: 56, // Fixed height for consistency
   },
   backButton: {
-    padding: 4,
+    padding: 8,
+    marginLeft: -8, // Negative margin to align with content
   },
   title: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '600',
     marginLeft: 8,
     flex: 1,
+    textAlign: 'center', // Center the title
   },
   rightComponentContainer: {
     marginLeft: 'auto',
