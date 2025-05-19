@@ -27,7 +27,7 @@ export function BottomNavBar({ style }: BottomNavBarProps) {
     }
     
     // Special case for notifications
-    if (path === '/dashboard/notifications' && (currentPath === '/dashboard/notifications' || currentPath === '/notifications' || currentPath.startsWith('/notifications/'))) {
+    if (path === '/notifications' && (currentPath === '/notifications' || currentPath.startsWith('/notifications/'))) {
       return true;
     }
     
@@ -73,8 +73,7 @@ export function BottomNavBar({ style }: BottomNavBarProps) {
       name: 'Notifikasi',
       icon: 'notifications-outline' as const,
       activeIcon: 'notifications' as const,
-      path: '/dashboard/notifications',
-      alternatePaths: ['/notifications'],
+      path: '/notifications',
     },
     {
       name: 'Profil',

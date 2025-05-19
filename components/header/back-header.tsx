@@ -27,7 +27,7 @@ export function BackHeader({ title, onBackPress, rightComponent }: BackHeaderPro
     <View style={[
       styles.container, 
       { 
-        paddingTop: insets.top > 0 ? Math.min(insets.top + 4, 16) : 8,
+        paddingTop: insets.top,
         backgroundColor: isDark ? '#1a1a1a' : '#fff',
         borderBottomColor: isDark ? '#333' : '#f0f0f0' 
       }
@@ -39,11 +39,15 @@ export function BackHeader({ title, onBackPress, rightComponent }: BackHeaderPro
       >
         <Ionicons name="chevron-back" size={24} color={isDark ? "#fff" : "#000"} />
       </TouchableOpacity>
-      <Text style={[styles.title, { color: isDark ? '#fff' : '#000' }]}>{title}</Text>
-      {rightComponent && (
+      <View style={styles.titleContainer}>
+        <Text style={[styles.title, { color: isDark ? '#fff' : '#000' }]}>{title}</Text>
+      </View>
+      {rightComponent ? (
         <View style={styles.rightComponentContainer}>
           {rightComponent}
         </View>
+      ) : (
+        <View style={styles.spacer} />
       )}
     </View>
   );
@@ -54,22 +58,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingBottom: 10,
+    paddingBottom: 12,
     borderBottomWidth: 1,
-    height: 56, // Fixed height for consistency
   },
   backButton: {
-    padding: 8,
-    marginLeft: -8, // Negative margin to align with content
+    padding: 4,
+    width: 32,
+  },
+  titleContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
     fontSize: 18,
-    fontWeight: '600',
-    marginLeft: 8,
-    flex: 1,
-    textAlign: 'center', // Center the title
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
   rightComponentContainer: {
-    marginLeft: 'auto',
+    width: 32,
+  },
+  spacer: {
+    width: 32,
   },
 });

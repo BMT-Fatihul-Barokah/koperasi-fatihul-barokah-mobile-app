@@ -145,10 +145,7 @@ export default function AccountValidationScreen() {
     }
   };
 
-  const handleNewAccount = () => {
-    // Navigate to the new customer registration flow
-    router.push('/onboarding/new-account');
-  };
+
 
   return (
     <SafeAreaProvider>
@@ -223,11 +220,7 @@ export default function AccountValidationScreen() {
           style={styles.primaryButton}
         />
         
-        <SecondaryButton 
-          label="Daftar Rekening BMT Fatihul Barokah"
-          onPress={handleNewAccount}
-          style={styles.secondaryButton}
-        />
+
       </View>
     </ScrollView>
     </SafeAreaProvider>
