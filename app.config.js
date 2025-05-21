@@ -24,6 +24,7 @@ export default {
     supportsTablet: true
   },
   android: {
+    package: "com.fatihulbarokah.koperasi",
     adaptiveIcon: {
       foregroundImage: "./assets/adaptive-icon.png",
       backgroundColor: "#007BFF"
