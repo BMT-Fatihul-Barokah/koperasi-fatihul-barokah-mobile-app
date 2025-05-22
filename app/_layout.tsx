@@ -6,6 +6,9 @@ import * as SplashScreen from 'expo-splash-screen';
 import { ErrorBoundary } from '../components/error-boundary';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { LogBox } from 'react-native';
+import { AuthProvider } from '../context/auth-context';
+import { DataProvider } from '../context/data-context';
+import { QueryProvider } from '../context/query-provider';
 
 // Ignore specific warnings
 LogBox.ignoreLogs([
@@ -74,15 +77,21 @@ export default function RootLayout() {
     <ErrorBoundary>
       <AppWrapper>
         <SafeAreaProvider>
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: {
-                backgroundColor: '#FFFFFF',
-              },
-              animation: 'none',
-            }}
-          />
+          <QueryProvider>
+            <AuthProvider>
+              <DataProvider>
+                <Stack
+                  screenOptions={{
+                    headerShown: false,
+                    contentStyle: {
+                      backgroundColor: '#FFFFFF',
+                    },
+                    animation: 'none',
+                  }}
+                />
+              </DataProvider>
+            </AuthProvider>
+          </QueryProvider>
         </SafeAreaProvider>
       </AppWrapper>
     </ErrorBoundary>
