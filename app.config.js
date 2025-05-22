@@ -2,7 +2,9 @@ const path = require('path');
 const dotenv = require('dotenv');
 
 // Load environment variables from .env file
-const env = dotenv.config({ path: path.resolve(__dirname, '.env') }).parsed || {};
+const env = process.env.EAS_BUILD 
+  ? process.env 
+  : dotenv.config({ path: path.resolve(__dirname, '.env') }).parsed || {};
 
 export default {
   name: "Koperasi Fatihul Barokah",

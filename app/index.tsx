@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ActivityIndicator, InteractionManager } from 'react-native';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import Logo from '../assets/logo.svg';
 import { AuthService } from '../services/auth.service';
 import { useAuth } from '../context/auth-context';
 import { PrimaryButton } from '../components/buttons/primary-button';
+import { SafeRender } from '../components/safe-render';
+import { ErrorBoundary } from '../components/error-boundary';
 
-export default function LoginScreen() {
+function LoginScreenContent() {
   // Auth states
   const [isLoading, setIsLoading] = useState(true);
   const [step, setStep] = useState<'welcome' | 'loading'>('welcome');
@@ -98,6 +100,17 @@ export default function LoginScreen() {
         </View>
       )}
     </SafeAreaView>
+  );
+}
+
+// Wrap the component with ErrorBoundary and SafeRender to prevent "unknown view tag" errors
+export default function LoginScreen() {
+  return (
+    <ErrorBoundary>
+      <SafeRender delay={100}>
+        <LoginScreenContent />
+      </SafeRender>
+    </ErrorBoundary>
   );
 }
 
