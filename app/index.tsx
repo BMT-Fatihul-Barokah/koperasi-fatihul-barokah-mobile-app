@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ActivityIndicator, TouchableOpacity, Image } from 'react-native';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ErrorBoundary } from '../components/error-boundary';
@@ -39,9 +39,11 @@ export default function LoginScreen() {
         <StatusBar style="auto" />
         
         <View style={styles.imageContainer}>
-          <View style={styles.logoPlaceholder}>
-            <Text style={styles.logoText}>KFB</Text>
-          </View>
+          <Image 
+            source={require('../assets/logo.png')} 
+            style={styles.logo}
+            resizeMode="contain"
+          />
         </View>
         
         <View style={styles.contentContainer}>
@@ -86,19 +88,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 20,
   },
-  logoPlaceholder: {
-    width: 200,
-    height: 200,
-    backgroundColor: '#007BFF',
-    borderRadius: 100,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20
-  },
-  logoText: {
-    color: '#FFFFFF',
-    fontSize: 48,
-    fontWeight: 'bold'
+  logo: {
+    width: 280,
+    height: 280,
+    marginBottom: 20,
+    marginTop: 50,
   },
   contentContainer: {
     flex: 1,
