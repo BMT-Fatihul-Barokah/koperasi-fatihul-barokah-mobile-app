@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { Logger } from '../lib/logger';
 
 interface ErrorBoundaryProps {
@@ -10,6 +10,7 @@ interface ErrorBoundaryProps {
 interface ErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
+  errorInfo: React.ErrorInfo | null;
 }
 
 /**
@@ -18,10 +19,14 @@ interface ErrorBoundaryState {
 export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { 
+      hasError: false, 
+      error: null,
+      errorInfo: null
+    };
   }
 
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+  static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
     // Update state so the next render will show the fallback UI
     return { hasError: true, error };
   }
@@ -29,13 +34,32 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
     // Log the error to our logging service
     Logger.error('ErrorBoundary', 'Uncaught error in component', {
-      error,
+      error: error.toString(),
       componentStack: errorInfo.componentStack
     });
+    
+    // Save error info for debugging
+    this.setState({ errorInfo });
+    
+    // Show a more detailed error in development
+    if (__DEV__) {
+      console.error('Error caught by ErrorBoundary:', error);
+      console.error('Component stack:', errorInfo.componentStack);
+    }
   }
 
   resetError = (): void => {
-    this.setState({ hasError: false, error: null });
+    this.setState({ hasError: false, error: null, errorInfo: null });
+  };
+
+  showErrorDetails = (): void => {
+    if (this.state.error && this.state.errorInfo) {
+      Alert.alert(
+        'Error Details',
+        `${this.state.error.toString()}\n\nComponent Stack: ${this.state.errorInfo.componentStack}`,
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   render(): React.ReactNode {
@@ -52,9 +76,16 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
           <Text style={styles.message}>
             {this.state.error?.message || 'Aplikasi mengalami masalah saat memuat komponen.'}
           </Text>
-          <TouchableOpacity style={styles.button} onPress={this.resetError}>
-            <Text style={styles.buttonText}>Coba Lagi</Text>
-          </TouchableOpacity>
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity style={styles.button} onPress={this.resetError}>
+              <Text style={styles.buttonText}>Coba Lagi</Text>
+            </TouchableOpacity>
+            {__DEV__ && (
+              <TouchableOpacity style={[styles.button, styles.detailsButton]} onPress={this.showErrorDetails}>
+                <Text style={styles.buttonText}>Lihat Detail</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       );
     }
@@ -82,11 +113,20 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     color: '#666',
   },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   button: {
     backgroundColor: '#007BFF',
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 5,
+    marginHorizontal: 5,
+  },
+  detailsButton: {
+    backgroundColor: '#6c757d',
   },
   buttonText: {
     color: '#fff',

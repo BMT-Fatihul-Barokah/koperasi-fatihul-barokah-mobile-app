@@ -54,19 +54,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         if (accountId) {
           Logger.debug('Auth', 'Found stored account ID', { accountId });
-          const success = await login(accountId);
-          if (!success) {
-            Logger.warn('Auth', 'Login failed, removing stored account ID');
+          try {
+            const success = await login(accountId);
+            if (!success) {
+              Logger.warn('Auth', 'Login failed, removing stored account ID');
+              await storage.removeItem(AUTH_STORAGE_KEY);
+            }
+          } catch (loginError) {
+            Logger.error('Auth', 'Error during auto-login', loginError);
+            // Clear stored credentials on login error
             await storage.removeItem(AUTH_STORAGE_KEY);
+            setState(prev => ({ 
+              ...initialState, 
+              isLoading: false,
+              error: loginError as Error 
+            }));
           }
         } else {
           Logger.debug('Auth', 'No stored account ID found');
+          setState(prev => ({ ...initialState, isLoading: false }));
         }
       } catch (error) {
         Logger.error('Auth', 'Error loading auth session', error);
-        setState(prev => ({ ...prev, error: error as Error }));
-      } finally {
-        setState(prev => ({ ...prev, isLoading: false }));
+        setState(prev => ({ 
+          ...initialState,
+          isLoading: false,
+          error: error as Error 
+        }));
       }
     };
 

@@ -1,56 +1,27 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ActivityIndicator, InteractionManager } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import Logo from '../assets/logo.svg';
-import { AuthService } from '../services/auth.service';
-import { useAuth } from '../context/auth-context';
-import { PrimaryButton } from '../components/buttons/primary-button';
-import { SafeRender } from '../components/safe-render';
 import { ErrorBoundary } from '../components/error-boundary';
 
-function LoginScreenContent() {
-  // Auth states
-  const [isLoading, setIsLoading] = useState(true);
-  const [step, setStep] = useState<'welcome' | 'loading'>('welcome');
-  const { login } = useAuth();
-
-  // Check for existing session on component mount
-  useEffect(() => {
-    const checkSession = async () => {
-      try {
-        setIsLoading(true);
-        const { isLoggedIn, accountId } = await AuthService.checkExistingSession();
-        
-        if (isLoggedIn && accountId) {
-          // User is already logged in, redirect to dashboard
-          const loginSuccess = await login(accountId);
-          if (loginSuccess) {
-            router.replace('/dashboard');
-            return;
-          }
-        }
-        
-        // No active session, show welcome screen
-        setStep('welcome');
-      } catch (error) {
-        console.error('Error checking session:', error);
-        setStep('welcome');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    checkSession();
-  }, []);
-
-  // Handle continue button press
+export default function LoginScreen() {
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // Simplified continue button handler
   const handleContinue = () => {
-    // Navigate directly to phone verification
-    router.push('/onboarding/phone-verification');
+    try {
+      setIsLoading(true);
+      // Simple navigation without complex logic
+      setTimeout(() => {
+        router.push('/onboarding/phone-verification');
+      }, 500);
+    } catch (error) {
+      console.error('Navigation error:', error);
+      setIsLoading(false);
+    }
   };
 
-  // Show loading indicator while checking session
+  // Show loading indicator
   if (isLoading) {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
@@ -61,58 +32,39 @@ function LoginScreenContent() {
     );
   }
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="auto" />
-      
-      {step === 'welcome' && (
-        <>
-          <View style={styles.imageContainer}>
-            <Logo 
-              width={300}
-              height={300}
-              style={styles.logo} 
-            />
-          </View>
-          
-          <View style={styles.contentContainer}>
-            <Text style={styles.title}>Selamat Datang di BMT Fatihul Barokah</Text>
-            <Text style={styles.subtitle}>
-              Kelola tabungan, pembiayaan, dan informasi keuangan Anda dengan mudah
-            </Text>
-          </View>
-          
-          <View style={styles.buttonContainer}>
-            <View style={styles.buttonWrapper}>
-              <PrimaryButton 
-                label="Lanjutkan"
-                onPress={handleContinue}
-              />
-            </View>
-          </View>
-        </>
-      )}
-      
-      {step === 'loading' && (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007BFF" />
-          <Text style={styles.loadingText}>Memuat...</Text>
-        </View>
-      )}
-    </SafeAreaView>
-  );
-}
-
-// Wrap the component with ErrorBoundary and SafeRender to prevent "unknown view tag" errors
-export default function LoginScreen() {
+  // Simplified welcome screen
   return (
     <ErrorBoundary>
-      <SafeRender delay={100}>
-        <LoginScreenContent />
-      </SafeRender>
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="auto" />
+        
+        <View style={styles.imageContainer}>
+          <View style={styles.logoPlaceholder}>
+            <Text style={styles.logoText}>KFB</Text>
+          </View>
+        </View>
+        
+        <View style={styles.contentContainer}>
+          <Text style={styles.title}>Selamat Datang di BMT Fatihul Barokah</Text>
+          <Text style={styles.subtitle}>
+            Kelola tabungan, pembiayaan, dan informasi keuangan Anda dengan mudah
+          </Text>
+        </View>
+        
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity 
+            style={styles.button}
+            onPress={handleContinue}
+          >
+            <Text style={styles.buttonText}>Lanjutkan</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     </ErrorBoundary>
   );
 }
+
+
 
 const styles = StyleSheet.create({
   container: {
@@ -134,8 +86,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 20,
   },
-  logo: {
+  logoPlaceholder: {
+    width: 200,
+    height: 200,
+    backgroundColor: '#007BFF',
+    borderRadius: 100,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 20
+  },
+  logoText: {
+    color: '#FFFFFF',
+    fontSize: 48,
+    fontWeight: 'bold'
   },
   contentContainer: {
     flex: 1,
@@ -158,8 +121,19 @@ const styles = StyleSheet.create({
   buttonContainer: {
     paddingHorizontal: 20,
     marginBottom: 30,
+    alignItems: 'center',
   },
-  buttonWrapper: {
+  button: {
+    backgroundColor: '#007BFF',
+    paddingHorizontal: 30,
+    paddingVertical: 12,
+    borderRadius: 8,
     width: '100%',
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
   }
 });

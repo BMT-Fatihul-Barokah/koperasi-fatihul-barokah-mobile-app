@@ -6,6 +6,13 @@ const env = process.env.EAS_BUILD
   ? process.env 
   : dotenv.config({ path: path.resolve(__dirname, '.env') }).parsed || {};
 
+// Handle potential undefined values
+const safeEnv = {
+  NEXT_PUBLIC_SUPABASE_URL: env.NEXT_PUBLIC_SUPABASE_URL || '',
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+  SUPABASE_SERVICE_ROLE_KEY: env.SUPABASE_SERVICE_ROLE_KEY || '',
+};
+
 export default {
   name: "Koperasi Fatihul Barokah",
   slug: "koperasi-fatihul-barokah-mobile-apps",
@@ -37,12 +44,16 @@ export default {
   },
   // Pass environment variables to the app securely
   extra: {
-    SUPABASE_URL: env.NEXT_PUBLIC_SUPABASE_URL,
-    SUPABASE_ANON_KEY: env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    SUPABASE_SERVICE_ROLE_KEY: env.SUPABASE_SERVICE_ROLE_KEY,
+    SUPABASE_URL: safeEnv.NEXT_PUBLIC_SUPABASE_URL,
+    SUPABASE_ANON_KEY: safeEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    SUPABASE_SERVICE_ROLE_KEY: safeEnv.SUPABASE_SERVICE_ROLE_KEY,
     eas: {
       projectId: "7f50e699-bd38-4115-99dd-759fafda7a3e"
     },
+  },
+  // Add development client configuration
+  developmentClient: {
+    silentLaunch: false,
   },
   // Define public environment variables
   plugins: [
@@ -51,6 +62,11 @@ export default {
       {
         ios: {
           useFrameworks: "static",
+        },
+        android: {
+          compileSdkVersion: 33,
+          targetSdkVersion: 33,
+          buildToolsVersion: "33.0.0",
         },
       },
     ],
