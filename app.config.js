@@ -48,7 +48,7 @@ export default {
     SUPABASE_ANON_KEY: safeEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     SUPABASE_SERVICE_ROLE_KEY: safeEnv.SUPABASE_SERVICE_ROLE_KEY,
     eas: {
-      projectId: "7f50e699-bd38-4115-99dd-759fafda7a3e"
+      projectId: "24849da3-ebce-4918-ae41-3c37e379063f"
     },
   },
   // Add development client configuration
@@ -64,9 +64,8 @@ export default {
           useFrameworks: "static",
         },
         android: {
-          compileSdkVersion: 33,
-          targetSdkVersion: 33,
-          buildToolsVersion: "33.0.0",
+          compileSdkVersion: 35,
+          targetSdkVersion: 35,
         },
       },
     ],
