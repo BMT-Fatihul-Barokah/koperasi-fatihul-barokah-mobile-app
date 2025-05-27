@@ -32,6 +32,13 @@ interface Transaction {
   updated_at: string;
   recipient_name?: string;
   bank_name?: string;
+  tabungan_id?: string;
+  jenis_tabungan?: {
+    id: string;
+    nama: string;
+    kode: string;
+    deskripsi?: string;
+  };
 }
 
 export default function TransactionDetailScreen() {
@@ -49,9 +56,13 @@ export default function TransactionDetailScreen() {
     const fetchTransactionDetail = async () => {
       setIsLoading(true);
       try {
+        // Fetch transaction with tabungan (savings) information
         const { data, error } = await supabase
           .from('transaksi')
-          .select('*')
+          .select(`
+            *,
+            tabungan:tabungan_id(id, nomor_rekening, jenis_tabungan:jenis_tabungan_id(id, nama, kode, deskripsi))
+          `)
           .eq('id', id)
           .eq('anggota_id', member.id)
           .single();
@@ -78,10 +89,16 @@ export default function TransactionDetailScreen() {
           }
         }
         
+        // Extract jenis_tabungan from nested data structure if available
+        const jenis_tabungan = data.tabungan?.jenis_tabungan || null;
+        const tabungan_id = data.tabungan_id || null;
+        
         setTransaction({
           ...data,
           recipient_name: recipientName,
-          bank_name: bankName
+          bank_name: bankName,
+          tabungan_id,
+          jenis_tabungan
         });
       } catch (error) {
         console.error('Error in transaction detail fetch:', error);
@@ -200,7 +217,16 @@ export default function TransactionDetailScreen() {
               {transaction.kategori 
                 ? transaction.kategori.replace(/_/g, ' ').split(' ').map(word => 
                     word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
-                : 'Tidak diketahui'}
+                : '-'}
+            </Text>
+          </View>
+          
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Jenis Tabungan</Text>
+            <Text style={styles.detailValue}>
+              {transaction.jenis_tabungan 
+                ? `${transaction.jenis_tabungan.nama} (${transaction.jenis_tabungan.kode})` 
+                : '-'}
             </Text>
           </View>
           

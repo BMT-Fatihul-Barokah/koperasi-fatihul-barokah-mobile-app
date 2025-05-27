@@ -114,7 +114,7 @@ export default function PinjamanDetailScreen() {
   // Render loading state
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={styles.container} edges={['bottom']}>
         <StatusBar style={isDark ? 'light' : 'dark'} />
         <BackHeader title="Detail Pinjaman" />
         <View style={styles.loadingContainer}>
@@ -129,7 +129,7 @@ export default function PinjamanDetailScreen() {
   // Render error state
   if (error) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={styles.container} edges={['bottom']}>
         <StatusBar style={isDark ? 'light' : 'dark'} />
         <BackHeader title="Detail Pinjaman" />
         <View style={styles.errorContainer}>
@@ -150,7 +150,7 @@ export default function PinjamanDetailScreen() {
   // Render loan not found state
   if (!loan) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={styles.container} edges={['bottom']}>
         <StatusBar style={isDark ? 'light' : 'dark'} />
         <BackHeader title="Detail Pinjaman" />
         <View style={styles.errorContainer}>
@@ -169,7 +169,7 @@ export default function PinjamanDetailScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <BackHeader title="Detail Pinjaman" />
       

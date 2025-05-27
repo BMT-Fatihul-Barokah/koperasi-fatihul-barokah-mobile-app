@@ -30,7 +30,11 @@ export default {
     "**/*"
   ],
   ios: {
-    supportsTablet: true
+    supportsTablet: true,
+    bundleIdentifier: "com.fatihulbarokah.koperasi",
+    infoPlist: {
+      ITSAppUsesNonExemptEncryption: false
+    }
   },
   android: {
     package: "com.fatihulbarokah.koperasi",
