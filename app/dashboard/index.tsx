@@ -12,7 +12,7 @@ import {
   Image 
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { router } from 'expo-router';
+import { router, Redirect } from 'expo-router';
 import { useAuth } from '../../context/auth-context';
 import { format, parseISO, formatDistanceToNow } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
@@ -50,19 +50,11 @@ export default function DashboardScreen() {
   // Loan balance is still mock data for now
   const loanBalance = 2000000;
   
-  // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!isAuthenticated) {
-      Logger.info('Dashboard', 'User is not authenticated, redirecting to login');
-      // Use setTimeout to ensure the Root Layout is mounted before navigation
-      // This helps prevent the "Attempted to navigate before mounting the Root Layout component" error in web
-      const timer = setTimeout(() => {
-        router.replace('/');
-      }, 100);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [isAuthenticated]);
+  // If not authenticated, redirect to onboarding
+  if (!isAuthenticated) {
+    Logger.info('Dashboard', 'User is not authenticated, redirecting to onboarding');
+    return <Redirect href="/onboarding" />;
+  }
   
   // Log member data for debugging in development only
   useEffect(() => {

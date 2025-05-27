@@ -145,6 +145,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await storage.removeItem(AUTH_STORAGE_KEY);
       
+      // Update auth state
       setState({
         isLoading: false,
         isAuthenticated: false,
@@ -154,7 +155,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         error: null
       });
       
-      router.replace('/');
+      // Reset global authentication state
+      global.isAuthenticated = false;
+      
+      Logger.info('Auth', 'Logout successful, redirecting to onboarding');
+      
+      // Redirect to onboarding instead of root index
+      router.replace('/onboarding');
     } catch (error) {
       Logger.error('Auth', 'Error during logout', error);
       setState(prev => ({ 

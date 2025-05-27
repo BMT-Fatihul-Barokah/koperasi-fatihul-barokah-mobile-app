@@ -1,22 +1,38 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ActivityIndicator, TouchableOpacity, Image } from 'react-native';
 import { router, Redirect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ErrorBoundary } from '../components/error-boundary';
 import { Logger } from '../lib/logger';
+import { useAuth } from '../context/auth-context';
 
 // Access the global authentication state
 declare global {
   var isAuthenticated: boolean;
 }
 
-export default function LoginScreen() {
+export default function RootScreen() {
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   
-  // Check if user is already authenticated and redirect if needed
-  if (global.isAuthenticated) {
+  // Show loading while auth is being determined
+  if (authLoading) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <StatusBar style="auto" />
+        <ActivityIndicator size="large" color="#007BFF" />
+        <Text style={styles.loadingText}>Memuat...</Text>
+      </View>
+    );
+  }
+  
+  // Use declarative navigation with Redirect
+  if (isAuthenticated) {
     Logger.info('Index', 'User is authenticated, redirecting to dashboard');
-    return <Redirect href="/dashboard" />;
+    return <Redirect href="/dashboard" />
+  } else {
+    Logger.info('Index', 'User is not authenticated, redirecting to onboarding');
+    return <Redirect href="/onboarding" />
   }
   
   // Simplified continue button handler
