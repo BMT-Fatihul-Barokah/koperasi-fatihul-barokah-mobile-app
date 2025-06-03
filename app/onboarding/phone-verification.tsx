@@ -14,11 +14,9 @@ import {
 import { router } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { storage } from '../../lib/storage';
-import { supabase } from '../../lib/supabase';
 import { BackHeader } from '../../components/header/back-header';
 import { PrimaryButton } from '../../components/buttons/primary-button';
 import { AuthService } from '../../services/auth.service';
-import { useAuth } from '../../context/auth-context';
 
 export default function PhoneVerificationScreen() {
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -103,7 +101,7 @@ export default function PhoneVerificationScreen() {
             <BackHeader title="Verifikasi Nomor Telepon" />
             
             <View style={styles.content}>
-              <Text style={styles.title}>Masuk atau Daftar</Text>
+              <Text style={styles.title}>Masuk</Text>
               <Text style={styles.subtitle}>
                 Masukkan nomor telepon Anda untuk menerima kode verifikasi
               </Text>
@@ -152,7 +150,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
-
   content: {
     flex: 1,
     paddingHorizontal: 24,
@@ -199,14 +196,13 @@ const styles = StyleSheet.create({
   },
   countryCode: {
     fontSize: 16,
-    fontWeight: '500',
     color: '#000',
   },
   phoneInput: {
     flex: 1,
-    fontSize: 16,
-    paddingHorizontal: 16,
     height: '100%',
+    paddingHorizontal: 16,
+    fontSize: 16,
+    color: '#000',
   },
-
 });

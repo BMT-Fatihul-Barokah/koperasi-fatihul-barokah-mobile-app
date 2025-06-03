@@ -80,16 +80,14 @@ export default function NotificationDetailScreen() {
         if (!data) {
           Logger.debug(LogCategory.NOTIFICATIONS, `Notification ${notificationId} not found in database, checking for jatuh_tempo notification`);
 
-          // For jatuh_tempo notifications, use the existing get_jatuh_tempo_notifications function as a fallback
+          // For jatuh_tempo notifications, query directly from the notifikasi table
           try {
             if (member?.id) {
               const { data: jatuhTempoData, error: jatuhTempoError } = await supabase
-                .rpc('get_jatuh_tempo_notifications', { 
-                  member_id: member.id 
-                }) as {
-                  data: any[] | null;
-                  error: any;
-                };
+                .from('notifikasi')
+                .select('*')
+                .eq('anggota_id', member.id)
+                .eq('jenis', 'jatuh_tempo');
 
               if (jatuhTempoError) {
                 Logger.error(LogCategory.NOTIFICATIONS, 'Error fetching jatuh_tempo notifications:', jatuhTempoError);
@@ -101,7 +99,7 @@ export default function NotificationDetailScreen() {
                 const targetNotification = jatuhTempoData.find(notification => notification.id === notificationId);
 
                 if (targetNotification) {
-                  Logger.debug(LogCategory.NOTIFICATIONS, 'Found jatuh_tempo notification via get_jatuh_tempo_notifications');
+                  Logger.debug(LogCategory.NOTIFICATIONS, 'Found jatuh_tempo notification via direct query');
                   setNotification(targetNotification as Notification);
                   setIsLoading(false);
                   return;

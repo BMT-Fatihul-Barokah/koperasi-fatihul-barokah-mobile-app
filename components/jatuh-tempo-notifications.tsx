@@ -42,33 +42,24 @@ export function JatuhTempoNotifications() {
       try {
         Logger.debug(LogCategory.NOTIFICATIONS, 'Fetching jatuh tempo notifications', { memberId: member.id });
         
-        // Try using the RPC function first
-        const { data: rpcData, error: rpcError } = await supabase
-          .rpc('get_jatuh_tempo_notifications', { member_id: member.id });
+        // Query directly from the notifikasi table
+        Logger.debug(LogCategory.NOTIFICATIONS, 'Fetching jatuh tempo notifications via direct query');
+        const { data, error } = await supabase
+          .from('notifikasi')
+          .select('*')
+          .eq('anggota_id', member.id)
+          .eq('jenis', 'jatuh_tempo')
+          .order('created_at', { ascending: false });
           
-        if (!rpcError && rpcData && rpcData.length > 0) {
-          Logger.info(LogCategory.NOTIFICATIONS, 'Found jatuh tempo notifications via RPC', { count: rpcData.length });
-          setNotifications(rpcData);
+        if (error) {
+          Logger.error(LogCategory.NOTIFICATIONS, 'Error fetching jatuh tempo notifications', error);
+          setError('Failed to load notifications');
+        } else if (data && data.length > 0) {
+          Logger.info(LogCategory.NOTIFICATIONS, 'Found jatuh tempo notifications via direct query', { count: data.length });
+          setNotifications(data);
         } else {
-          // Fallback to direct query
-          Logger.debug(LogCategory.NOTIFICATIONS, 'RPC failed or returned no results, trying direct query');
-          const { data, error } = await supabase
-            .from('notifikasi')
-            .select('*')
-            .eq('anggota_id', member.id)
-            .eq('jenis', 'jatuh_tempo')
-            .order('created_at', { ascending: false });
-            
-          if (error) {
-            Logger.error(LogCategory.NOTIFICATIONS, 'Error fetching jatuh tempo notifications', error);
-            setError('Failed to load notifications');
-          } else if (data && data.length > 0) {
-            Logger.info(LogCategory.NOTIFICATIONS, 'Found jatuh tempo notifications via direct query', { count: data.length });
-            setNotifications(data);
-          } else {
-            Logger.info(LogCategory.NOTIFICATIONS, 'No jatuh tempo notifications found');
-            setNotifications([]);
-          }
+          Logger.info(LogCategory.NOTIFICATIONS, 'No jatuh tempo notifications found');
+          setNotifications([]);
         }
       } catch (err) {
         Logger.error(LogCategory.NOTIFICATIONS, 'Exception in jatuh tempo notifications fetch', err);

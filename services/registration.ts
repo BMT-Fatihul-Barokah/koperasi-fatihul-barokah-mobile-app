@@ -1,3 +1,6 @@
+// This file is deprecated and should be removed
+// Registration flow has been removed from the application
+
 import { supabase } from '../lib/supabase';
 import { storage } from '../lib/storage';
 

@@ -52,8 +52,8 @@ export default {
     SUPABASE_ANON_KEY: safeEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     SUPABASE_SERVICE_ROLE_KEY: safeEnv.SUPABASE_SERVICE_ROLE_KEY,
     eas: {
-      projectId: "24849da3-ebce-4918-ae41-3c37e379063f"
-    },
+      projectId: "2d865ad5-e7b5-4ecf-9eb3-7b0a5fd4767b"
+    }
   },
   // Add development client configuration
   developmentClient: {

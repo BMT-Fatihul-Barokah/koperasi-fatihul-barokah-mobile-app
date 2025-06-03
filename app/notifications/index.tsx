@@ -102,19 +102,19 @@ export default function NotificationsScreen() {
         return;
       }
       
-      // Use the dedicated SQL function for jatuh_tempo notifications
-      Logger.debug(LogCategory.NOTIFICATIONS, 'Using dedicated SQL function for jatuh_tempo notifications');
-      // Cast the result as any to handle the type mismatch between varchar and text
+      // Directly query for jatuh_tempo notifications instead of using RPC function
+      Logger.debug(LogCategory.NOTIFICATIONS, 'Querying directly for jatuh_tempo notifications');
       const { data: jatuhTempoData, error: jatuhTempoError } = await supabase
-        .rpc('get_jatuh_tempo_notifications', { member_id: memberId }) as {
-          data: any[] | null;
-          error: any;
-        };
+        .from('notifikasi')
+        .select('*')
+        .eq('anggota_id', memberId)
+        .eq('jenis', 'jatuh_tempo')
+        .order('created_at', { ascending: false });
       
       if (jatuhTempoError) {
-        Logger.error(LogCategory.NOTIFICATIONS, 'Error calling get_jatuh_tempo_notifications function', jatuhTempoError);
+        Logger.error(LogCategory.NOTIFICATIONS, 'Error fetching jatuh_tempo notifications directly', jatuhTempoError);
       } else {
-        Logger.info(LogCategory.NOTIFICATIONS, 'Found due date notifications via RPC', { count: jatuhTempoData?.length || 0 });
+        Logger.info(LogCategory.NOTIFICATIONS, 'Found due date notifications via direct query', { count: jatuhTempoData?.length || 0 });
         
         if (jatuhTempoData && jatuhTempoData.length > 0) {
           // Add jatuh_tempo notifications to the data array if they exist
@@ -130,34 +130,7 @@ export default function NotificationsScreen() {
             data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
           }
         } else {
-          // Fallback to direct query if RPC returns no results
-          Logger.debug(LogCategory.NOTIFICATIONS, 'No results from RPC function, trying direct query for jatuh_tempo');
-          const { data: directJatuhTempoData, error: directJatuhTempoError } = await supabase
-            .from('notifikasi')
-            .select('*')
-            .eq('anggota_id', memberId)
-            .eq('jenis', 'jatuh_tempo')
-            .order('created_at', { ascending: false });
-          
-          if (directJatuhTempoError) {
-            Logger.error(LogCategory.NOTIFICATIONS, 'Error with direct jatuh_tempo query', directJatuhTempoError);
-          } else if (directJatuhTempoData && directJatuhTempoData.length > 0) {
-            Logger.info(LogCategory.NOTIFICATIONS, 'Found jatuh_tempo notifications via direct query', { count: directJatuhTempoData.length });
-            
-            // Add these notifications to our data array
-            if (data) {
-              directJatuhTempoData.forEach(notification => {
-                if (!data.some(n => n.id === notification.id)) {
-                  data.push(notification);
-                }
-              });
-              
-              // Re-sort by created_at
-              data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-            }
-          } else {
-            Logger.info(LogCategory.NOTIFICATIONS, 'No jatuh_tempo notifications found via direct query');
-          }
+          Logger.info(LogCategory.NOTIFICATIONS, 'No jatuh_tempo notifications found');
         }
       }
         

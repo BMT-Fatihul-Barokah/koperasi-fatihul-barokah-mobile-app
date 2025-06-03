@@ -262,24 +262,24 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         throw generalError;
       }
       
-      // Then use our dedicated SQL function for jatuh_tempo notifications
-      Logger.debug(LogCategory.NOTIFICATIONS, 'Fetching due date notifications');
-      // Cast the result as any to handle the type mismatch between varchar and text
+      // Query directly for jatuh_tempo notifications from the notifikasi table
+      Logger.debug(LogCategory.NOTIFICATIONS, 'Fetching due date notifications directly');
       const { data: jatuhTempoData, error: jatuhTempoError } = await supabase
-        .rpc('get_jatuh_tempo_notifications', { member_id: member.id }) as {
-          data: any[] | null;
-          error: any;
-        };
+        .from('notifikasi')
+        .select('*')
+        .eq('anggota_id', member.id)
+        .eq('jenis', 'jatuh_tempo')
+        .order('created_at', { ascending: false });
       
       let allData = generalData || [];
       let jatuhTempoFound = false;
       
-      // First try using the RPC function
+      // Check if we found any jatuh_tempo notifications
       if (!jatuhTempoError && jatuhTempoData && jatuhTempoData.length > 0) {
-        Logger.debug(LogCategory.NOTIFICATIONS, 'Found due date notifications via RPC', { count: jatuhTempoData.length });
+        Logger.debug(LogCategory.NOTIFICATIONS, 'Found due date notifications via direct query', { count: jatuhTempoData.length });
         jatuhTempoFound = true;
         
-        // Add jatuh_tempo notifications from RPC function
+        // Add jatuh_tempo notifications from direct query
         jatuhTempoData.forEach(notification => {
           if (!allData.some(n => n.id === notification.id)) {
             allData.push(notification);

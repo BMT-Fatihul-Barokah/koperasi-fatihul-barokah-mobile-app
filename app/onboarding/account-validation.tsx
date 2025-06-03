@@ -8,14 +8,12 @@ import { checkSupabaseConnection } from '../../lib/supabase';
 import { storage } from '../../lib/storage';
 import { BackHeader } from '../../components/header/back-header';
 import { PrimaryButton } from '../../components/buttons/primary-button';
-import { SecondaryButton } from '../../components/buttons/secondary-button';
 
 export default function AccountValidationScreen() {
   const [fullName, setFullName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [rawAccountNumber, setRawAccountNumber] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   
   // Check if form is valid
@@ -145,8 +143,6 @@ export default function AccountValidationScreen() {
     }
   };
 
-
-
   return (
     <SafeAreaProvider>
       <BackHeader title="Validasi Akun" />
@@ -200,7 +196,6 @@ export default function AccountValidationScreen() {
               
               setAccountNumber(formatted);
             }}
-            maxLength={10} // XX.X.XXXX format has max 10 characters
           />
         </View>
         
