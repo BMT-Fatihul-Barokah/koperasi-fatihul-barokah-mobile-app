@@ -20,13 +20,13 @@ import { formatCurrency } from '../../lib/format-utils';
 import { format, addMonths } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
 import { useAuth } from '../../context/auth-context';
-import { Pinjaman, PinjamanService } from '../../services/pinjaman.service';
+import { Pembiayaan, PembiayaanService } from '../../services/pinjaman.service';
 
 export default function PinjamanDetailScreen() {
   const params = useLocalSearchParams();
   const loanId = params.id as string;
   const { member } = useAuth();
-  const [loan, setLoan] = useState<Pinjaman | null>(null);
+  const [loan, setLoan] = useState<Pembiayaan | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -49,7 +49,7 @@ export default function PinjamanDetailScreen() {
       setIsLoading(true);
       setError(null);
       
-      const loanData = await PinjamanService.getPinjamanById(loanId);
+      const loanData = await PembiayaanService.getPembiayaanById(loanId);
       
       if (!loanData) {
         setError('Pinjaman tidak ditemukan');
@@ -88,17 +88,17 @@ export default function PinjamanDetailScreen() {
 
   // Get status color
   const getStatusColor = (status: string) => {
-    return PinjamanService.getStatusColor(status);
+    return PembiayaanService.getStatusColor(status);
   };
 
   // Get status label
   const getStatusLabel = (status: string) => {
-    return PinjamanService.getStatusLabel(status);
+    return PembiayaanService.getStatusLabel(status);
   };
 
   // Calculate progress
-  const calculateProgress = (pinjaman: Pinjaman) => {
-    return PinjamanService.calculateProgress(pinjaman);
+  const calculateProgress = (pembiayaan: Pembiayaan) => {
+    return PembiayaanService.calculateProgress(pembiayaan);
   };
 
   // Get loan icon based on loan type
@@ -186,16 +186,18 @@ export default function PinjamanDetailScreen() {
       >
         <View style={styles.content}>
           <View style={styles.loanHeaderDetailed}>
-            <View style={styles.loanTypeContainer}>
-              <FontAwesome5 
-                name={getLoanIcon(loan.jenis_pinjaman)} 
-                size={24} 
-                color={isDark ? '#FFFFFF' : '#333333'} 
-              />
-              <Text style={styles.loanTypeText}>{loan.jenis_pinjaman}</Text>
-            </View>
-            <View style={[styles.statusBadgeDetailed, { backgroundColor: getStatusColor(loan.status) }]}>
-              <Text style={styles.statusTextDetailed}>{getStatusLabel(loan.status)}</Text>
+            <View style={styles.loanHeaderContent}>
+              <View style={styles.loanTypeContainer}>
+                <FontAwesome5 
+                  name={getLoanIcon(loan.jenis_pembiayaan)} 
+                  size={24} 
+                  color={isDark ? '#FFFFFF' : '#333333'} 
+                />
+                <Text style={styles.loanTypeText} numberOfLines={1}>{loan.jenis_pembiayaan}</Text>
+              </View>
+              <View style={[styles.statusBadgeDetailed, { backgroundColor: getStatusColor(loan.status) }]}>
+                <Text style={styles.statusTextDetailed}>{getStatusLabel(loan.status)}</Text>
+              </View>
             </View>
           </View>
           
@@ -295,15 +297,7 @@ export default function PinjamanDetailScreen() {
             })}
           </View>
           
-          {/* Action buttons based on loan status */}
-          {loan.status === 'aktif' && (
-            <View style={styles.actionContainer}>
-              <TouchableOpacity style={styles.actionButton}>
-                <MaterialCommunityIcons name="cash-multiple" size={20} color="#FFFFFF" />
-                <Text style={styles.actionButtonText}>Bayar Angsuran</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+          {/* Payment functionality removed as requested */}
           
           {loan.status === 'diajukan' && (
             <View style={styles.actionContainer}>
@@ -369,9 +363,6 @@ const createStyles = (isDark: boolean, width: number) => StyleSheet.create({
     fontWeight: '500',
   },
   loanHeaderDetailed: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 16,
     backgroundColor: isDark ? '#2A2A2A' : '#FFFFFF',
     padding: 16,
@@ -382,15 +373,23 @@ const createStyles = (isDark: boolean, width: number) => StyleSheet.create({
     shadowRadius: 2,
     elevation: 1,
   },
+  loanHeaderContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   loanTypeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+    marginRight: 12,
   },
   loanTypeText: {
     fontSize: 18,
     fontWeight: '600',
     color: isDark ? '#FFFFFF' : '#333333',
     marginLeft: 12,
+    flexShrink: 1,
   },
   statusBadgeDetailed: {
     paddingHorizontal: 12,

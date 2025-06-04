@@ -1,4 +1,5 @@
 import React, { useEffect, useCallback, useState, useMemo, useRef } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View,
   Text,
@@ -43,13 +44,28 @@ export default function NotificationsScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isProcessingNotification, setIsProcessingNotification] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+  
+  // Store filter preference when it changes
+  const storeFilterPreference = async (filter: FilterType) => {
+    try {
+      await AsyncStorage.setItem('notification_filter_preference', filter);
+    } catch (error) {
+      Logger.error(LogCategory.NOTIFICATIONS, 'Error storing filter preference', error);
+    }
+  };
+  
+  // Set active filter and store preference
+  const setAndStoreActiveFilter = (filter: FilterType) => {
+    setActiveFilter(filter);
+    storeFilterPreference(filter);
+  };
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   
   // Create styles with dynamic values based on theme
   const styles = useMemo(() => createStyles(isDark), [isDark]);
 
-  // Load notifications when component mounts
+  // Load notifications and restore filter preference when component mounts
   useEffect(() => {
     if (member?.id) {
       Logger.info(LogCategory.NOTIFICATIONS, 'Fetching notifications on mount', { memberId: member.id });
@@ -57,15 +73,45 @@ export default function NotificationsScreen() {
       
       // Direct check for notifications in Supabase
       checkNotificationsDirectly(member.id);
+      
+      // Restore filter preference
+      const restoreFilterPreference = async () => {
+        try {
+          const storedFilter = await AsyncStorage.getItem('notification_filter_preference');
+          if (storedFilter && ['all', 'unread', 'transaksi', 'pengumuman', 'sistem', 'jatuh_tempo'].includes(storedFilter)) {
+            setActiveFilter(storedFilter as FilterType);
+            Logger.debug(LogCategory.NOTIFICATIONS, 'Restored filter preference', { filter: storedFilter });
+          }
+        } catch (error) {
+          Logger.error(LogCategory.NOTIFICATIONS, 'Error restoring filter preference', error);
+        }
+      };
+      
+      restoreFilterPreference();
     }
   }, [member?.id]); // Removed fetchNotifications from dependencies
   
-  // Refresh notifications when the screen comes into focus
+  // Refresh notifications and restore filter when the screen comes into focus
   useFocusEffect(
     useCallback(() => {
       if (member?.id) {
         Logger.info(LogCategory.NOTIFICATIONS, 'Screen focused, refreshing notifications');
         fetchNotifications(true);
+        
+        // Restore filter preference when returning to the screen
+        const restoreFilterPreference = async () => {
+          try {
+            const storedFilter = await AsyncStorage.getItem('notification_filter_preference');
+            if (storedFilter && ['all', 'unread', 'transaksi', 'pengumuman', 'sistem', 'jatuh_tempo'].includes(storedFilter)) {
+              setActiveFilter(storedFilter as FilterType);
+              Logger.debug(LogCategory.NOTIFICATIONS, 'Restored filter preference on focus', { filter: storedFilter });
+            }
+          } catch (error) {
+            Logger.error(LogCategory.NOTIFICATIONS, 'Error restoring filter preference on focus', error);
+          }
+        };
+        
+        restoreFilterPreference();
       }
       
       // No cleanup needed for useFocusEffect
@@ -297,13 +343,14 @@ export default function NotificationsScreen() {
 
   // Get icon for notification type
   const getNotificationIcon = useCallback((type: string) => {
+    // Default to info if the type doesn't exist in NOTIFICATION_TYPES
     const typeInfo = NOTIFICATION_TYPES[type] || NOTIFICATION_TYPES.info;
     
     return (
       <Ionicons 
-        name={typeInfo.icon as any} 
+        name={(typeInfo?.icon || 'information-circle-outline') as any} 
         size={24} 
-        color={typeInfo.color} 
+        color={typeInfo?.color || '#17a2b8'} 
       />
     );
   }, []);
@@ -411,14 +458,14 @@ export default function NotificationsScreen() {
         >
           <TouchableOpacity 
             style={[styles.filterTab, activeFilter === 'all' && styles.activeFilterTab]}
-            onPress={() => setActiveFilter('all')}
+            onPress={() => setAndStoreActiveFilter('all')}
           >
             <Text style={[styles.filterText, activeFilter === 'all' && styles.activeFilterText]}>Semua</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
             style={[styles.filterTab, activeFilter === 'unread' && styles.activeFilterTab]}
-            onPress={() => setActiveFilter('unread')}
+            onPress={() => setAndStoreActiveFilter('unread')}
           >
             <Text style={[styles.filterText, activeFilter === 'unread' && styles.activeFilterText]}>
               Belum Dibaca {notifications.unreadCount > 0 && `(${notifications.unreadCount})`}
@@ -429,7 +476,7 @@ export default function NotificationsScreen() {
           <TouchableOpacity 
             key="transaksi"
             style={[styles.filterTab, activeFilter === 'transaksi' && styles.activeFilterTab]}
-            onPress={() => setActiveFilter('transaksi')}
+            onPress={() => setAndStoreActiveFilter('transaksi')}
           >
             <Text style={[styles.filterText, activeFilter === 'transaksi' && styles.activeFilterText]}>
               Transaksi
@@ -440,7 +487,7 @@ export default function NotificationsScreen() {
           <TouchableOpacity 
             key="jatuh_tempo"
             style={[styles.filterTab, activeFilter === 'jatuh_tempo' && styles.activeFilterTab]}
-            onPress={() => setActiveFilter('jatuh_tempo')}
+            onPress={() => setAndStoreActiveFilter('jatuh_tempo')}
           >
             <Text style={[styles.filterText, activeFilter === 'jatuh_tempo' && styles.activeFilterText]}>
               Jatuh Tempo
@@ -454,7 +501,7 @@ export default function NotificationsScreen() {
               <TouchableOpacity 
                 key={key}
                 style={[styles.filterTab, activeFilter === key && styles.activeFilterTab]}
-                onPress={() => setActiveFilter(key as FilterType)}
+                onPress={() => setAndStoreActiveFilter(key as FilterType)}
               >
                 <Text style={[styles.filterText, activeFilter === key && styles.activeFilterText]}>
                   {value.name}

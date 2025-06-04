@@ -20,12 +20,12 @@ import { BottomNavBar } from '../../components/navigation/BottomNavBar';
 import { formatCurrency } from '../../lib/format-utils';
 import { format, parseISO } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
-import { Pinjaman, PinjamanService } from '../../services/pinjaman.service';
+import { Pembiayaan, PembiayaanService } from '../../services/pinjaman.service';
 
 export default function PinjamanScreen() {
   const { isLoading: authLoading, isAuthenticated, member } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
-  const [loans, setLoans] = useState<Pinjaman[]>([]);
+  const [loans, setLoans] = useState<Pembiayaan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const colorScheme = useColorScheme();
@@ -44,9 +44,9 @@ export default function PinjamanScreen() {
       setError(null);
       console.log('Fetching loans for member:', member.id);
       
-      const pinjamanData = await PinjamanService.getPinjamanByAnggota(member.id);
-      console.log(`Fetched ${pinjamanData.length} loans`);
-      setLoans(pinjamanData);
+      const pembiayaanData = await PembiayaanService.getPembiayaanByAnggota(member.id);
+      console.log(`Fetched ${pembiayaanData.length} loans`);
+      setLoans(pembiayaanData);
     } catch (err) {
       console.error('Error fetching loans:', err);
       setError('Gagal memuat data pinjaman. Silakan coba lagi.');
@@ -136,9 +136,9 @@ export default function PinjamanScreen() {
                   onPress={() => handleViewLoanDetail(loan.id)}
                 >
                   <View style={styles.loanHeader}>
-                    <Text style={styles.loanName}>{loan.jenis_pinjaman}</Text>
-                    <View style={[styles.statusBadge, { backgroundColor: PinjamanService.getStatusColor(loan.status) }]}>
-                      <Text style={styles.statusText}>{PinjamanService.getStatusLabel(loan.status)}</Text>
+                    <Text style={styles.loanName}>{loan.jenis_pembiayaan}</Text>
+                    <View style={[styles.statusBadge, { backgroundColor: PembiayaanService.getStatusColor(loan.status) }]}>
+                      <Text style={styles.statusText}>{PembiayaanService.getStatusLabel(loan.status)}</Text>
                     </View>
                   </View>
 
@@ -160,11 +160,11 @@ export default function PinjamanScreen() {
                   <View style={styles.progressContainer}>
                     <View style={styles.progressBar}>
                       <View 
-                        style={[styles.progressFill, { width: `${PinjamanService.calculateProgress(loan)}%` }]} 
+                        style={[styles.progressFill, { width: `${PembiayaanService.calculateProgress(loan)}%` }]} 
                       />
                     </View>
                     <Text style={styles.progressText}>
-                      {PinjamanService.calculateProgress(loan)}% Terbayar
+                      {PembiayaanService.calculateProgress(loan)}% Terbayar
                     </Text>
                   </View>
                 </TouchableOpacity>

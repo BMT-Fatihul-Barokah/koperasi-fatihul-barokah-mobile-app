@@ -10,7 +10,7 @@ export interface Transaksi {
   saldo_sebelum: number;
   saldo_sesudah: number;
   anggota_id?: string;
-  pinjaman_id?: string;
+  pembiayaan_id?: string;
   tabungan_id?: string;
   created_at: string;
   updated_at: string;

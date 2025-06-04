@@ -48,6 +48,14 @@ export const NOTIFICATION_TYPES: Record<string, NotificationTypeInfo> = {
     color: '#dc3545',
     isPushEnabled: true,
     isGlobal: false
+  },
+  // Default fallback for any unrecognized types
+  info: {
+    name: 'Info',
+    icon: 'information-circle-outline',
+    color: '#17a2b8',
+    isPushEnabled: false,
+    isGlobal: false
   }
 }
 

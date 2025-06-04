@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { NotificationService } from './notification.service';
-import { Pinjaman } from './pinjaman.service';
+import { Pembiayaan } from './pinjaman.service';
 import { format, addMonths, isWithinInterval, addDays, isSameDay } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
 import { Logger } from '../lib/logger';
@@ -19,7 +19,7 @@ export const LoanNotificationService = {
       
       // Get all active loans
       const { data: activeLoans, error } = await supabase
-        .from('pinjaman')
+        .from('pembiayaan')
         .select('*')
         .eq('status', 'aktif');
       
@@ -54,7 +54,7 @@ export const LoanNotificationService = {
    * @param loan The loan to process
    * @param currentDate The current date
    */
-  async processLoanInstallments(loan: Pinjaman, currentDate: Date): Promise<void> {
+  async processLoanInstallments(loan: Pembiayaan, currentDate: Date): Promise<void> {
     try {
       // Parse loan creation date and final due date
       const loanStartDate = new Date(loan.created_at);
@@ -148,7 +148,7 @@ export const LoanNotificationService = {
           loan,
           todayInstallment,
           'Pembayaran Angsuran Hari Ini',
-          `Pembayaran angsuran pinjaman ${loan.jenis_pinjaman} jatuh tempo hari ini. Silakan lakukan pembayaran secepatnya.`
+          `Pembayaran angsuran pembiayaan ${loan.jenis_pembiayaan} jatuh tempo hari ini. Silakan lakukan pembayaran secepatnya.`
         );
       }
       // For upcoming installments, send reminders
@@ -174,7 +174,7 @@ export const LoanNotificationService = {
             loan,
             installmentDate,
             `Pengingat Pembayaran Angsuran`,
-            `Pembayaran angsuran pinjaman ${loan.jenis_pinjaman} akan jatuh tempo dalam ${daysUntil} hari. Silakan siapkan pembayaran Anda.`
+            `Pembayaran angsuran pembiayaan ${loan.jenis_pembiayaan} akan jatuh tempo dalam ${daysUntil} hari. Silakan siapkan pembayaran Anda.`
           );
         }
       }
@@ -191,7 +191,7 @@ export const LoanNotificationService = {
    * @param message The notification message
    */
   async createDueDateNotification(
-    loan: Pinjaman,
+    loan: Pembiayaan,
     installmentDate: Date,
     title: string,
     message: string
@@ -220,7 +220,7 @@ export const LoanNotificationService = {
         loanId: loan.id,
         installmentDate: installmentDate.toISOString(),
         installmentAmount: installmentAmount,
-        loanType: loan.jenis_pinjaman,
+        loanType: loan.jenis_pembiayaan,
         totalPayment: loan.total_pembayaran,
         remainingPayment: loan.sisa_pembayaran
       });
@@ -258,7 +258,7 @@ export const LoanNotificationService = {
       
       // Get all active loans for this member
       const { data: activeLoans, error } = await supabase
-        .from('pinjaman')
+        .from('pembiayaan')
         .select('*')
         .eq('anggota_id', memberId)
         .eq('status', 'aktif');

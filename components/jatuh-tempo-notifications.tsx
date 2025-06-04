@@ -44,12 +44,49 @@ export function JatuhTempoNotifications() {
         
         // Query directly from the notifikasi table
         Logger.debug(LogCategory.NOTIFICATIONS, 'Fetching jatuh tempo notifications via direct query');
-        const { data, error } = await supabase
+        
+        // First, try with underscore (jatuh_tempo)
+        const { data: dataWithUnderscore, error: errorWithUnderscore } = await supabase
           .from('notifikasi')
           .select('*')
           .eq('anggota_id', member.id)
           .eq('jenis', 'jatuh_tempo')
           .order('created_at', { ascending: false });
+        
+        // Then, try with space (jatuh tempo) for legacy data
+        const { data: dataWithSpace, error: errorWithSpace } = await supabase
+          .from('notifikasi')
+          .select('*')
+          .eq('anggota_id', member.id)
+          .eq('jenis', 'jatuh tempo')
+          .order('created_at', { ascending: false });
+          
+        // Combine results from both queries
+        let data = [];
+        let error = null;
+        
+        if (errorWithUnderscore && errorWithSpace) {
+          // Both queries failed
+          error = errorWithUnderscore;
+          Logger.error(LogCategory.NOTIFICATIONS, 'Error fetching jatuh tempo notifications (both formats)', { errorWithUnderscore, errorWithSpace });
+        } else {
+          // Combine the results
+          if (dataWithUnderscore) {
+            data = [...dataWithUnderscore];
+          }
+          
+          if (dataWithSpace) {
+            // Add data with space, avoiding duplicates
+            dataWithSpace.forEach(notification => {
+              if (!data.some(n => n.id === notification.id)) {
+                data.push(notification);
+              }
+            });
+          }
+          
+          // Sort by created_at
+          data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        }
           
         if (error) {
           Logger.error(LogCategory.NOTIFICATIONS, 'Error fetching jatuh tempo notifications', error);
