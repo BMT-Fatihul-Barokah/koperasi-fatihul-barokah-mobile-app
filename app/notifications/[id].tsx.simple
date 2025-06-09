@@ -1,0 +1,220 @@
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  ActivityIndicator,
+  TouchableOpacity,
+  Alert
+} from 'react-native';
+import { useLocalSearchParams, router } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { StandardHeader } from '../../components/header/standard-header';
+import { useAuth } from '../../context/auth-context';
+import { useData } from '../../context/data-context';
+import { NotificationService } from '../../services/notification.service';
+import { Logger, LogCategory } from '../../lib/logger';
+
+export default function NotificationDetailScreen() {
+  const { id } = useLocalSearchParams();
+  const notificationId = id ? String(id) : '';
+  const { member } = useAuth();
+  const { markNotificationAsRead, fetchNotifications } = useData();
+  const [notification, setNotification] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [markedAsRead, setMarkedAsRead] = useState(false);
+  const didAttemptMarkAsRead = useRef(false);
+
+  // Fetch notification details
+  useEffect(() => {
+    if (!notificationId || !member?.id) return;
+
+    const fetchNotificationDetails = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        // Get all notifications for this member
+        const allNotifications = await NotificationService.getNotifications(member.id);
+        
+        // Find the specific notification by ID
+        const targetNotification = allNotifications.find(notification => notification.id === notificationId);
+
+        if (!targetNotification) {
+          setError(`Notification with ID ${notificationId} not found`);
+          setIsLoading(false);
+          return;
+        }
+
+        setNotification(targetNotification);
+      } catch (error) {
+        setError('Failed to fetch notification details');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchNotificationDetails();
+  }, [notificationId, member?.id]);
+
+  // Mark notification as read
+  useEffect(() => {
+    if (didAttemptMarkAsRead.current || !notification || isLoading) {
+      return;
+    }
+
+    const markAsRead = async () => {
+      try {
+        didAttemptMarkAsRead.current = true;
+        
+        if (!notification.is_read && member?.id) {
+          const source = notification.source || 'global';
+          const success = await markNotificationAsRead(notificationId, source);
+          
+          if (success) {
+            setMarkedAsRead(true);
+            setNotification(prev => {
+              if (!prev) return null;
+              return { ...prev, is_read: true };
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error marking notification as read:', error);
+      }
+    };
+
+    markAsRead();
+  }, [notification, isLoading, notificationId, markNotificationAsRead, member?.id]);
+
+  // Cleanup when unmounting
+  useEffect(() => {
+    return () => {
+      if (markedAsRead) {
+        fetchNotifications(true);
+      }
+    };
+  }, [markedAsRead, fetchNotifications]);
+
+  // Render loading state
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <StandardHeader title="Detail Notifikasi" showBackButton />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#007BFF" />
+          <Text style={styles.loadingText}>Memuat notifikasi...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Render notification not found
+  if (!notification) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <StandardHeader title="Detail Notifikasi" showBackButton />
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={64} color="#dc3545" />
+          <Text style={styles.errorText}>
+            {error || 'Notifikasi tidak ditemukan'}
+          </Text>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.backButtonText}>Kembali</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Render notification detail
+  return (
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <StandardHeader title="Detail Notifikasi" showBackButton />
+      
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+        <View style={styles.contentBox}>
+          <Text style={styles.title}>{notification.title || notification.judul}</Text>
+          <Text style={styles.message}>{notification.message || notification.pesan}</Text>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+// Create styles
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  contentContainer: {
+    padding: 16,
+    paddingBottom: 32,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#dc3545',
+    marginTop: 16,
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  backButton: {
+    backgroundColor: '#007BFF',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  backButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  contentBox: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333333',
+    marginBottom: 16,
+  },
+  message: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: '#333333',
+  }
+});

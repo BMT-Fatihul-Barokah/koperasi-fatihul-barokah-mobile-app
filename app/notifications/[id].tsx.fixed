@@ -1,0 +1,553 @@
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  ActivityIndicator,
+  TouchableOpacity,
+  useColorScheme,
+  Alert
+} from 'react-native';
+import { useLocalSearchParams, router } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { format, parseISO } from 'date-fns';
+import { id as idLocale } from 'date-fns/locale';
+import { Ionicons } from '@expo/vector-icons';
+import { StandardHeader } from '../../components/header/standard-header';
+import { useAuth } from '../../context/auth-context';
+import { useData } from '../../context/data-context';
+import { 
+  Notification, 
+  NOTIFICATION_TYPES, 
+  NotificationService,
+  parseNotificationData
+} from '../../services/notification.service';
+import { Logger, LogCategory } from '../../lib/logger';
+
+export default function NotificationDetailScreen() {
+  const { id } = useLocalSearchParams();
+  const notificationId = id as string;
+  const { member } = useAuth();
+  const { markNotificationAsRead, fetchNotifications } = useData();
+  const [notification, setNotification] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [markedAsRead, setMarkedAsRead] = useState(false);
+  const didAttemptMarkAsRead = useRef(false);
+
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+
+  // Log when component mounts and handle cleanup
+  useEffect(() => {
+    Logger.debug(LogCategory.NOTIFICATIONS, 'Notification detail screen loaded', { notificationId });
+    
+    // Cleanup when unmounting
+    return () => {
+      if (markedAsRead) {
+        Logger.debug(LogCategory.NOTIFICATIONS, 'Notification detail screen unmounting, refreshing notifications');
+        // Force refresh notifications when navigating away if we marked as read
+        fetchNotifications(true);
+      }
+    };
+  }, [markedAsRead, fetchNotifications, notificationId]);
+
+  // Fetch notification details
+  useEffect(() => {
+    if (!notificationId || !member?.id) return;
+
+    const fetchNotificationDetails = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        Logger.debug(LogCategory.NOTIFICATIONS, `Fetching notification details for ID: ${notificationId}`);
+
+        if (!member?.id) {
+          setError('User authentication required');
+          setIsLoading(false);
+          return;
+        }
+
+        // Get all notifications for this member
+        const allNotifications = await NotificationService.getNotifications(member.id);
+        
+        // Find the specific notification by ID
+        const targetNotification = allNotifications.find(notification => notification.id === notificationId);
+
+        if (!targetNotification) {
+          Logger.debug(LogCategory.NOTIFICATIONS, `Notification ${notificationId} not found`);
+          
+          // Try to get jatuh_tempo notifications specifically
+          try {
+            const jatuhTempoNotifications = await NotificationService.getNotificationsByType(member.id, 'jatuh_tempo');
+            const jatuhTempoNotification = jatuhTempoNotifications.find(notification => notification.id === notificationId);
+            
+            if (jatuhTempoNotification) {
+              Logger.debug(LogCategory.NOTIFICATIONS, 'Found jatuh_tempo notification');
+              setNotification(jatuhTempoNotification);
+              setIsLoading(false);
+              return;
+            } else {
+              Logger.debug(LogCategory.NOTIFICATIONS, `Notification with ID ${notificationId} not found in jatuh_tempo notifications`);
+            }
+          } catch (error) {
+            Logger.error(LogCategory.NOTIFICATIONS, 'Error fetching jatuh_tempo notifications:', error);
+          }
+          
+          setError(`Notification with ID ${notificationId} not found`);
+          setIsLoading(false);
+          return;
+        }
+
+        setNotification(targetNotification);
+      } catch (error) {
+        Logger.error(LogCategory.NOTIFICATIONS, 'Error fetching notification details:', error);
+        setError('Failed to fetch notification details');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchNotificationDetails();
+  }, [notificationId, member?.id]);
+
+  // Mark notification as read
+  useEffect(() => {
+    if (didAttemptMarkAsRead.current || !notification || isLoading) {
+      return;
+    }
+
+    const markAsRead = async () => {
+      try {
+        didAttemptMarkAsRead.current = true;
+        
+        if (!notification.is_read && member?.id) {
+          Logger.debug(LogCategory.NOTIFICATIONS, `Marking notification ${notificationId} as read`);
+          
+          // Use the markNotificationAsRead from context
+          const success = await markNotificationAsRead(notificationId, notification.source);
+          
+          if (success) {
+            Logger.debug(LogCategory.NOTIFICATIONS, `Successfully marked notification ${notificationId} as read`);
+            setMarkedAsRead(true);
+            
+            // Update local notification state to reflect read status
+            setNotification(prev => {
+              if (!prev) return null;
+              return { ...prev, is_read: true };
+            });
+          } else {
+            Logger.error(LogCategory.NOTIFICATIONS, `Failed to mark notification ${notificationId} as read`);
+          }
+        } else {
+          Logger.debug(LogCategory.NOTIFICATIONS, `Notification ${notificationId} already marked as read or no member ID`);
+        }
+      } catch (error) {
+        Logger.error(LogCategory.NOTIFICATIONS, 'Error marking notification as read:', error);
+      }
+    };
+
+    markAsRead();
+  }, [notification, isLoading, notificationId, markNotificationAsRead, member?.id]);
+
+  // Format date
+  const formatDate = useCallback((dateString) => {
+    try {
+      const date = parseISO(dateString);
+      return format(date, 'dd MMMM yyyy, HH:mm', { locale: idLocale });
+    } catch (error) {
+      return dateString;
+    }
+  }, []);
+
+  // Check if notification has related action
+  const hasRelatedAction = useCallback(() => {
+    if (!notification) return false;
+    
+    // Check if transaction notification with valid transaction ID
+    if (notification.jenis === 'transaksi' || notification.source === 'transaction') {
+      const data = notification.data;
+      return !!(data?.transaksi_id || data?.transaction_id);
+    }
+    
+    // Check if due date notification with valid loan ID
+    if (notification.jenis === 'jatuh_tempo') {
+      const data = notification.data;
+      return !!data?.loan_id;
+    }
+    
+    return false;
+  }, [notification]);
+
+  // Handle related action based on notification type and data
+  const handleRelatedAction = useCallback(() => {
+    if (!notification) return;
+    
+    try {
+      // Handle based on notification type or source
+      if (notification.jenis === 'transaksi' || notification.source === 'transaction') {
+        // Check for transaksi_id (Indonesian) or transaction_id (English) in data
+        const data = notification.data;
+        if (data) {
+          const transactionId = data.transaksi_id || data.transaction_id;
+          if (transactionId) {
+            // Navigate to transaction detail
+            Logger.debug(LogCategory.NOTIFICATIONS, 'Navigating to transaction detail:', transactionId);
+            router.push(`/activity/${transactionId}`);
+            return;
+          }
+        }
+        
+        // If no transaction ID found, show alert
+        Alert.alert('Info', 'Detail transaksi tidak ditemukan');
+      } else if (notification.jenis === 'jatuh_tempo') {
+        // Parse the data
+        const data = notification.data;
+        if (data?.loan_id) {
+          // Navigate to loan detail
+          router.push(`/loans/${data.loan_id}`);
+          return;
+        }
+        Alert.alert('Info', 'Detail pinjaman tidak ditemukan');
+      } else {
+        // No related action for this notification type
+        Alert.alert('Info', 'Tidak ada tindakan terkait untuk notifikasi ini');
+      }
+    } catch (error) {
+      Logger.error(LogCategory.NOTIFICATIONS, 'Error handling related action:', error);
+      Alert.alert('Error', 'Gagal menjalankan tindakan terkait');
+    }
+  }, [notification, router]);
+
+  // Format currency
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount);
+  };
+  
+  // Render transaction details if this is a transaction notification
+  const renderTransactionDetails = () => {
+    if (!notification) return null;
+    
+    // Check if this is a transaction notification
+    const isTransactionNotification = 
+      notification.jenis === 'transaksi' || 
+      notification.source === 'transaction';
+      
+    if (!isTransactionNotification || !notification.data) {
+      return null;
+    }
+    
+    const data = notification.data;
+    const { jenis, jumlah } = data;
+    
+    // Get transaction type display name
+    let transactionType = 'Transaksi';
+    if (jenis === 'simpanan') {
+      transactionType = 'Simpanan';
+    } else if (jenis === 'penarikan') {
+      transactionType = 'Penarikan';
+    } else if (jenis === 'angsuran') {
+      transactionType = 'Pembayaran Angsuran';
+    } else if (jenis === 'bagi_hasil') {
+      transactionType = 'Bagi Hasil';
+    }
+    
+    return (
+      <View style={styles.transactionDetailsContainer}>
+        <Text style={styles.dataTitle}>Detail Transaksi:</Text>
+        
+        <View style={styles.transactionDetail}>
+          <Text style={styles.dataKey}>Jenis:</Text>
+          <Text style={styles.dataValue}>{transactionType}</Text>
+        </View>
+        
+        {jumlah && (
+          <View style={styles.transactionDetail}>
+            <Text style={styles.dataKey}>Jumlah:</Text>
+            <Text style={styles.dataValue}>{formatCurrency(jumlah)}</Text>
+          </View>
+        )}
+        
+        {data.penerima && (
+          <View style={styles.transactionDetail}>
+            <Text style={styles.dataKey}>Penerima:</Text>
+            <Text style={styles.dataValue}>{data.penerima}</Text>
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  // Get notification type info
+  const getNotificationTypeInfo = (notification) => {
+    const typeKey = notification.jenis || notification.source || 'system';
+    const typeInfo = NOTIFICATION_TYPES[typeKey] || NOTIFICATION_TYPES.sistem;
+    
+    return {
+      name: typeInfo.name,
+      color: typeInfo.color,
+      icon: typeInfo.icon
+    };
+  };
+
+  // Render loading state
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <StandardHeader title="Detail Notifikasi" showBackButton />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#007BFF" />
+          <Text style={styles.loadingText}>Memuat notifikasi...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Render notification not found
+  if (!notification) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <StandardHeader title="Detail Notifikasi" showBackButton />
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={64} color="#dc3545" />
+          <Text style={styles.errorText}>
+            {error || 'Notifikasi tidak ditemukan'}
+          </Text>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.backButtonText}>Kembali</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Get notification type info
+  const typeInfo = getNotificationTypeInfo(notification);
+
+  return (
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <StandardHeader title="Detail Notifikasi" showBackButton />
+      
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+        {/* Notification header */}
+        <View style={styles.notificationHeader}>
+          <View 
+            style={[
+              styles.iconContainer, 
+              { backgroundColor: typeInfo.color }
+            ]}
+          >
+            <Ionicons 
+              name={typeInfo.icon} 
+              size={32} 
+              color="#ffffff" 
+            />
+          </View>
+          
+          <View style={styles.typeContainer}>
+            <Text style={styles.typeText}>{typeInfo.name}</Text>
+          </View>
+        </View>
+        
+        {/* Notification content */}
+        <View style={styles.contentBox}>
+          <Text style={styles.title}>{notification.title || notification.judul}</Text>
+          <Text style={styles.timestamp}>
+            {formatDate(notification.created_at)}
+            {notification.is_read ? ' • Telah dibaca' : ''}
+          </Text>
+          
+          <View style={styles.divider} />
+          
+          <Text style={styles.message}>{notification.message || notification.pesan}</Text>
+          
+          {/* Render transaction details if applicable */}
+          {renderTransactionDetails()}
+        </View>
+        
+        {/* Related action button if applicable */}
+        {hasRelatedAction() && (
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={handleRelatedAction}
+          >
+            <Text style={styles.actionButtonText}>
+              {notification.jenis === 'transaksi' || notification.source === 'transaction'
+                ? 'Lihat Detail Transaksi' 
+                : notification.jenis === 'jatuh_tempo'
+                ? 'Lihat Detail Pinjaman'
+                : 'Lihat Detail'}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+// Create styles
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  contentContainer: {
+    padding: 16,
+    paddingBottom: 32,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#dc3545',
+    marginTop: 16,
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  backButton: {
+    backgroundColor: '#007BFF',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  backButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  notificationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  iconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  typeContainer: {
+    backgroundColor: '#f0f0f0',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  typeText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333333',
+  },
+  contentBox: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333333',
+    marginBottom: 8,
+  },
+  timestamp: {
+    fontSize: 14,
+    color: '#666666',
+    marginBottom: 16,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#e0e0e0',
+    marginBottom: 16,
+  },
+  message: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: '#333333',
+    marginBottom: 16,
+  },
+  dataContainer: {
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 8,
+  },
+  dataTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333333',
+    marginBottom: 8,
+  },
+  dataItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  dataKey: {
+    fontWeight: 'bold',
+    color: '#333333',
+  },
+  dataValue: {
+    flex: 1,
+    color: '#333333',
+    textAlign: 'right',
+  },
+  transactionDetailsContainer: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+  },
+  transactionDetail: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  actionButton: {
+    backgroundColor: '#007BFF',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  actionButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+});

@@ -1,19 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/auth-context';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { Logger, LogCategory } from '../lib/logger';
 import { Ionicons } from '@expo/vector-icons';
+import { NotificationService } from '../services/notification.service';
 
-interface JatuhTempoNotification {
+// Import the Notification type from NotificationService and extend it for our specific needs
+type JatuhTempoNotification = {
   id: string;
-  anggota_id: string;
   judul: string;
   pesan: string; 
   jenis: string;
   is_read: boolean;
+  created_at: string;
+  // Add any additional fields needed for jatuh tempo notifications
   data?: {
     loanId: string;
     installmentDate: string;
@@ -22,7 +24,7 @@ interface JatuhTempoNotification {
     totalPayment: number;
     remainingPayment: number;
   };
-  created_at: string;
+  anggota_id?: string; // Make this optional to match NotificationService type
 }
 
 export function JatuhTempoNotifications() {
@@ -42,58 +44,20 @@ export function JatuhTempoNotifications() {
       try {
         Logger.debug(LogCategory.NOTIFICATIONS, 'Fetching jatuh tempo notifications', { memberId: member.id });
         
-        // Query directly from the notifikasi table
-        Logger.debug(LogCategory.NOTIFICATIONS, 'Fetching jatuh tempo notifications via direct query');
+        // Use NotificationService to get notifications by type
+        const data = await NotificationService.getNotificationsByType(member.id, 'jatuh_tempo');
         
-        // First, try with underscore (jatuh_tempo)
-        const { data: dataWithUnderscore, error: errorWithUnderscore } = await supabase
-          .from('notifikasi')
-          .select('*')
-          .eq('anggota_id', member.id)
-          .eq('jenis', 'jatuh_tempo')
-          .order('created_at', { ascending: false });
-        
-        // Then, try with space (jatuh tempo) for legacy data
-        const { data: dataWithSpace, error: errorWithSpace } = await supabase
-          .from('notifikasi')
-          .select('*')
-          .eq('anggota_id', member.id)
-          .eq('jenis', 'jatuh tempo')
-          .order('created_at', { ascending: false });
-          
-        // Combine results from both queries
-        let data = [];
-        let error = null;
-        
-        if (errorWithUnderscore && errorWithSpace) {
-          // Both queries failed
-          error = errorWithUnderscore;
-          Logger.error(LogCategory.NOTIFICATIONS, 'Error fetching jatuh tempo notifications (both formats)', { errorWithUnderscore, errorWithSpace });
-        } else {
-          // Combine the results
-          if (dataWithUnderscore) {
-            data = [...dataWithUnderscore];
-          }
-          
-          if (dataWithSpace) {
-            // Add data with space, avoiding duplicates
-            dataWithSpace.forEach(notification => {
-              if (!data.some(n => n.id === notification.id)) {
-                data.push(notification);
-              }
-            });
-          }
+        if (data && data.length > 0) {
+          Logger.info(LogCategory.NOTIFICATIONS, 'Found jatuh tempo notifications', { count: data.length });
           
           // Sort by created_at
-          data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-        }
+          const sortedData = [...data].sort((a, b) => 
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          );
           
-        if (error) {
-          Logger.error(LogCategory.NOTIFICATIONS, 'Error fetching jatuh tempo notifications', error);
-          setError('Failed to load notifications');
-        } else if (data && data.length > 0) {
-          Logger.info(LogCategory.NOTIFICATIONS, 'Found jatuh tempo notifications via direct query', { count: data.length });
-          setNotifications(data);
+          // Convert to JatuhTempoNotification type
+          const typedData = sortedData as JatuhTempoNotification[];
+          setNotifications(typedData);
         } else {
           Logger.info(LogCategory.NOTIFICATIONS, 'No jatuh tempo notifications found');
           setNotifications([]);
@@ -125,35 +89,15 @@ export function JatuhTempoNotifications() {
   // Function to mark a notification as read
   async function markNotificationAsRead(notificationId: string) {
     try {
-      console.log(`Marking jatuh tempo notification ${notificationId} as read`);
+      Logger.debug(LogCategory.NOTIFICATIONS, `Marking jatuh tempo notification ${notificationId} as read`);
       
-      // First check if the notification exists to avoid the PGRST116 error
-      const { data: checkData, error: checkError } = await supabase
-        .from('notifikasi')
-        .select('id')
-        .eq('id', notificationId);
+      // Use NotificationService to mark notification as read
+      const success = await NotificationService.markAsRead(notificationId);
       
-      if (checkError || !checkData || checkData.length === 0) {
-        console.log('Notification not found or error checking:', checkError);
-        // Still update local state even if the server update fails
-        setNotifications(prev => 
-          prev.map(notification => 
-            notification.id === notificationId 
-              ? { ...notification, is_read: true } 
-              : notification
-          )
-        );
-        return;
-      }
-      
-      // Update the notification
-      const { error } = await supabase
-        .from('notifikasi')
-        .update({ is_read: true, updated_at: new Date().toISOString() })
-        .eq('id', notificationId);
-      
-      if (error) {
-        console.error('Error marking notification as read:', error);
+      if (!success) {
+        Logger.error(LogCategory.NOTIFICATIONS, `Failed to mark notification ${notificationId} as read`);
+      } else {
+        Logger.info(LogCategory.NOTIFICATIONS, `Successfully marked notification ${notificationId} as read`);
       }
       
       // Update local state regardless of server result
@@ -165,7 +109,7 @@ export function JatuhTempoNotifications() {
         )
       );
     } catch (err) {
-      console.error('Error in markNotificationAsRead:', err);
+      Logger.error(LogCategory.NOTIFICATIONS, 'Error in markNotificationAsRead:', err);
       // Still update local state even if there's an exception
       setNotifications(prev => 
         prev.map(notification => 

@@ -104,25 +104,27 @@ export const LoanNotificationService = {
         hasTodayInstallment: !!todayInstallment 
       });
       
-      // Check for existing notifications for this loan in the last 3 days
+      // Check for existing notifications for this loan in the last 3 days using NotificationService
       // to avoid duplicate notifications
       const threeDaysAgo = addDays(currentDate, -3).toISOString();
-      const { data: existingNotifications, error } = await supabase
-        .from('notifikasi')
-        .select('*')
-        .eq('anggota_id', loan.anggota_id)
-        .eq('jenis', 'jatuh_tempo')
-        .gte('created_at', threeDaysAgo);
       
-      if (error) {
-        Logger.error('Loan', 'Error checking existing notifications', error);
+      // Get jatuh_tempo notifications for this member
+      const jatuhTempoNotifications = await NotificationService.getNotificationsByType(loan.anggota_id, 'jatuh_tempo');
+      
+      if (!jatuhTempoNotifications) {
+        Logger.error('Loan', 'Error getting jatuh_tempo notifications');
         return;
       }
       
-      // Filter notifications for this specific loan
-      const loanNotifications = existingNotifications ? existingNotifications.filter(notification => {
+      // Filter notifications by creation date and for this specific loan
+      const loanNotifications = jatuhTempoNotifications.filter(notification => {
+        // Check if the notification was created in the last 3 days
+        const isRecent = new Date(notification.created_at) >= new Date(threeDaysAgo);
+        
+        if (!isRecent) return false;
+        
         try {
-          // Parse the data field which is stored as JSONB in Supabase
+          // Parse the data field
           const data = typeof notification.data === 'string' 
             ? JSON.parse(notification.data) 
             : notification.data;
@@ -133,7 +135,7 @@ export const LoanNotificationService = {
           Logger.error('Loan', 'Error parsing notification data', e);
           return false;
         }
-      }) : [];
+      });
       
       // If there's an installment today and no notification has been sent
       if (todayInstallment && !loanNotifications.some(n => {

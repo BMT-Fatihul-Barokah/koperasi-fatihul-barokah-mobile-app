@@ -4,6 +4,7 @@ import { useAuth } from './auth-context';
 import { Anggota } from '../lib/database.types';
 import { LoanNotificationService } from '../services/loan-notification.service';
 import { Logger, LogCategory } from '../lib/logger';
+import { NotificationService, Notification as NotificationType } from '../services/notification.service';
 
 interface Transaction {
   id: string;
@@ -18,16 +19,8 @@ interface Transaction {
   bank_name?: string;
 }
 
-interface Notification {
-  id: string;
-  anggota_id: string;
-  judul: string;
-  pesan: string;
-  jenis: string;
-  is_read: boolean;
-  data?: any;
-  created_at: string;
-}
+// Use the Notification type from the notification service
+type Notification = NotificationType;
 
 interface DataState {
   transactions: {
@@ -221,7 +214,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const fetchNotifications = useCallback(async (forceRefresh = false) => {
     // If not authenticated or no member, return
     if (!isAuthenticated || !member) {
-      Logger.debug(LogCategory.DATA, 'Not authenticated or no member, skipping notification fetch');
+      Logger.debug(LogCategory.NOTIFICATIONS, 'Not authenticated or no member, skipping notifications fetch');
       return;
     }
     
@@ -231,13 +224,17 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     const dataLength = state.notifications.data.length;
     
     const isCacheValid = lastFetched && 
-      (now - lastFetched < CACHE_EXPIRATION);
-    
-    if (isCacheValid && !forceRefresh && dataLength > 0) {
-      Logger.debug(LogCategory.DATA, 'Using cached notifications data', { count: dataLength });
+                        (now - lastFetched < CACHE_EXPIRATION) && 
+                        dataLength > 0;
+                        
+    if (isCacheValid && !forceRefresh) {
+      Logger.debug(LogCategory.NOTIFICATIONS, 'Using cached notifications data');
       return;
     }
     
+    Logger.info(LogCategory.NOTIFICATIONS, 'Fetching notifications', { memberId: member.id });
+    
+    // Set loading state
     setState(prev => ({
       ...prev,
       notifications: {
@@ -248,66 +245,17 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }));
     
     try {
-      Logger.info(LogCategory.NOTIFICATIONS, 'Fetching notifications', { memberId: member.id });
-      
-      // Fetch all notifications in a single query
-      const { data: generalData, error: generalError } = await supabase
-        .from('notifikasi')
-        .select('*')
-        .or(`anggota_id.eq.${member.id},jenis.eq.sistem,jenis.eq.pengumuman`)
-        .order('created_at', { ascending: false });
-        
-      if (generalError) {
-        Logger.error(LogCategory.NOTIFICATIONS, 'Error fetching general notifications', generalError);
-        throw generalError;
-      }
-      
-      // Query directly for jatuh_tempo notifications from the notifikasi table
-      Logger.debug(LogCategory.NOTIFICATIONS, 'Fetching due date notifications directly');
-      const { data: jatuhTempoData, error: jatuhTempoError } = await supabase
-        .from('notifikasi')
-        .select('*')
-        .eq('anggota_id', member.id)
-        .eq('jenis', 'jatuh_tempo')
-        .order('created_at', { ascending: false });
-      
-      let allData = generalData || [];
-      let jatuhTempoFound = false;
+      // Use NotificationService to fetch notifications
+      const allData = await NotificationService.getNotifications(member.id);
+      Logger.debug(LogCategory.NOTIFICATIONS, `Fetched ${allData.length} notifications`);
       
       // Check if we found any jatuh_tempo notifications
-      if (!jatuhTempoError && jatuhTempoData && jatuhTempoData.length > 0) {
-        Logger.debug(LogCategory.NOTIFICATIONS, 'Found due date notifications via direct query', { count: jatuhTempoData.length });
-        jatuhTempoFound = true;
-        
-        // Add jatuh_tempo notifications from direct query
-        jatuhTempoData.forEach(notification => {
-          if (!allData.some(n => n.id === notification.id)) {
-            allData.push(notification);
-          }
-        });
+      const jatuhTempoFound = allData.some(notification => notification.jenis === 'jatuh_tempo');
+      
+      if (jatuhTempoFound) {
+        Logger.debug(LogCategory.NOTIFICATIONS, `Found jatuh_tempo notifications`);
       } else {
-        // If RPC function failed or returned no results, try direct query
-        Logger.debug(LogCategory.NOTIFICATIONS, 'Falling back to direct query for due date notifications');
-        const { data: directJatuhTempoData, error: directJatuhTempoError } = await supabase
-          .from('notifikasi')
-          .select('*')
-          .eq('anggota_id', member.id)
-          .eq('jenis', 'jatuh_tempo')
-          .order('created_at', { ascending: false });
-          
-        if (!directJatuhTempoError && directJatuhTempoData && directJatuhTempoData.length > 0) {
-          Logger.debug(LogCategory.NOTIFICATIONS, 'Found due date notifications via direct query', { count: directJatuhTempoData.length });
-          jatuhTempoFound = true;
-          
-          // Add jatuh_tempo notifications from direct query
-          directJatuhTempoData.forEach(notification => {
-            if (!allData.some(n => n.id === notification.id)) {
-              allData.push(notification);
-            }
-          });
-        } else {
-          Logger.debug(LogCategory.NOTIFICATIONS, 'No due date notifications found');
-        }
+        Logger.debug(LogCategory.NOTIFICATIONS, 'No due date notifications found');
       }
       
       // Sort by created_at
@@ -347,7 +295,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isAuthenticated, member]);
   
-  // Mark notification as read
+  // Mark a notification as read
   const markNotificationAsRead = useCallback(async (id: string): Promise<boolean> => {
     if (!isAuthenticated || !member) {
       Logger.debug(LogCategory.NOTIFICATIONS, 'Not authenticated or no member, cannot mark notification as read');
@@ -357,203 +305,18 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     Logger.info(LogCategory.NOTIFICATIONS, `Marking notification ${id} as read`, { memberId: member.id });
     
     try {
-      // First, verify the notification exists and get its current status
-      // Use maybeSingle() instead of single() to avoid error when notification isn't found
-      const { data: checkData, error: checkError } = await supabase
-        .from('notifikasi')
-        .select('id, is_read, anggota_id, jenis')
-        .eq('id', id)
-        .maybeSingle();
+      // Find the notification to get its source
+      const notification = state.notifications.data.find(n => n.id === id);
       
-      if (checkError) {
-        Logger.error(LogCategory.NOTIFICATIONS, 'Error checking notification before marking as read', checkError);
+      // Use NotificationService to mark notification as read with source field
+      const success = await NotificationService.markAsRead(id, notification?.source);
+      
+      if (!success) {
+        Logger.error(LogCategory.NOTIFICATIONS, `Failed to mark notification ${id} as read`);
         return false;
       }
       
-      if (!checkData) {
-        Logger.debug(LogCategory.NOTIFICATIONS, `Notification ${id} not found in database, checking local state`);
-        
-        // Check if notification exists in local state
-        const localNotification = state.notifications.data.find(n => n.id === id);
-        if (!localNotification) {
-          Logger.info(LogCategory.NOTIFICATIONS, `Notification ${id} not found in local state, will try to mark as read anyway`);
-          // Continue processing even if not in local state - this allows handling notifications
-          // that might be accessible directly but not in our cache
-        } else {
-          Logger.debug(LogCategory.NOTIFICATIONS, `Found notification ${id} in local state, type: ${localNotification.jenis}`);
-        }
-        
-        // For jatuh_tempo notifications, we need special handling
-        // If we don't have local notification info, we'll try both methods
-        if (!localNotification || localNotification.jenis === 'jatuh_tempo') {
-          Logger.debug(LogCategory.NOTIFICATIONS, `Handling jatuh_tempo notification ${id}`);
-          
-          // Use the specialized RPC function to mark jatuh_tempo notifications as read
-          try {
-            Logger.debug(LogCategory.NOTIFICATIONS, `Using mark_jatuh_tempo_notification_as_read RPC function for ${id}`);
-            const { data: updateResult, error: updateError } = await supabase
-              .rpc('mark_jatuh_tempo_notification_as_read', {
-                notification_id: id,
-                member_id: member.id
-              }) as {
-                data: boolean | null;
-                error: any;
-              };
-            
-            if (updateError) {
-              Logger.error(LogCategory.NOTIFICATIONS, `Error using mark_jatuh_tempo_notification_as_read for ${id}`, updateError);
-              
-              // Fall back to the regular update if the RPC function fails
-              try {
-                Logger.debug(LogCategory.NOTIFICATIONS, `Falling back to regular update for jatuh_tempo notification ${id}`);
-                const { error } = await supabase
-                  .from('notifikasi')
-                  .update({ 
-                    is_read: true,
-                    updated_at: new Date().toISOString() 
-                  })
-                  .eq('id', id);
-                  
-                if (error) {
-                  Logger.error(LogCategory.NOTIFICATIONS, `Error with fallback update for jatuh_tempo ${id}`, error);
-                } else {
-                  Logger.info(LogCategory.NOTIFICATIONS, `Fallback update successful for jatuh_tempo ${id}`);
-                }
-              } catch (fallbackError) {
-                Logger.error(LogCategory.NOTIFICATIONS, `Error in fallback update for jatuh_tempo ${id}`, fallbackError);
-              }
-            } else {
-              if (updateResult === true) {
-                Logger.info(LogCategory.NOTIFICATIONS, `Successfully marked jatuh_tempo notification ${id} as read via RPC`);
-              } else {
-                Logger.info(LogCategory.NOTIFICATIONS, `RPC function returned false for ${id}, notification might not exist in DB`);
-              }
-            }
-          } catch (error) {
-            Logger.error(LogCategory.NOTIFICATIONS, `Error handling jatuh_tempo notification ${id}`, error);
-          }
-        }
-        
-        // Always update local state
-        setState(prev => {
-          const updatedNotifications = prev.notifications.data.map(n => 
-            n.id === id ? { ...n, is_read: true } : n
-          );
-          
-          const unreadCount = updatedNotifications.filter(n => !n.is_read).length;
-          
-          Logger.debug(LogCategory.NOTIFICATIONS, `Updated local state for notification ${id}`, { unreadCount });
-          
-          return {
-            ...prev,
-            notifications: {
-              ...prev.notifications,
-              data: updatedNotifications,
-              unreadCount,
-            }
-          };
-        });
-        
-        return true;
-      }
-      
-      if (checkData.is_read) {
-        Logger.debug(LogCategory.NOTIFICATIONS, `Notification ${id} is already marked as read`);
-        return true;
-      }
-      
-      // Check if this notification belongs to the current member
-      if (checkData.anggota_id !== member.id) {
-        // Check if it's a system notification that should be visible to all
-        const isSystemNotification = checkData.jenis === 'sistem' || checkData.jenis === 'pengumuman';
-        
-        if (!isSystemNotification) {
-          Logger.error(LogCategory.NOTIFICATIONS, `User ${member.id} does not have permission to mark notification ${id} as read`);
-          return false;
-        }
-      }
-    
-      // For jatuh_tempo notifications, we need special handling
-      if (checkData.jenis === 'jatuh_tempo') {
-        Logger.debug(LogCategory.NOTIFICATIONS, `Using specialized approach for jatuh_tempo notification ${id}`);
-        
-        // Use the specialized RPC function to mark jatuh_tempo notifications as read
-        try {
-          const { data: updateResult, error: updateError } = await supabase
-            .rpc('mark_jatuh_tempo_notification_as_read', {
-              notification_id: id,
-              member_id: member.id
-            }) as {
-              data: boolean | null;
-              error: any;
-            };
-          
-          if (updateError) {
-            Logger.error(LogCategory.NOTIFICATIONS, `Error using mark_jatuh_tempo_notification_as_read for ${id}`, updateError);
-            // Fall back to the regular update if the RPC function fails
-            return await updateNotificationDirectly(id);
-          }
-          
-          if (updateResult === true) {
-            Logger.info(LogCategory.NOTIFICATIONS, `Successfully marked jatuh_tempo notification ${id} as read via RPC`);
-          } else {
-            Logger.info(LogCategory.NOTIFICATIONS, `RPC function returned false for ${id}, notification might not exist in DB`);
-          }
-          
-          // Update local state
-          setState(prev => {
-            const updatedNotifications = prev.notifications.data.map(n => 
-              n.id === id ? { ...n, is_read: true } : n
-            );
-            
-            const unreadCount = updatedNotifications.filter(n => !n.is_read).length;
-            
-            Logger.debug(LogCategory.NOTIFICATIONS, `Updated local state for notification ${id}`, { unreadCount });
-            
-            return {
-              ...prev,
-              notifications: {
-                ...prev.notifications,
-                data: updatedNotifications,
-                unreadCount,
-              }
-            };
-          });
-          
-          return true;
-        } catch (error) {
-          Logger.error(LogCategory.NOTIFICATIONS, `Error handling jatuh_tempo notification ${id}`, error);
-          return false;
-        }
-      }
-      
-      // For other notification types, use a direct update
-      return await updateNotificationDirectly(id);
-    } catch (error) {
-      Logger.error(LogCategory.NOTIFICATIONS, 'Error in markNotificationAsRead', error);
-      return false;
-    }
-  }, [isAuthenticated, member]);
-
-  // Helper function to update a notification directly
-  const updateNotificationDirectly = async (id: string): Promise<boolean> => {
-    try {
-      Logger.debug(LogCategory.NOTIFICATIONS, `Updating notification ${id} directly`);
-      
-      const { error } = await supabase
-        .from('notifikasi')
-        .update({ 
-          is_read: true,
-          updated_at: new Date().toISOString() 
-        })
-        .eq('id', id);
-      
-      if (error) {
-        Logger.error(LogCategory.NOTIFICATIONS, `Error updating notification ${id}`, error);
-        return false;
-      }
-      
-      Logger.info(LogCategory.NOTIFICATIONS, `Successfully updated notification ${id} directly`);
+      Logger.info(LogCategory.NOTIFICATIONS, `Successfully marked notification ${id} as read`);
       
       // Update local state
       setState(prev => {
@@ -577,10 +340,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       
       return true;
     } catch (error) {
-      Logger.error(LogCategory.NOTIFICATIONS, `Error in updateNotificationDirectly for ${id}`, error);
+      Logger.error(LogCategory.NOTIFICATIONS, 'Error in markNotificationAsRead', error);
       return false;
     }
-  };
+  }, [isAuthenticated, member]);
+
+  // No longer need the updateNotificationDirectly helper function as we're using NotificationService
 
   // Mark all notifications as read
   const markAllNotificationsAsRead = useCallback(async (): Promise<boolean> => {
@@ -592,81 +357,24 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     Logger.info(LogCategory.NOTIFICATIONS, `Marking all notifications as read`, { memberId: member.id });
     
     try {
-      // First, get all unread notifications for this member
-      const { data: unreadNotifications, error: fetchError } = await supabase
-        .from('notifikasi')
-        .select('id, jenis')
-        .eq('anggota_id', member.id)
-        .eq('is_read', false);
+      // Use NotificationService to mark all notifications as read
+      const success = await NotificationService.markAllAsRead(member.id);
       
-      if (fetchError) {
-        Logger.error(LogCategory.NOTIFICATIONS, 'Error fetching unread notifications', fetchError);
+      if (!success) {
+        Logger.error(LogCategory.NOTIFICATIONS, 'Failed to mark all notifications as read');
         return false;
       }
       
-      if (!unreadNotifications || unreadNotifications.length === 0) {
-        Logger.info(LogCategory.NOTIFICATIONS, 'No unread notifications found');
-        return true; // Nothing to update
-      }
-      
-      Logger.info(LogCategory.NOTIFICATIONS, `Found unread notifications to mark as read`, { count: unreadNotifications.length });
-      
-      // For jatuh_tempo notifications, use the specialized RPC function
-      const jatuhTempoNotifications = unreadNotifications.filter(n => n.jenis === 'jatuh_tempo');
-      if (jatuhTempoNotifications.length > 0) {
-        Logger.debug(LogCategory.NOTIFICATIONS, `Marking jatuh_tempo notifications as read`, { count: jatuhTempoNotifications.length });
-        
-        // Use the specialized RPC function to mark all jatuh_tempo notifications as read
-        try {
-          const { data: updateResult, error: updateError } = await supabase
-            .rpc('mark_all_jatuh_tempo_notifications_as_read', {
-              member_id: member.id
-            }) as {
-              data: boolean | null;
-              error: any;
-            };
-          
-          if (updateError) {
-            Logger.error(LogCategory.NOTIFICATIONS, 'Error using mark_all_jatuh_tempo_notifications_as_read', updateError);
-          } else if (updateResult === true) {
-            Logger.info(LogCategory.NOTIFICATIONS, 'Successfully marked all jatuh_tempo notifications as read via RPC');
-          } else {
-            Logger.info(LogCategory.NOTIFICATIONS, 'RPC function returned false, some notifications might not have been updated');
-          }
-        } catch (error) {
-          Logger.error(LogCategory.NOTIFICATIONS, 'Error handling jatuh_tempo notifications', error);
-        }
-      }
-      
-      // For regular notifications, use a direct update
-      const regularNotifications = unreadNotifications.filter(n => n.jenis !== 'jatuh_tempo');
-      if (regularNotifications.length > 0) {
-        Logger.debug(LogCategory.NOTIFICATIONS, `Marking regular notifications as read`, { count: regularNotifications.length });
-        
-        const { error: updateError } = await supabase
-          .from('notifikasi')
-          .update({ 
-            is_read: true,
-            updated_at: new Date().toISOString() 
-          })
-          .eq('anggota_id', member.id)
-          .eq('is_read', false)
-          .not('jenis', 'eq', 'jatuh_tempo');
-        
-        if (updateError) {
-          Logger.error(LogCategory.NOTIFICATIONS, 'Error updating regular notifications', updateError);
-        } else {
-          Logger.info(LogCategory.NOTIFICATIONS, 'Successfully updated regular notifications');
-        }
-      }
+      Logger.info(LogCategory.NOTIFICATIONS, 'Successfully marked all notifications as read');
       
       // Update local state
       setState(prev => {
-        const updatedNotifications = prev.notifications.data.map(n => 
-          n.anggota_id === member.id ? { ...n, is_read: true } : n
-        );
+        const updatedNotifications = prev.notifications.data.map(n => ({
+          ...n,
+          is_read: true
+        }));
         
-        Logger.debug(LogCategory.NOTIFICATIONS, 'Updated local state for all notifications', { unreadCount: 0 });
+        Logger.debug(LogCategory.NOTIFICATIONS, 'Updated local state for all notifications');
         
         return {
           ...prev,

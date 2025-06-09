@@ -8,4 +8,6 @@ export interface Notification {
   data?: any;
   created_at: string;
   updated_at?: string;
+  source: 'global' | 'transaction';
+  transaksi_id?: string;
 }

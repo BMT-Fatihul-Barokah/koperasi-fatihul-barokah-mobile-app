@@ -37,7 +37,7 @@ export function SupabaseDebug() {
         connected: true,
         timestamp: new Date().toISOString(),
         url: supabase.supabaseUrl,
-        tables: ['anggota', 'akun', 'notifikasi', 'transaksi']
+        tables: ['anggota', 'akun', 'global_notifikasi', 'global_notifikasi_read', 'transaksi_notifikasi', 'transaksi']
       };
       setProjectInfo(projectInfo);
       

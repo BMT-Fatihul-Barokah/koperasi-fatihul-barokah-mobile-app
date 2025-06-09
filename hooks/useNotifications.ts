@@ -2,71 +2,57 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/auth-context';
 import { Logger } from '../lib/logger';
+import { NotificationService, Notification } from '../services/notification.service';
 
-// Define notification interface
-export interface Notification {
-  id: string;
-  anggota_id: string;
-  judul: string;
-  pesan: string;
-  jenis: string;
-  is_read: boolean;
-  data?: any;
-  created_at: string;
-}
+// Re-export the Notification type from the service
+export type { Notification } from '../services/notification.service';
 
-// Fetch notifications from Supabase
+// Fetch notifications from Supabase using the NotificationService
 const fetchNotifications = async (memberId: string): Promise<Notification[]> => {
   Logger.info('Notifications', 'Fetching notifications', { memberId });
   
-  const { data, error } = await supabase
-    .from('notifikasi')
-    .select('*')
-    .eq('anggota_id', memberId)
-    .order('created_at', { ascending: false });
-
-  if (error) {
+  try {
+    const notifications = await NotificationService.getNotifications(memberId);
+    Logger.debug('Notifications', `Found ${notifications.length} notifications`);
+    return notifications;
+  } catch (error) {
     Logger.error('Notifications', 'Error fetching notifications', error);
     throw error;
   }
-  
-  Logger.debug('Notifications', `Found ${data?.length || 0} notifications`);
-  return data || [];
 };
 
-// Mark notification as read
+// Mark notification as read using the NotificationService
 const markAsRead = async (notificationId: string): Promise<boolean> => {
   Logger.info('Notifications', 'Marking notification as read', { notificationId });
   
-  const { error } = await supabase
-    .from('notifikasi')
-    .update({ is_read: true })
-    .eq('id', notificationId);
-    
-  if (error) {
+  try {
+    const success = await NotificationService.markAsRead(notificationId);
+    if (!success) {
+      Logger.error('Notifications', 'Failed to mark notification as read');
+      return false;
+    }
+    return true;
+  } catch (error) {
     Logger.error('Notifications', 'Error marking notification as read', error);
     throw error;
   }
-  
-  return true;
 };
 
-// Mark all notifications as read
+// Mark all notifications as read using the NotificationService
 const markAllAsRead = async (memberId: string): Promise<boolean> => {
   Logger.info('Notifications', 'Marking all notifications as read', { memberId });
   
-  const { error } = await supabase
-    .from('notifikasi')
-    .update({ is_read: true })
-    .eq('anggota_id', memberId)
-    .eq('is_read', false);
-    
-  if (error) {
+  try {
+    const success = await NotificationService.markAllAsRead(memberId);
+    if (!success) {
+      Logger.error('Notifications', 'Failed to mark all notifications as read');
+      return false;
+    }
+    return true;
+  } catch (error) {
     Logger.error('Notifications', 'Error marking all notifications as read', error);
     throw error;
   }
-  
-  return true;
 };
 
 // Custom hook to use notifications with caching

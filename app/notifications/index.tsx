@@ -24,8 +24,14 @@ import { Notification } from '../../lib/notification.types';
 import { format, parseISO, formatDistanceToNow } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { DashboardHeader } from '../../components/header/dashboard-header';
-import { NOTIFICATION_TYPES, NotificationService } from '../../services/notification.service';
+import { StandardHeader } from '../../components/header/standard-header';
+import { 
+  NOTIFICATION_TYPES, 
+  NotificationService, 
+  TransactionNotificationData,
+  parseNotificationData,
+  isTransactionNotificationData
+} from '../../services/notification.service';
 import { BottomNavBar } from '../../components/navigation/BottomNavBar';
 import { supabase } from '../../lib/supabase';
 import { Logger, LogCategory } from '../../lib/logger';
@@ -119,106 +125,68 @@ export default function NotificationsScreen() {
     }, [member?.id, fetchNotifications])
   );
   
-  // Direct check for notifications in Supabase (bypassing the data context)
+  // Handle transaction notification press
+  const handleTransactionPress = useCallback((notification) => {
+    // Check if this is a transaction notification
+    if (notification.jenis === 'transaksi' || notification.source === 'transaction') {
+      // Extract transaction ID from notification data using type-safe parsing
+      let transactionId = null;
+      
+      if (notification.data) {
+        // Parse the data with type safety
+        const transactionData = parseNotificationData<TransactionNotificationData>(notification.data);
+        
+        if (transactionData) {
+          // Try to get transaction ID from data
+          if (transactionData.transaksi_id) {
+            transactionId = transactionData.transaksi_id;
+          } else if (transactionData.transaction_id) {
+            transactionId = transactionData.transaction_id;
+          }
+        }
+      }
+      
+      // If we found a transaction ID, navigate to transaction detail
+      if (transactionId) {
+        Logger.debug(LogCategory.NOTIFICATIONS, 'Navigating to transaction detail', { transactionId });
+        router.push(`/transactions/${transactionId}`);
+        return true;
+      }
+    }
+    
+    return false;
+  }, []);
+
+  // Direct check for notifications using NotificationService
   const checkNotificationsDirectly = async (memberId: string) => {
     try {
-      Logger.debug(LogCategory.NOTIFICATIONS, 'Checking notifications directly', { memberId });
+      Logger.debug(LogCategory.NOTIFICATIONS, 'Checking notifications directly using NotificationService', { memberId });
       
-      // Check if the notifikasi table exists
-      const { data: tableInfo, error: tableError } = await supabase
-        .from('notifikasi')
-        .select('id')
-        .limit(1);
+      // Fetch all notifications using NotificationService
+      const allNotifications = await NotificationService.getNotifications(memberId);
       
-      if (tableError) {
-        Logger.error(LogCategory.NOTIFICATIONS, 'Error checking notifikasi table', tableError);
-        return;
-      }
-      
-      // Fetch notifications directly from Supabase
-      // Include both personal notifications and system/announcement notifications
-      const { data, error } = await supabase
-        .from('notifikasi')
-        .select('*')
-        .or(`anggota_id.eq.${memberId},jenis.eq.sistem,jenis.eq.pengumuman`)
-        .order('created_at', { ascending: false });
-      
-      if (error) {
-        Logger.error(LogCategory.NOTIFICATIONS, 'Error fetching general notifications', error);
-        return;
-      }
-      
-      // Directly query for jatuh_tempo notifications instead of using RPC function
-      Logger.debug(LogCategory.NOTIFICATIONS, 'Querying directly for jatuh_tempo notifications');
-      const { data: jatuhTempoData, error: jatuhTempoError } = await supabase
-        .from('notifikasi')
-        .select('*')
-        .eq('anggota_id', memberId)
-        .eq('jenis', 'jatuh_tempo')
-        .order('created_at', { ascending: false });
-      
-      if (jatuhTempoError) {
-        Logger.error(LogCategory.NOTIFICATIONS, 'Error fetching jatuh_tempo notifications directly', jatuhTempoError);
-      } else {
-        Logger.info(LogCategory.NOTIFICATIONS, 'Found due date notifications via direct query', { count: jatuhTempoData?.length || 0 });
-        
-        if (jatuhTempoData && jatuhTempoData.length > 0) {
-          // Add jatuh_tempo notifications to the data array if they exist
-          if (data) {
-            // Add jatuh_tempo notifications, avoiding duplicates
-            jatuhTempoData.forEach(notification => {
-              if (!data.some(n => n.id === notification.id)) {
-                data.push(notification);
-              }
-            });
-            
-            // Re-sort by created_at
-            data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-          }
-        } else {
-          Logger.info(LogCategory.NOTIFICATIONS, 'No jatuh_tempo notifications found');
-        }
-      }
-        
-      // If we don't find transaction notifications, try a direct query
-      if (!error && data && data.filter(n => n.jenis === 'transaksi').length === 0) {
-        Logger.debug(LogCategory.NOTIFICATIONS, 'No transaction notifications found in main query, trying direct query');
-        
-        // Try a direct query specifically for transaction notifications
-        const { data: transactionData, error: transactionError } = await supabase
-          .from('notifikasi')
-          .select('*')
-          .eq('anggota_id', memberId)
-          .eq('jenis', 'transaksi')
-          .order('created_at', { ascending: false });
-          
-        if (!transactionError && transactionData && transactionData.length > 0) {
-          Logger.info(LogCategory.NOTIFICATIONS, 'Found transaction notifications in direct query', { count: transactionData.length });
-          // Add transaction notifications to the data array
-          data.push(...transactionData);
-          // Re-sort by created_at
-          data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-        }
-      }
-      
-      if (error) {
-        Logger.error(LogCategory.NOTIFICATIONS, 'Error fetching notifications directly', error);
+      if (!allNotifications || allNotifications.length === 0) {
+        Logger.info(LogCategory.NOTIFICATIONS, 'No notifications found via NotificationService');
         return;
       }
       
       // Log summary information about notifications
-      Logger.info(LogCategory.NOTIFICATIONS, 'Number of notifications found', { count: data?.length || 0 });
+      Logger.info(LogCategory.NOTIFICATIONS, 'Number of notifications found', { count: allNotifications.length });
+      
+      // Check for jatuh_tempo notifications specifically
+      const jatuhTempoNotifications = await NotificationService.getNotificationsByType(memberId, 'jatuh_tempo');
+      Logger.info(LogCategory.NOTIFICATIONS, 'Found due date notifications', { count: jatuhTempoNotifications.length || 0 });
+      
+      // Check for transaction notifications specifically
+      const transactionNotifications = allNotifications.filter(n => n.jenis === 'transaksi') || [];
+      Logger.debug(LogCategory.NOTIFICATIONS, 'Transaction notifications found', { count: transactionNotifications.length });
       
       // Count notification types for logging
       const typeCount = {};
-      data?.forEach(n => {
+      allNotifications.forEach(n => {
         typeCount[n.jenis] = (typeCount[n.jenis] || 0) + 1;
       });
       Logger.info(LogCategory.NOTIFICATIONS, 'Notification summary', { types: typeCount });
-      
-      // Check specifically for transaction notifications
-      const transactionNotifications = data?.filter(n => n.jenis === 'transaksi') || [];
-      Logger.debug(LogCategory.NOTIFICATIONS, 'Transaction notifications found', { count: transactionNotifications.length });
     } catch (error) {
       Logger.error(LogCategory.NOTIFICATIONS, 'Error in notification direct check', error);
     }
@@ -266,43 +234,28 @@ export default function NotificationsScreen() {
       } else {
         Logger.warn(LogCategory.NOTIFICATIONS, `Failed to mark notification ${notification.id} as read through context method`);
         
-        // If context method fails for jatuh_tempo notification, try direct database update as fallback
+        // If context method fails for jatuh_tempo notification, try using NotificationService directly as fallback
         if (notification.jenis === 'jatuh_tempo') {
-          Logger.debug(LogCategory.NOTIFICATIONS, `Attempting direct database update for jatuh_tempo`, { id: notification.id });
+          Logger.debug(LogCategory.NOTIFICATIONS, `Attempting direct NotificationService update for jatuh_tempo`, { id: notification.id });
           try {
-            const { error } = await supabase
-              .from('notifikasi')
-              .update({ 
-                is_read: true,
-                updated_at: new Date().toISOString() 
-              })
-              .eq('id', notification.id);
+            const success = await NotificationService.markAsRead(notification.id, notification.source);
             
-            if (error) {
-              Logger.error(LogCategory.NOTIFICATIONS, `Direct database update failed`, { id: notification.id, error });
+            if (!success) {
+              Logger.error(LogCategory.NOTIFICATIONS, `NotificationService direct update failed`, { id: notification.id });
             } else {
-              Logger.debug(LogCategory.NOTIFICATIONS, `Direct database update successful`, { id: notification.id });
+              Logger.debug(LogCategory.NOTIFICATIONS, `NotificationService direct update successful`, { id: notification.id });
             }
-          } catch (dbError) {
-            Logger.error(LogCategory.NOTIFICATIONS, `Error in direct database update`, { id: notification.id, error: dbError });
+          } catch (serviceError) {
+            Logger.error(LogCategory.NOTIFICATIONS, `Error in NotificationService direct update`, { id: notification.id, error: serviceError });
           }
         }
       }
 
-      // Navigate to transaction detail
-      if (notification.jenis === 'transaksi') {
-        Logger.debug(LogCategory.NOTIFICATIONS, 'Navigating to transaction:', notification.data?.transaksi_id || notification.data?.transaction_id);
-        router.push(`/activity/${notification.data?.transaksi_id || notification.data?.transaction_id}`);
+      // Check if this is a transaction notification
+      if (handleTransactionPress(notification)) {
         return;
-      } else if (notification.jenis === 'jatuh_tempo') {
-        // For jatuh_tempo notifications, we've already marked it as read above
-        // The data context handles both RPC and direct database updates
-        // No need for additional direct updates here
-      } else {
-        // For other notification types, use the context method
-        await markNotificationAsRead(notification.id);
       }
-      
+
       // For jatuh_tempo notifications, log navigation separately
       if (notification.jenis === 'jatuh_tempo') {
         Logger.debug(LogCategory.NOTIFICATIONS, 'Navigating to jatuh_tempo notification detail', { id: notification.id });
@@ -363,6 +316,14 @@ export default function NotificationsScreen() {
       return notifications.data;
     } else if (activeFilter === 'unread') {
       return notifications.data.filter(item => !item.is_read);
+    } else if (activeFilter === 'transaksi') {
+      // Filter by source field for transaction notifications
+      const filtered = notifications.data.filter(item => 
+        item.source === 'transaction' || // New field
+        item.jenis === 'transaksi'       // Legacy field
+      );
+      Logger.debug(LogCategory.NOTIFICATIONS, `Filtered ${filtered.length} transaction notifications`);
+      return filtered;
     } else {
       const filtered = notifications.data.filter(item => item.jenis === activeFilter);
       Logger.debug(LogCategory.NOTIFICATIONS, `Filtered ${filtered.length} notifications for type ${activeFilter}`);
@@ -406,7 +367,7 @@ export default function NotificationsScreen() {
   
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
-      <DashboardHeader 
+      <StandardHeader 
         title="Notifikasi" 
         showBackButton={false}
         rightIcon={{
