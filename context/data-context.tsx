@@ -308,8 +308,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       // Find the notification to get its source
       const notification = state.notifications.data.find(n => n.id === id);
       
-      // Use NotificationService to mark notification as read with source field
-      const success = await NotificationService.markAsRead(id, notification?.source);
+      // Use NotificationService to mark notification as read with source field and member ID
+      const success = await NotificationService.markAsRead(
+        id, 
+        notification?.source, 
+        member.id // Pass member ID to ensure proper notification lookup
+      );
       
       if (!success) {
         Logger.error(LogCategory.NOTIFICATIONS, `Failed to mark notification ${id} as read`);

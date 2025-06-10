@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,40 +14,115 @@ import { StandardHeader } from '../../components/header/standard-header';
 import { useAuth } from '../../context/auth-context';
 import { useData } from '../../context/data-context';
 import { NotificationService } from '../../services/notification.service';
+import { Logger, LogCategory } from '../../lib/logger';
 
 export default function NotificationDetailScreen() {
   const { id } = useLocalSearchParams();
   const notificationId = id ? String(id) : '';
   const { member } = useAuth();
+  const { fetchNotifications } = useData();
   const [notification, setNotification] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [markedAsRead, setMarkedAsRead] = useState(false);
+  const didAttemptMarkAsRead = useRef(false);
+
+  // Log when component mounts and handle cleanup
+  useEffect(() => {
+    Logger.debug(LogCategory.NOTIFICATIONS, 'Notification detail screen loaded', { notificationId });
+    
+    // Cleanup when unmounting - refresh notifications if we marked one as read
+    return () => {
+      if (markedAsRead) {
+        Logger.debug(LogCategory.NOTIFICATIONS, 'Notification detail screen unmounting, refreshing notifications');
+        fetchNotifications(true);
+      }
+    };
+  }, [markedAsRead, fetchNotifications, notificationId]);
 
   // Fetch notification details
   useEffect(() => {
     if (!notificationId || !member?.id) return;
 
-    async function fetchNotification() {
+    async function fetchNotificationDetails() {
       try {
         setIsLoading(true);
+        setError(null);
+        
+        Logger.debug(LogCategory.NOTIFICATIONS, `Fetching notification details for ID: ${notificationId}`);
+        
         const notifications = await NotificationService.getNotifications(member.id);
         const found = notifications.find(n => n.id === notificationId);
         
         if (found) {
           setNotification(found);
         } else {
-          setError('Notification not found');
+          // Try to fetch specifically by type if not found in general notifications
+          try {
+            const typedNotifications = await NotificationService.getNotificationsByType(member.id, 'jatuh_tempo');
+            const foundInTyped = typedNotifications.find(n => n.id === notificationId);
+            
+            if (foundInTyped) {
+              setNotification(foundInTyped);
+            } else {
+              Logger.debug(LogCategory.NOTIFICATIONS, `Notification ${notificationId} not found in any collection`);
+              setError('Notification not found');
+            }
+          } catch (typeErr) {
+            Logger.error(LogCategory.NOTIFICATIONS, 'Error fetching typed notifications:', typeErr);
+            setError('Notification not found');
+          }
         }
       } catch (err) {
+        Logger.error(LogCategory.NOTIFICATIONS, 'Failed to load notification:', err);
         setError('Failed to load notification');
-        console.error(err);
       } finally {
         setIsLoading(false);
       }
     }
 
-    fetchNotification();
+    fetchNotificationDetails();
   }, [notificationId, member?.id]);
+  
+  // Mark notification as read
+  useEffect(() => {
+    // Skip if already attempted mark as read or notification not loaded yet
+    if (didAttemptMarkAsRead.current || !notification || isLoading) {
+      return;
+    }
+    
+    const markAsRead = async () => {
+      try {
+        didAttemptMarkAsRead.current = true;
+        Logger.debug(LogCategory.NOTIFICATIONS, `Attempting to mark notification ${notificationId} as read`);
+        
+        // Only attempt to mark as read if we have source information
+        const source = notification.source === 'global' ? 'global' : 'transaction';
+        
+        // Use direct call to service to ensure proper error handling
+        // Pass the member.id as anggotaId to help ensure proper lookup and update
+        const success = await NotificationService.markAsRead(
+          notificationId, 
+          source,
+          member?.id // Pass anggota_id to help with notification lookup
+        );
+        
+        if (success) {
+          Logger.debug(LogCategory.NOTIFICATIONS, `Successfully marked ${notificationId} as read`);
+          setMarkedAsRead(true);
+          
+          // Update local state to show as read
+          setNotification(prev => prev ? { ...prev, is_read: true } : prev);
+        } else {
+          Logger.warn(LogCategory.NOTIFICATIONS, `Failed to mark ${notificationId} as read, but continuing`);
+        }
+      } catch (error) {
+        Logger.error(LogCategory.NOTIFICATIONS, 'Error marking notification as read:', error);
+      }
+    };
+    
+    markAsRead();
+  }, [notification, isLoading, notificationId]);
 
   if (isLoading) {
     return (
