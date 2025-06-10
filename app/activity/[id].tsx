@@ -33,6 +33,7 @@ interface Transaction {
   recipient_name?: string;
   bank_name?: string;
   tabungan_id?: string;
+  nomor_rekening?: string;
   jenis_tabungan?: {
     id: string;
     nama: string;
@@ -46,6 +47,7 @@ export default function TransactionDetailScreen() {
   const { isAuthenticated, member } = useAuth();
   const [transaction, setTransaction] = useState<Transaction | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   useEffect(() => {
     if (!isAuthenticated || !member || !id) {
@@ -61,7 +63,8 @@ export default function TransactionDetailScreen() {
           .from('transaksi')
           .select(`
             *,
-            tabungan:tabungan_id(id, nomor_rekening, jenis_tabungan:jenis_tabungan_id(id, nama, kode, deskripsi))
+            tabungan:tabungan_id(id, jenis_tabungan:jenis_tabungan_id(id, nama, kode, deskripsi)),
+            anggota:anggota_id(id, nomor_rekening)
           `)
           .eq('id', id)
           .eq('anggota_id', member.id)
@@ -69,6 +72,7 @@ export default function TransactionDetailScreen() {
 
         if (error) {
           console.error('Error fetching transaction:', error);
+          setIsLoading(false);
           return;
         }
 
@@ -89,19 +93,22 @@ export default function TransactionDetailScreen() {
           }
         }
         
-        // Extract jenis_tabungan from nested data structure if available
+        // Extract jenis_tabungan and nomor_rekening from nested data structure if available
         const jenis_tabungan = data.tabungan?.jenis_tabungan || null;
         const tabungan_id = data.tabungan_id || null;
+        const nomor_rekening = data.anggota?.nomor_rekening || null;
         
         setTransaction({
           ...data,
           recipient_name: recipientName,
           bank_name: bankName,
           tabungan_id,
-          jenis_tabungan
+          jenis_tabungan,
+          nomor_rekening
         });
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error in transaction detail fetch:', error);
+        setError(error?.message || 'Terjadi kesalahan saat memuat transaksi');
       } finally {
         setIsLoading(false);
       }
@@ -148,27 +155,25 @@ export default function TransactionDetailScreen() {
   // Loading state
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.loadingContainer} edges={['top', 'bottom']}>
-        <ActivityIndicator size="large" color="#0066CC" />
+      <SafeAreaView style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007BFF" />
         <Text style={styles.loadingText}>Memuat detail transaksi...</Text>
       </SafeAreaView>
     );
   }
 
   // Error state
-  if (!transaction) {
+  if (error || !transaction) {
     return (
-      <SafeAreaView style={styles.errorContainer} edges={['top', 'bottom']}>
+      <SafeAreaView style={styles.errorContainer}>
         <Ionicons name="alert-circle-outline" size={64} color="#dc3545" />
-        <Text style={styles.errorText}>Transaksi tidak ditemukan</Text>
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity 
-            style={styles.backToActivityButton}
-            onPress={() => router.push('/activity')}
-          >
-            <Text style={styles.backToActivityText}>Kembali ke Aktivitas</Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.errorText}>{error || 'Transaksi tidak ditemukan'}</Text>
+        <TouchableOpacity 
+          style={styles.backToActivityButton}
+          onPress={() => router.replace('/activity')}
+        >
+          <Text style={styles.backToActivityText}>Kembali ke Aktivitas</Text>
+        </TouchableOpacity>
       </SafeAreaView>
     );
   }
