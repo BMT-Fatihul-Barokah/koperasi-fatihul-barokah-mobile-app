@@ -22,17 +22,19 @@ interface Transaction {
   id: string;
   anggota_id: string;
   tipe_transaksi: 'masuk' | 'keluar';
-  kategori: string;
+  kategori?: string;
   deskripsi: string;
   reference_number?: string;
   jumlah: number;
-  saldo_sebelum: number;
-  saldo_sesudah: number;
+  sebelum: number;
+  sesudah: number;
   created_at: string;
   updated_at: string;
   recipient_name?: string;
   bank_name?: string;
   tabungan_id?: string;
+  pembiayaan_id?: string;
+  source_type?: string;
   nomor_rekening?: string;
   jenis_tabungan?: {
     id: string;
@@ -118,13 +120,16 @@ export default function TransactionDetailScreen() {
   }, [id, isAuthenticated, member]);
 
   // Format currency
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number | null | undefined) => {
+    if (amount === null || amount === undefined || isNaN(Number(amount))) {
+      return 'Rp0';
+    }
     return new Intl.NumberFormat('id-ID', {
       style: 'currency',
       currency: 'IDR',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
-    }).format(amount);
+    }).format(Number(amount));
   };
 
   // Format date for display
@@ -267,12 +272,12 @@ export default function TransactionDetailScreen() {
           
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Saldo Sebelum</Text>
-            <Text style={styles.detailValue}>{formatCurrency(Number(transaction.saldo_sebelum))}</Text>
+            <Text style={styles.detailValue}>{formatCurrency(transaction.sebelum)}</Text>
           </View>
           
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Saldo Sesudah</Text>
-            <Text style={styles.detailValue}>{formatCurrency(Number(transaction.saldo_sesudah))}</Text>
+            <Text style={styles.detailValue}>{formatCurrency(transaction.sesudah)}</Text>
           </View>
         </View>
         
