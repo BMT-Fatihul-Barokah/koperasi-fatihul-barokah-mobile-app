@@ -25,13 +25,13 @@ import { format, parseISO, formatDistanceToNow } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { StandardHeader } from '../../components/header/standard-header';
+import { NotificationService } from '../../services/notification.service';
 import { 
   NOTIFICATION_TYPES, 
-  NotificationService, 
   TransactionNotificationData,
   parseNotificationData,
-  isTransactionNotificationData
-} from '../../services/notification.service';
+  isTransactionNotificationData 
+} from '../../lib/notification.types';
 import { BottomNavBar } from '../../components/navigation/BottomNavBar';
 import { supabase } from '../../lib/supabase';
 import { Logger, LogCategory } from '../../lib/logger';
@@ -182,11 +182,15 @@ export default function NotificationsScreen() {
       Logger.debug(LogCategory.NOTIFICATIONS, 'Transaction notifications found', { count: transactionNotifications.length });
       
       // Count notification types for logging
-      const typeCount = {};
-      allNotifications.forEach(n => {
-        typeCount[n.jenis] = (typeCount[n.jenis] || 0) + 1;
-      });
-      Logger.info(LogCategory.NOTIFICATIONS, 'Notification summary', { types: typeCount });
+      const typeCount: Record<string, number> = {};
+      if (allNotifications && allNotifications.length > 0) {
+        allNotifications.forEach(n => {
+          if (n && n.jenis) {
+            typeCount[n.jenis] = (typeCount[n.jenis] || 0) + 1;
+          }
+        });
+      }
+      Logger.info(LogCategory.NOTIFICATIONS, 'Notification summary', { hasDueDateNotifications: jatuhTempoNotifications.length > 0, types: typeCount });
     } catch (error) {
       Logger.error(LogCategory.NOTIFICATIONS, 'Error in notification direct check', error);
     }
@@ -456,7 +460,7 @@ export default function NotificationsScreen() {
           </TouchableOpacity>
           
           {/* Other notification types */}
-          {Object.entries(NOTIFICATION_TYPES)
+          {NOTIFICATION_TYPES && Object.entries(NOTIFICATION_TYPES)
             .filter(([key]) => key !== 'transaksi' && key !== 'jatuh_tempo') // Skip transaksi and jatuh_tempo since we added them explicitly
             .map(([key, value]) => (
               <TouchableOpacity 
@@ -465,7 +469,7 @@ export default function NotificationsScreen() {
                 onPress={() => setAndStoreActiveFilter(key as FilterType)}
               >
                 <Text style={[styles.filterText, activeFilter === key && styles.activeFilterText]}>
-                  {value.name}
+                  {value?.name || key}
                 </Text>
               </TouchableOpacity>
             ))}

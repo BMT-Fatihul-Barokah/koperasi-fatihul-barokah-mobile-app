@@ -1,308 +1,290 @@
 import { supabase } from '../lib/supabase';
+import { 
+  Notification, 
+  GlobalNotification, 
+  GlobalNotificationRead, 
+  TransactionNotification,
+  parseNotificationData,
+  NotificationTypeInfo,
+  NOTIFICATION_TYPES,
+  TransactionNotificationData
+} from '../lib/notification.types';
 
-// Base notification interface
-export interface BaseNotification<T = any> {
-  id: string;
-  judul: string;
-  pesan: string;
-  jenis: 'transaksi' | 'sistem' | 'pengumuman' | 'jatuh_tempo';
-  data?: T;
-  created_at: string;
-  updated_at: string;
-}
+// Logger for better debugging
+const log = (message: string, data?: any) => {
+  console.log(`[NotificationService] ${message}`, data || '');
+};
 
-// Global notification interface
-export interface GlobalNotification<T = any> extends BaseNotification<T> {
-  // Global notifications don't have anggota_id directly
-  source: 'global';
-}
-
-// Global notification read status
-export interface GlobalNotificationRead {
-  id: string;
-  global_notifikasi_id: string;
-  anggota_id: string;
-  is_read: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-// Transaction notification interface
-export interface TransaksiNotification<T = any> extends BaseNotification<T> {
-  transaksi_id?: string;
-  is_read: boolean;
-  source: 'transaction';
-}
-
-// Combined notification type for app usage
-export interface Notification<T = any> extends BaseNotification<T> {
-  anggota_id?: string;
-  is_read: boolean;
-  source: 'global' | 'transaction';
-  transaksi_id?: string;
-}
-
-// Define specific data types for different notification types
-export interface TransactionNotificationData {
-  transaksi_id?: string;
-  transaction_id?: string;
-  jenis?: string;
-  jumlah?: number;
-  tanggal?: string;
-}
-
-export interface DueDateNotificationData {
-  loan_id?: string;
-  amount?: number;
-  due_date?: string;
-}
-
-export interface SystemNotificationData {
-  action_url?: string;
-  priority?: 'low' | 'medium' | 'high';
-}
-
-export interface NotificationTypeInfo {
-  name: string;
-  icon: string;
-  color: string;
-  isPushEnabled: boolean;
-  isGlobal: boolean;
-}
-
-export const NOTIFICATION_TYPES: Record<string, NotificationTypeInfo> = {
-  transaksi: {
-    name: 'Transaksi',
-    icon: 'cash-outline',
-    color: '#28a745',
-    isPushEnabled: true,
-    isGlobal: false
-  },
-  pengumuman: {
-    name: 'Pengumuman',
-    icon: 'megaphone-outline',
-    color: '#0066CC',
-    isPushEnabled: false,
-    isGlobal: true
-  },
-  sistem: {
-    name: 'Sistem',
-    icon: 'settings-outline',
-    color: '#6c757d',
-    isPushEnabled: false,
-    isGlobal: true
-  },
-  jatuh_tempo: {
-    name: 'Jatuh Tempo',
-    icon: 'calendar-outline',
-    color: '#dc3545',
-    isPushEnabled: true,
-    isGlobal: false
-  },
-  // Default fallback for any unrecognized types
-  info: {
-    name: 'Info',
-    icon: 'information-circle-outline',
-    color: '#17a2b8',
-    isPushEnabled: false,
-    isGlobal: false
-  }
-}
+const logError = (message: string, error: any) => {
+  console.error(`[NotificationService] ${message}`, error);
+};
 
 /**
  * Service for handling notifications
  */
-// Type guard functions for notification data types
-export function isTransactionNotificationData(data: any): data is TransactionNotificationData {
-  return data && 
-    (typeof data.transaksi_id === 'string' || 
-     typeof data.transaction_id === 'string' || 
-     typeof data.jenis === 'string');
-}
-
-export function isDueDateNotificationData(data: any): data is DueDateNotificationData {
-  return data && 
-    (typeof data.loan_id === 'string' || 
-     typeof data.due_date === 'string');
-}
-
-export function isSystemNotificationData(data: any): data is SystemNotificationData {
-  return data && 
-    (typeof data.action_url === 'string' || 
-     (typeof data.priority === 'string' && 
-      ['low', 'medium', 'high'].includes(data.priority)));
-}
-
-// Helper function to parse notification data with type safety
-export function parseNotificationData<T>(data: string | object | null | undefined): T | undefined {
-  if (!data) return undefined;
-  
-  try {
-    if (typeof data === 'string') {
-      return JSON.parse(data) as T;
-    } else {
-      return data as T;
-    }
-  } catch (error) {
-    console.error('Error parsing notification data:', error);
-    return undefined;
-  }
-}
-
 export const NotificationService = {
   /**
    * Create a notification
+   * @param notification The notification to create
+   * @returns Promise<{success: boolean, id?: string}> indicating success or failure and the created notification ID
    */
-  async createNotification(notification: Omit<Notification, 'id' | 'created_at' | 'updated_at'>): Promise<boolean> {
+  async createNotification(notification: Omit<Notification, 'id' | 'created_at' | 'updated_at'>): Promise<{success: boolean, id?: string}> {
     try {
-      console.log('Creating notification:', notification);
+      log('Creating notification', notification);
       
       // Determine if this is a global notification or transaction notification
       const isGlobal = notification.source === 'global' || 
         ['pengumuman', 'sistem'].includes(notification.jenis);
       
+      const timestamp = new Date().toISOString();
+      
       if (isGlobal) {
         // Create global notification
-        const { error: globalError } = await supabase
+        const { data: globalData, error: globalError } = await supabase
           .from('global_notifikasi')
-          .insert([{
+          .insert({
             judul: notification.judul,
             pesan: notification.pesan,
             jenis: notification.jenis,
-            data: notification.data,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }]);
+            data: notification.data || {},
+            created_at: timestamp,
+            updated_at: timestamp
+          })
+          .select('id')
+          .single();
         
-        if (globalError) {
-          console.error('Error creating global notification:', globalError);
-          return false;
+        if (globalError || !globalData) {
+          logError('Error creating global notification', globalError);
+          return { success: false };
         }
         
-        // If anggota_id is provided, mark it as read/unread for that specific member
+        log(`Created global notification with ID: ${globalData.id}`);
+        
+        // If anggota_id is provided, create read status for that member
         if (notification.anggota_id) {
-          // Get the latest notification we just created
-          const { data: latestNotif, error: fetchError } = await supabase
-            .from('global_notifikasi')
-            .select('id')
-            .order('created_at', { ascending: false })
-            .limit(1);
-            
-          if (fetchError || !latestNotif || latestNotif.length === 0) {
-            console.error('Error fetching created notification:', fetchError);
-            return false;
-          }
-          
+          // Create read status for a single member
           const { error: readError } = await supabase
             .from('global_notifikasi_read')
-            .insert([{
-              global_notifikasi_id: latestNotif[0].id,
+            .insert({
+              global_notifikasi_id: globalData.id,
               anggota_id: notification.anggota_id,
               is_read: notification.is_read ?? false,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            }]);
+              created_at: timestamp,
+              updated_at: timestamp
+            });
             
           if (readError) {
-            console.error('Error creating notification read status:', readError);
-            return false;
+            logError('Error creating notification read status', readError);
+            // Continue despite error, the notification was still created
+          } else {
+            log(`Created read status for member ${notification.anggota_id}`);
+          }
+        } else if (notification.anggota_ids && Array.isArray(notification.anggota_ids)) {
+          // Create read status for multiple members if anggota_ids array is provided
+          const readStatusEntries = notification.anggota_ids.map(anggotaId => ({
+            global_notifikasi_id: globalData.id,
+            anggota_id: anggotaId,
+            is_read: notification.is_read ?? false,
+            created_at: timestamp,
+            updated_at: timestamp
+          }));
+          
+          const { error: batchReadError } = await supabase
+            .from('global_notifikasi_read')
+            .insert(readStatusEntries);
+          
+          if (batchReadError) {
+            logError('Error creating batch notification read statuses', batchReadError);
+            // Continue despite error, the notification was still created
+          } else {
+            log(`Created read status for ${readStatusEntries.length} members`);
           }
         }
+        
+        return { success: true, id: globalData.id };
       } else {
         // Create transaction notification
-        const { error } = await supabase
+        let transaksiId = notification.transaksi_id;
+        
+        // If transaksi_id is in the data object, extract it
+        if (!transaksiId && notification.data) {
+          const data = typeof notification.data === 'string' 
+            ? parseNotificationData<TransactionNotificationData>(notification.data)
+            : notification.data as TransactionNotificationData;
+            
+          transaksiId = data?.transaksi_id;
+        }
+        
+        if (!transaksiId) {
+          logError('Transaction ID is required for transaction notifications', { notification });
+          return { success: false };
+        }
+        
+        const { data: transactionData, error } = await supabase
           .from('transaksi_notifikasi')
-          .insert([{
+          .insert({
             judul: notification.judul,
             pesan: notification.pesan,
             jenis: notification.jenis,
-            data: notification.data,
+            data: notification.data || {},
             is_read: notification.is_read ?? false,
-            transaksi_id: notification.data?.transaksi_id,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }]);
+            transaksi_id: transaksiId,
+            created_at: timestamp,
+            updated_at: timestamp
+          })
+          .select('id')
+          .single();
         
         if (error) {
-          console.error('Error creating transaction notification:', error);
-          return false;
+          logError('Error creating transaction notification', error);
+          return { success: false };
         }
+        
+        log(`Created transaction notification with ID: ${transactionData?.id}`);
+        return { success: true, id: transactionData?.id };
       }
-      
-      console.log('Notification created successfully');
-      return true;
     } catch (error) {
-      console.error('Error in createNotification:', error);
-      return false;
+      logError('Error in createNotification', error);
+      return { success: false };
     }
   },
   
   /**
-   * Get all notifications for the current member
+   * Get all notifications for a member
+   * @param anggotaId ID of the member
+   * @param limit Maximum number of notifications to fetch
+   * @returns Array of notifications
    */
   async getNotifications(anggotaId: string, limit = 50): Promise<Notification[]> {
     try {
-      console.log(`Fetching notifications for anggota ID: ${anggotaId}`);
+      let transactionNotifications = [];
       
-      // Get all notifications using the new RPC function
-      const { data: allNotificationsData, error: notificationsError } = await supabase
-        .rpc('get_all_notifications')
-        .order('created_at', { ascending: false })
+      // First attempt to use RPC function
+      log(`Attempting to fetch transaction notifications for member ${anggotaId} using RPC`);
+      const { data: rpcNotifications, error: tnError } = await supabase
+        .rpc('get_member_transaction_notifications', { member_id: anggotaId })
         .limit(limit);
-      
-      if (notificationsError) {
-        console.error('Error fetching notifications:', notificationsError);
-        return [];
+
+      if (tnError) {
+        logError('Error fetching transaction notifications via RPC', tnError);
+        
+        // Fallback: Fetch member's transactions first, then get notifications for those transactions
+        log('Falling back to manual query for transaction notifications');
+        const { data: memberTransactions, error: mtError } = await supabase
+          .from('transaksi')
+          .select('id')
+          .eq('anggota_id', anggotaId);
+          
+        if (mtError) {
+          logError('Error fetching member transactions', mtError);
+        } else if (memberTransactions && memberTransactions.length > 0) {
+          const transactionIds = memberTransactions.map(t => t.id);
+          log(`Found ${transactionIds.length} transactions for member ${anggotaId}`);
+          
+          // Fetch transaction notifications filtered by transaction IDs
+          const { data: tNotifications, error: tNotifError } = await supabase
+            .from('transaksi_notifikasi')
+            .select('*')
+            .in('transaksi_id', transactionIds)
+            .order('created_at', { ascending: false })
+            .limit(limit);
+            
+          if (tNotifError) {
+            logError('Error fetching transaction notifications', tNotifError);
+          } else {
+            transactionNotifications = tNotifications || [];
+          }
+        } else {
+          log(`No transactions found for member ${anggotaId}`);
+        }
+      } else {
+        transactionNotifications = rpcNotifications || [];
       }
+      
+      log(`Found ${transactionNotifications.length} transaction notifications`);
+      
+      // Fetch global notifications
+      const { data: globalNotifications, error: gnError } = await supabase
+        .from('global_notifikasi')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (gnError) {
+        logError('Error fetching global notifications', gnError);
+      }
+      
+      log(`Found ${globalNotifications?.length || 0} global notifications`);
       
       // Get read status for global notifications
-      const { data: readStatusData, error: readStatusError } = await supabase
-        .rpc('get_notification_read_status', { p_anggota_id: anggotaId });
+      const { data: readStatusData, error: rsError } = await supabase
+        .from('global_notifikasi_read')
+        .select('global_notifikasi_id, is_read')
+        .eq('anggota_id', anggotaId);
       
-      if (readStatusError) {
-        console.error('Error fetching notification read status:', readStatusError);
-        // Continue with default read status
+      if (rsError) {
+        logError('Error fetching notification read status', rsError);
       }
       
-      // Create a map of notification IDs to read status
-      const readStatusMap = new Map();
-      if (readStatusData) {
+      // Create read status map for quick lookup
+      const readStatusMap = new Map<string, boolean>();
+      if (readStatusData && readStatusData.length > 0) {
         readStatusData.forEach(item => {
-          readStatusMap.set(item.notification_id, item.is_read);
+          readStatusMap.set(item.global_notifikasi_id, item.is_read);
         });
       }
       
-      // Transform notifications to match the Notification interface
-      const transformedNotifications = allNotificationsData.map(item => {
-        // For global notifications, get read status from the map or default to false
-        const isRead = item.source === 'global' 
-          ? readStatusMap.get(item.id) ?? false 
-          : item.is_read ?? false;
-          
-        return {
-          id: item.id,
-          judul: item.judul,
-          pesan: item.pesan,
-          jenis: item.jenis,
-          data: item.data || {},
-          created_at: item.created_at,
-          updated_at: item.updated_at,
-          is_read: isRead,
-          source: item.source,
-          transaksi_id: item.transaksi_id,
-          anggota_id: anggotaId
-        };
-      });
+      // Format transaction notifications
+      const formattedTransactionNotifications = transactionNotifications.map(item => ({
+        id: item.id,
+        judul: item.judul,
+        pesan: item.pesan,
+        jenis: item.jenis,
+        data: item.data || {},
+        is_read: item.is_read ?? false,
+        created_at: item.created_at,
+        updated_at: item.updated_at || item.created_at,
+        source: 'transaction' as const,
+        transaksi_id: item.transaksi_id,
+        anggota_id: anggotaId
+      }));
       
-      return transformedNotifications;
+      // Format global notifications
+      const formattedGlobalNotifications = (globalNotifications || []).map(item => ({
+        id: item.id,
+        judul: item.judul,
+        pesan: item.pesan,
+        jenis: item.jenis || 'pengumuman',
+        data: item.data || {},
+        is_read: readStatusMap.get(item.id) ?? false,
+        created_at: item.created_at,
+        updated_at: item.updated_at || item.created_at,
+        source: 'global' as const,
+        global_notifikasi_id: item.id,
+        anggota_id: anggotaId
+      }));
+      
+      // Combine, sort by date (newest first), and limit the results
+      const allNotifications = [
+        ...formattedTransactionNotifications,
+        ...formattedGlobalNotifications
+      ]
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, limit);
+      
+      log(`Returning ${allNotifications.length} total notifications (${formattedTransactionNotifications.length} transaction, ${formattedGlobalNotifications.length} global)`);
+      return allNotifications;
     } catch (error) {
-      console.error('Error in getNotifications:', error);
+      logError('Error in getNotifications', error);
       return [];
     }
   },
   
   /**
    * Get notifications by type
+   * @param anggotaId The ID of the member to get notifications for
+   * @param type The notification type to filter by
+   * @param limit Maximum number of notifications to return
+   * @returns Promise<Notification[]> Array of notifications of the specified type
    */
   async getNotificationsByType(anggotaId: string, type: string, limit = 20): Promise<Notification[]> {
     try {
@@ -320,31 +302,36 @@ export const NotificationService = {
             data,
             created_at,
             updated_at,
-            global_notifikasi_read!inner(id, anggota_id, is_read)
+            global_notifikasi_read!left(id, anggota_id, is_read)
           `)
           .eq('jenis', type)
-          .eq('global_notifikasi_read.anggota_id', anggotaId)
           .order('created_at', { ascending: false })
           .limit(limit);
         
         if (error) {
-          console.error(`Error fetching ${type} notifications:`, error);
-          throw new Error(`Failed to fetch ${type} notifications`);
+          logError(`Error fetching ${type} notifications`, error);
+          return [];
         }
         
         // Transform to match the Notification interface
-        return (data || []).map(item => ({
-          id: item.id,
-          judul: item.judul,
-          pesan: item.pesan,
-          jenis: item.jenis,
-          data: item.data,
-          created_at: item.created_at,
-          updated_at: item.updated_at,
-          is_read: item.global_notifikasi_read[0]?.is_read ?? false,
-          anggota_id: anggotaId,
-          is_global: true
-        }));
+        return (data || []).map(item => {
+          // Find read status for this member
+          const readStatus = item.global_notifikasi_read.find(r => r.anggota_id === anggotaId);
+          
+          return {
+            id: item.id,
+            judul: item.judul,
+            pesan: item.pesan,
+            jenis: item.jenis,
+            data: item.data || {},
+            created_at: item.created_at,
+            updated_at: item.updated_at || item.created_at,
+            is_read: readStatus?.is_read ?? false,
+            source: 'global',
+            global_notifikasi_id: item.id,
+            anggota_id: anggotaId
+          };
+        });
       } else {
         // Get transaction notifications of this type
         const { data, error } = await supabase
@@ -355,8 +342,8 @@ export const NotificationService = {
           .limit(limit);
         
         if (error) {
-          console.error(`Error fetching ${type} notifications:`, error);
-          throw new Error(`Failed to fetch ${type} notifications`);
+          logError(`Error fetching ${type} notifications`, error);
+          return [];
         }
         
         // Transform to match the Notification interface
@@ -365,16 +352,18 @@ export const NotificationService = {
           judul: item.judul,
           pesan: item.pesan,
           jenis: item.jenis,
-          data: item.data,
+          data: item.data || {},
           created_at: item.created_at,
-          updated_at: item.updated_at,
-          is_read: item.is_read,
-          is_global: false
+          updated_at: item.updated_at || item.created_at,
+          is_read: item.is_read ?? false,
+          source: 'transaction',
+          transaksi_id: item.transaksi_id,
+          anggota_id: anggotaId
         }));
       }
     } catch (error) {
-      console.error(`Error in getNotificationsByType (${type}):`, error);
-      throw error;
+      logError(`Error in getNotificationsByType (${type})`, error);
+      return [];
     }
   },
   
@@ -393,9 +382,13 @@ export const NotificationService = {
   
   /**
    * Get unread notification count
+   * @param anggotaId The ID of the member to get unread count for
+   * @returns Promise<number> The count of unread notifications
    */
   async getUnreadCount(anggotaId: string): Promise<number> {
     try {
+      log(`Getting unread notification count for anggota ID: ${anggotaId}`);
+      
       // Count unread transaction notifications
       const { count: transactionCount, error: transactionError } = await supabase
         .from('transaksi_notifikasi')
@@ -403,7 +396,7 @@ export const NotificationService = {
         .eq('is_read', false);
       
       if (transactionError) {
-        console.error('Error counting unread transaction notifications:', transactionError);
+        logError('Error counting unread transaction notifications', transactionError);
         return 0;
       }
       
@@ -415,23 +408,28 @@ export const NotificationService = {
         .eq('is_read', false);
       
       if (globalError) {
-        console.error('Error counting unread global notifications:', globalError);
+        logError('Error counting unread global notifications', globalError);
         return transactionCount || 0;
       }
       
-      return (transactionCount || 0) + (globalCount || 0);
+      const totalCount = (transactionCount || 0) + (globalCount || 0);
+      log(`Found ${totalCount} unread notifications for anggota ID: ${anggotaId}`);
+      return totalCount;
     } catch (error) {
-      console.error('Error in getUnreadCount:', error);
+      logError('Error in getUnreadCount', error);
       return 0;
     }
   },
   
   /**
    * Mark a notification as read
+   * @param notificationId The ID of the notification to mark as read
+   * @param source Optional source type to specify which table to update
+   * @returns Promise<boolean> Whether the operation was successful
    */
   async markAsRead(notificationId: string, source?: 'global' | 'transaction'): Promise<boolean> {
     try {
-      console.log(`Marking notification as read: ${notificationId}, source: ${source || 'unknown'}`);
+      log(`Marking notification as read: ${notificationId}, source: ${source || 'unknown'}`);
       
       // If source is provided, use it to determine which table to update
       if (source === 'transaction') {
@@ -443,11 +441,17 @@ export const NotificationService = {
           .select('id');
         
         if (error) {
-          console.error('Error marking transaction notification as read:', error);
+          logError('Error marking transaction notification as read', error);
           return false;
         }
         
-        return data && data.length > 0;
+        const success = data && data.length > 0;
+        if (success) {
+          log(`Successfully marked transaction notification ${notificationId} as read`);
+        } else {
+          log(`Transaction notification ${notificationId} not found`);
+        }
+        return success;
       } else if (source === 'global') {
         // Update global notification read status
         const { error } = await supabase
@@ -456,13 +460,16 @@ export const NotificationService = {
           .eq('global_notifikasi_id', notificationId);
         
         if (error) {
-          console.error('Error marking global notification as read:', error);
+          logError('Error marking global notification as read', error);
           return false;
         }
         
+        log(`Successfully marked global notification ${notificationId} as read`);
         return true;
       } else {
         // If source is not provided, try both tables
+        log(`Source not provided, trying both tables for notification ${notificationId}`);
+        
         // First try transaction notifications
         const { data: transactionData, error: transactionError } = await supabase
           .from('transaksi_notifikasi')
@@ -471,6 +478,7 @@ export const NotificationService = {
           .select('id');
         
         if (!transactionError && transactionData && transactionData.length > 0) {
+          log(`Successfully marked transaction notification ${notificationId} as read`);
           return true;
         }
         
@@ -487,28 +495,31 @@ export const NotificationService = {
             .eq('global_notifikasi_id', notificationId);
           
           if (globalUpdateError) {
-            console.error('Error marking global notification as read:', globalUpdateError);
+            logError('Error marking global notification as read', globalUpdateError);
             return false;
           }
           
+          log(`Successfully marked global notification ${notificationId} as read`);
           return true;
         }
         
-        console.error('Notification not found in either table:', notificationId);
+        logError('Notification not found in either table', { notificationId });
         return false;
       }
     } catch (error) {
-      console.error('Error in markAsRead:', error);
+      logError('Error in markAsRead', error);
       return false;
     }
   },
   
   /**
    * Mark all notifications as read for a member
+   * @param anggotaId The ID of the member to mark all notifications as read for
+   * @returns Promise<boolean> Whether the operation was successful
    */
   async markAllAsRead(anggotaId: string): Promise<boolean> {
     try {
-      console.log(`Marking all notifications as read for anggota ID: ${anggotaId}`);
+      log(`Marking all notifications as read for anggota ID: ${anggotaId}`);
       
       let success = true;
       
@@ -519,8 +530,10 @@ export const NotificationService = {
         .eq('is_read', false);
       
       if (transactionError) {
-        console.error('Error marking all transaction notifications as read:', transactionError);
+        logError('Error marking all transaction notifications as read', transactionError);
         success = false;
+      } else {
+        log('Successfully marked all transaction notifications as read');
       }
       
       // Mark all global notifications as read for this member
@@ -531,13 +544,15 @@ export const NotificationService = {
         .eq('is_read', false);
       
       if (globalError) {
-        console.error('Error marking all global notifications as read:', globalError);
+        logError('Error marking all global notifications as read', globalError);
         success = false;
+      } else {
+        log(`Successfully marked all global notifications as read for anggota ID: ${anggotaId}`);
       }
       
       return success;
     } catch (error) {
-      console.error('Error in markAllAsRead:', error);
+      logError('Error in markAllAsRead', error);
       return false;
     }
   }
