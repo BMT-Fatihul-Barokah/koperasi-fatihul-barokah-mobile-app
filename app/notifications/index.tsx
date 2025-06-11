@@ -68,7 +68,7 @@ export default function NotificationsScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   
-  // Create styles with dynamic values based on theme
+  // Using memo to avoid recreating styles on every render
   const styles = useMemo(() => createStyles(isDark), [isDark]);
 
   // Load notifications and restore filter preference when component mounts
@@ -97,15 +97,31 @@ export default function NotificationsScreen() {
     }
   }, [member?.id]); // Removed fetchNotifications from dependencies
   
-  // Refresh notifications and restore filter when the screen comes into focus
+  // Refresh notification list when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       if (member?.id) {
         Logger.info(LogCategory.NOTIFICATIONS, 'Screen focused, refreshing notifications');
-        fetchNotifications(true);
         
-        // Restore filter preference when returning to the screen
-        const restoreFilterPreference = async () => {
+        // Force refresh notifications when the screen comes into focus
+        // This ensures we have the latest read status for notifications
+        const refreshData = async () => {
+          try {
+            // Force clear notification cache to ensure we get fresh data
+            NotificationService.clearCache();
+            
+            // Use context method with force refresh flag
+            await fetchNotifications(true);
+            
+            Logger.debug(
+              LogCategory.NOTIFICATIONS, 
+              'Successfully refreshed notifications on focus'
+            );
+          } catch (error) {
+            Logger.error(LogCategory.NOTIFICATIONS, 'Error refreshing notifications on focus', error);
+          }
+          
+          // Restore filter preference when returning to the screen
           try {
             const storedFilter = await AsyncStorage.getItem('notification_filter_preference');
             if (storedFilter && ['all', 'unread', 'transaksi', 'pengumuman', 'sistem', 'jatuh_tempo'].includes(storedFilter)) {
@@ -117,12 +133,12 @@ export default function NotificationsScreen() {
           }
         };
         
-        restoreFilterPreference();
+        refreshData();
       }
       
       // No cleanup needed for useFocusEffect
       return () => {};
-    }, [member?.id, fetchNotifications])
+    }, [member?.id, fetchNotifications, activeFilter])
   );
   
   // Handle transaction notification press
@@ -196,9 +212,6 @@ export default function NotificationsScreen() {
     }
   };
 
-  
-
-
   // Refresh notifications
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -224,58 +237,26 @@ export default function NotificationsScreen() {
   }, [notifications.unreadCount, markAllNotificationsAsRead]);
 
   // Handle notification press
-  const handleNotificationPress = useCallback(async (notification: Notification) => {
-    try {
-      setIsProcessingNotification(true);
-      Logger.debug(LogCategory.NOTIFICATIONS, `Pressed notification ID ${notification.id}`, { type: notification.jenis });
-
-      // For all notification types, use the context method
-      // The context method now has special handling for jatuh_tempo notifications using RPC
-      const result = await markNotificationAsRead(notification.id);
-      
-      if (result) {
-        Logger.debug(LogCategory.NOTIFICATIONS, `Successfully marked notification ${notification.id} as read`);
-      } else {
-        Logger.warn(LogCategory.NOTIFICATIONS, `Failed to mark notification ${notification.id} as read through context method`);
-        
-        // If context method fails for jatuh_tempo notification, try using NotificationService directly as fallback
-        if (notification.jenis === 'jatuh_tempo') {
-          Logger.debug(LogCategory.NOTIFICATIONS, `Attempting direct NotificationService update for jatuh_tempo`, { id: notification.id });
-          try {
-            const success = await NotificationService.markAsRead(notification.id, notification.source);
-            
-            if (!success) {
-              Logger.error(LogCategory.NOTIFICATIONS, `NotificationService direct update failed`, { id: notification.id });
-            } else {
-              Logger.debug(LogCategory.NOTIFICATIONS, `NotificationService direct update successful`, { id: notification.id });
-            }
-          } catch (serviceError) {
-            Logger.error(LogCategory.NOTIFICATIONS, `Error in NotificationService direct update`, { id: notification.id, error: serviceError });
-          }
-        }
+  const handleNotificationPress = useCallback((notification: Notification) => {
+    Logger.debug(LogCategory.NOTIFICATIONS, 'Notification pressed', { 
+      id: notification.id,
+      is_read: notification.is_read,
+      source: notification.source || 'unknown',
+      type: notification.jenis
+    });
+    
+    // For optimistic UI update, let's pre-fetch notifications after a short delay
+    setTimeout(() => {
+      if (member?.id) {
+        // Clear cache before fetching to ensure we get latest data
+        NotificationService.clearCache();
+        fetchNotifications(true); 
       }
-
-      // Check if this is a transaction notification
-      if (handleTransactionPress(notification)) {
-        return;
-      }
-
-      // For jatuh_tempo notifications, log navigation separately
-      if (notification.jenis === 'jatuh_tempo') {
-        Logger.debug(LogCategory.NOTIFICATIONS, 'Navigating to jatuh_tempo notification detail', { id: notification.id });
-      } else {
-        // For all other notifications
-        Logger.debug(LogCategory.NOTIFICATIONS, 'Navigating to notification detail', { id: notification.id });
-      }
-      
-      // Navigate to the notification detail screen
-      router.push(`/notifications/${notification.id}`);
-    } catch (error) {
-      Logger.error(LogCategory.NOTIFICATIONS, 'Error handling notification press:', error);
-    } finally {
-      setIsProcessingNotification(false);
-    }
-  }, [markNotificationAsRead, fetchNotifications, router]);
+    }, 500);
+    
+    // Navigate to notification detail
+    router.push(`/notifications/${notification.id}`);
+  }, [member?.id, fetchNotifications, router]);
 
   // Format relative time
   const formatRelativeTime = useCallback((dateString: string) => {
@@ -336,34 +317,45 @@ export default function NotificationsScreen() {
   }, [notifications.data, activeFilter]);
 
   // Render notification item
-  const renderNotificationItem = ({ item }) => (
-    <TouchableOpacity
-      style={[
-        styles.notificationItem,
-        !item.is_read && styles.unreadNotification
-      ]}
-      onPress={() => handleNotificationPress(item)}
-    >
-      <View style={styles.notificationIconContainer}>
-        {getNotificationIcon(item.jenis)}
-      </View>
-      
-      <View style={styles.notificationContent}>
-        <View style={styles.notificationHeader}>
-          <Text style={styles.notificationTitle}>{item.judul}</Text>
-          {!item.is_read && <View style={styles.unreadDot} />}
+  const renderNotificationItem = useCallback(({ item }) => {
+    const isRead = item.is_read === true; // Ensure boolean comparison
+    
+    return (
+      <TouchableOpacity
+        style={[
+          styles.notificationItem,
+          isRead ? { backgroundColor: '#f9f9f9' } : styles.unreadNotification
+        ]}
+        onPress={() => handleNotificationPress(item)}
+      >
+        <View style={styles.notificationIconContainer}>
+          {getNotificationIcon(item.jenis)}
         </View>
         
-        <Text style={styles.notificationMessage} numberOfLines={2}>
-          {item.pesan}
-        </Text>
-        
-        <Text style={styles.notificationTime}>
-          {formatRelativeTime(item.created_at)}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
+        <View style={styles.notificationContent}>
+          <View style={styles.notificationHeader}>
+            <Text style={styles.notificationTitle}>{item.judul}</Text>
+            {!isRead && <View style={styles.unreadDot} />}
+          </View>
+          
+          <Text style={styles.notificationMessage} numberOfLines={2}>
+            {item.pesan}
+          </Text>
+          
+          <Text style={styles.notificationTime}>
+            {formatRelativeTime(item.created_at)}
+          </Text>
+          
+          {/* Debug read status in dev mode */}
+          {__DEV__ && (
+            <Text style={{ fontSize: 10, color: 'gray' }}>
+              ID: {item.id.substring(0, 8)}... | Read: {String(isRead)} | Source: {item.source || 'unknown'}
+            </Text>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  }, [handleNotificationPress, formatRelativeTime, getNotificationIcon]);
 
   // Menu state and handlers
   const [menuVisible, setMenuVisible] = useState(false);

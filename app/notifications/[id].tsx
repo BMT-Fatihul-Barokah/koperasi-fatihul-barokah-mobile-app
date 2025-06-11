@@ -31,14 +31,15 @@ export default function NotificationDetailScreen() {
   useEffect(() => {
     Logger.debug(LogCategory.NOTIFICATIONS, 'Notification detail screen loaded', { notificationId });
     
-    // Cleanup when unmounting - refresh notifications if we marked one as read
+    // Cleanup when unmounting
     return () => {
-      if (markedAsRead) {
-        Logger.debug(LogCategory.NOTIFICATIONS, 'Notification detail screen unmounting, refreshing notifications');
-        fetchNotifications(true);
-      }
+      // Always refresh notifications when leaving the notification detail screen
+      // Clean up and refresh notifications list when component unmounts
+      Logger.debug(LogCategory.NOTIFICATIONS, 'Notification detail screen unmounting, refreshing notifications');
+      NotificationService.clearCache();
+      fetchNotifications(true);
     };
-  }, [markedAsRead, fetchNotifications, notificationId]);
+  }, [fetchNotifications, notificationId]);
 
   // Fetch notification details
   useEffect(() => {
@@ -84,28 +85,28 @@ export default function NotificationDetailScreen() {
     fetchNotificationDetails();
   }, [notificationId, member?.id]);
   
-  // Mark notification as read
+  // Mark notification as read when component mounts
   useEffect(() => {
-    // Skip if already attempted mark as read or notification not loaded yet
-    if (didAttemptMarkAsRead.current || !notification || isLoading) {
-      return;
-    }
+    if (didAttemptMarkAsRead.current || !notification || isLoading) return;
     
     const markAsRead = async () => {
       try {
-        didAttemptMarkAsRead.current = true;
         Logger.debug(LogCategory.NOTIFICATIONS, `Attempting to mark notification ${notificationId} as read`);
+        didAttemptMarkAsRead.current = true;
         
-        // Only attempt to mark as read if we have source information
+        // Force clear notification cache first to ensure the most up-to-date data
+        NotificationService.clearCache();
+        
         const source = notification.source === 'global' ? 'global' : 'transaction';
         
-        // Use direct call to service to ensure proper error handling
-        // Pass the member.id as anggotaId to help ensure proper lookup and update
-        const success = await NotificationService.markAsRead(
-          notificationId, 
-          source,
-          member?.id // Pass anggota_id to help with notification lookup
-        );
+        // Make sure we have anggotaId
+        if (!member?.id) {
+          Logger.warn(LogCategory.NOTIFICATIONS, 'Cannot mark notification as read: missing member.id');
+          return;
+        }
+        
+        // Pass anggotaId to ensure proper read status update
+        const success = await NotificationService.markAsRead(notificationId, source, member.id);
         
         if (success) {
           Logger.debug(LogCategory.NOTIFICATIONS, `Successfully marked ${notificationId} as read`);
@@ -113,8 +114,24 @@ export default function NotificationDetailScreen() {
           
           // Update local state to show as read
           setNotification(prev => prev ? { ...prev, is_read: true } : prev);
+          
+          // Ensure notifications list is updated immediately
+          fetchNotifications(true);
         } else {
-          Logger.warn(LogCategory.NOTIFICATIONS, `Failed to mark ${notificationId} as read, but continuing`);
+          // Try one more time with the opposite source type
+          Logger.warn(LogCategory.NOTIFICATIONS, `Failed first attempt to mark ${notificationId} as read, trying alternative source`);
+          
+          const alternativeSource = source === 'global' ? 'transaction' : 'global';
+          const secondAttempt = await NotificationService.markAsRead(notificationId, alternativeSource, member.id);
+          
+          if (secondAttempt) {
+            Logger.debug(LogCategory.NOTIFICATIONS, `Successfully marked ${notificationId} as read on second attempt`);
+            setMarkedAsRead(true);
+            setNotification(prev => prev ? { ...prev, is_read: true } : prev);
+            fetchNotifications(true);
+          } else {
+            Logger.warn(LogCategory.NOTIFICATIONS, `Failed to mark ${notificationId} as read on both attempts`);
+          }
         }
       } catch (error) {
         Logger.error(LogCategory.NOTIFICATIONS, 'Error marking notification as read:', error);
@@ -122,7 +139,7 @@ export default function NotificationDetailScreen() {
     };
     
     markAsRead();
-  }, [notification, isLoading, notificationId]);
+  }, [notification, isLoading, notificationId, member?.id, fetchNotifications]);
 
   if (isLoading) {
     return (

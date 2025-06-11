@@ -22,7 +22,18 @@ const logError = (message: string, error: any) => {
 /**
  * Service for handling notifications
  */
+// Cache for notifications to prevent excessive database queries
+let notificationCache: Record<string, any> = {};
+
 export const NotificationService = {
+  /**
+   * Clear the notification cache to ensure fresh data on next fetch
+   */
+  clearCache(): void {
+    notificationCache = {};
+    log('Notification cache cleared');
+  },
+  
   /**
    * Create a notification
    * @param notification The notification to create
@@ -153,9 +164,16 @@ export const NotificationService = {
    * Get all notifications for a member
    * @param anggotaId ID of the member
    * @param limit Maximum number of notifications to fetch
+   * @param forceRefresh Force refresh the cache
    * @returns Array of notifications
    */
-  async getNotifications(anggotaId: string, limit = 50): Promise<Notification[]> {
+  async getNotifications(anggotaId: string, limit: number = 50, forceRefresh: boolean = false): Promise<Notification[]> {
+    // Use cache if available and not forcing refresh
+    const cacheKey = `notifications-${anggotaId}-${limit}`;
+    if (!forceRefresh && notificationCache[cacheKey]) {
+      log(`Returning cached notifications for member ${anggotaId}`);
+      return notificationCache[cacheKey];
+    }
     try {
       let transactionNotifications = [];
       
@@ -270,7 +288,11 @@ export const NotificationService = {
       ]
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         .slice(0, limit);
-      
+        
+      // Store in cache
+      notificationCache[cacheKey] = allNotifications;
+      log(`Cached ${allNotifications.length} notifications for member ${anggotaId}`);
+
       log(`Returning ${allNotifications.length} total notifications (${formattedTransactionNotifications.length} transaction, ${formattedGlobalNotifications.length} global)`);
       return allNotifications;
     } catch (error) {
@@ -436,6 +458,55 @@ export const NotificationService = {
     try {
       log(`Marking notification as read: ${notificationId}, source: ${source || 'unknown'}, anggotaId: ${anggotaId || 'not provided'}`);
       
+      if (!anggotaId) {
+        logError('Cannot mark notification as read: missing anggotaId');
+        return false;
+      }
+      
+      // Use the dedicated RPC function to ensure transaction completion and proper read status
+      const { data, error } = await supabase.rpc('mark_notification_as_read', {
+        p_notification_id: notificationId,
+        p_source: source || null, // Send as null if source is undefined
+        p_anggota_id: anggotaId
+      });
+      
+      if (error) {
+        logError('Error calling mark_notification_as_read RPC', error);
+        
+        // Fall back to direct table updates if RPC fails
+        log('Falling back to direct table updates');
+        return this.markAsReadDirectly(notificationId, source, anggotaId);
+      }
+      
+      const success = data === true;
+      
+      if (success) {
+        log(`Successfully marked notification ${notificationId} as read via RPC`);
+        // Clear cache to ensure fresh data on next fetch
+        this.clearCache();
+      } else {
+        log(`Failed to mark notification ${notificationId} as read via RPC`);
+      }
+      
+      return success;
+    } catch (error) {
+      logError('Error in markAsRead', error);
+      // Fallback to direct method as last resort
+      return this.markAsReadDirectly(notificationId, source, anggotaId);
+    }
+  },
+  
+  /**
+   * Legacy direct method to mark a notification as read - used as fallback if RPC fails
+   */
+  async markAsReadDirectly(
+    notificationId: string, 
+    source?: 'global' | 'transaction',
+    anggotaId?: string
+  ): Promise<boolean> {
+    try {
+      log(`Using direct table updates to mark notification as read: ${notificationId}`);
+      
       // Try to first fetch the notification to see its actual data
       if (anggotaId) {
         try {
@@ -478,10 +549,13 @@ export const NotificationService = {
         if (!checkTransError && checkTransData && checkTransData.length > 0) {
           log(`Found notification ${notificationId} in transaksi_notifikasi table`);
           
-          // Update transaction notification
+          // Update transaction notification - explicitly set is_read to true
           const { error: updateError } = await supabase
             .from('transaksi_notifikasi')
-            .update({ is_read: true, updated_at: new Date().toISOString() })
+            .update({ 
+              is_read: true, 
+              updated_at: new Date().toISOString() 
+            })
             .eq('id', notificationId);
           
           if (updateError) {
@@ -490,6 +564,10 @@ export const NotificationService = {
           }
           
           log(`Successfully marked transaction notification ${notificationId} as read`);
+          
+          // Clear cache to ensure fresh data on next fetch
+          this.clearCache();
+          
           return true;
         }
         
@@ -560,11 +638,15 @@ export const NotificationService = {
             }
             
             log(`Successfully handled global notification ${notificationId} read status`);
+            
+            // Clear cache to ensure fresh data on next fetch
+            this.clearCache();
+            
             return true;
           } else {
             log(`Found global notification but no anggotaId provided to mark as read`);
-            // Return true because we found the notification, even though we couldn't mark it as read
-            return true;
+            // Return false in this case, as we need anggotaId to mark global notifs as read
+            return false;
           }
         }
         
@@ -576,11 +658,10 @@ export const NotificationService = {
       }
       
       // If we got here, notification was not found in appropriate tables
-      // But we'll pretend it succeeded to avoid errors in the UI, since the notification was displayed to the user
-      log(`Notification ${notificationId} not found in database tables, but was in UI. Treating as successful.`);
-      return true;
+      log(`Notification ${notificationId} not found in database tables.`);
+      return false;
     } catch (error) {
-      logError('Error in markAsRead', error);
+      logError('Error in markAsReadDirectly', error);
       return false;
     }
   },
@@ -596,18 +677,39 @@ export const NotificationService = {
       
       let success = true;
       
-      // Mark all transaction notifications as read
-      const { error: transactionError } = await supabase
-        .from('transaksi_notifikasi')
-        .update({ is_read: true, updated_at: new Date().toISOString() })
-        .eq('is_read', false);
-      
-      if (transactionError) {
-        logError('Error marking all transaction notifications as read', transactionError);
+      // Mark all transaction notifications as read for this member
+      // First get all transactions for this member
+      const { data: transactions, error: transQueryError } = await supabase
+        .from('transaksi')
+        .select('id')
+        .eq('anggota_id', anggotaId);
+        
+      if (transQueryError) {
+        logError('Error getting transactions for member', transQueryError);
         success = false;
+      } else if (transactions && transactions.length > 0) {
+        // Get the transaction IDs for this member
+        const transactionIds = transactions.map(t => t.id);
+        log(`Found ${transactionIds.length} transactions for member ${anggotaId}`);
+        
+        // Mark notifications for these transactions as read
+        const { error: transactionError } = await supabase
+          .from('transaksi_notifikasi')
+          .update({ is_read: true, updated_at: new Date().toISOString() })
+          .eq('is_read', false)
+          .in('transaksi_id', transactionIds);
+            
+        if (transactionError) {
+          logError('Error marking transaction notifications as read', transactionError);
+          success = false;
+        } else {
+          log(`Successfully marked transaction notifications as read for member ${anggotaId}`);
+        }
       } else {
-        log('Successfully marked all transaction notifications as read');
+        log(`No transactions found for member ${anggotaId}`);
       }
+      
+      // Note: Transaction notification error handling is now done inside the conditional block above
       
       // Mark all global notifications as read for this member
       const { error: globalError } = await supabase
