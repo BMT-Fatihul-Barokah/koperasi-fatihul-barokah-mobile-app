@@ -94,43 +94,41 @@ export default function NotificationDetailScreen() {
         Logger.debug(LogCategory.NOTIFICATIONS, `Attempting to mark notification ${notificationId} as read`);
         didAttemptMarkAsRead.current = true;
         
-        // Force clear notification cache first to ensure the most up-to-date data
-        NotificationService.clearCache();
-        
-        const source = notification.source === 'global' ? 'global' : 'transaction';
-        
         // Make sure we have anggotaId
         if (!member?.id) {
-          Logger.warn(LogCategory.NOTIFICATIONS, 'Cannot mark notification as read: missing member.id');
+          Logger.warn(LogCategory.NOTIFICATIONS, 'Cannot mark notification as read: missing member ID');
           return;
         }
         
-        // Pass anggotaId to ensure proper read status update
-        const success = await NotificationService.markAsRead(notificationId, source, member.id);
+        // Force clear notification cache first to ensure the most up-to-date data
+        NotificationService.clearCache();
+        
+        // Call markAsRead without specifying source to try both sources
+        const success = await NotificationService.markAsRead(notificationId, undefined, member.id);
         
         if (success) {
           Logger.debug(LogCategory.NOTIFICATIONS, `Successfully marked ${notificationId} as read`);
           setMarkedAsRead(true);
-          
-          // Update local state to show as read
           setNotification(prev => prev ? { ...prev, is_read: true } : prev);
           
           // Ensure notifications list is updated immediately
           fetchNotifications(true);
         } else {
-          // Try one more time with the opposite source type
-          Logger.warn(LogCategory.NOTIFICATIONS, `Failed first attempt to mark ${notificationId} as read, trying alternative source`);
+          Logger.warn(LogCategory.NOTIFICATIONS, `Failed to mark notification ${notificationId} as read`);
           
-          const alternativeSource = source === 'global' ? 'transaction' : 'global';
-          const secondAttempt = await NotificationService.markAsRead(notificationId, alternativeSource, member.id);
-          
-          if (secondAttempt) {
-            Logger.debug(LogCategory.NOTIFICATIONS, `Successfully marked ${notificationId} as read on second attempt`);
-            setMarkedAsRead(true);
-            setNotification(prev => prev ? { ...prev, is_read: true } : prev);
-            fetchNotifications(true);
-          } else {
-            Logger.warn(LogCategory.NOTIFICATIONS, `Failed to mark ${notificationId} as read on both attempts`);
+          // Try one more direct attempt with explicit source if we know it
+          if (notification.source) {
+            Logger.debug(LogCategory.NOTIFICATIONS, `Trying one more time with explicit source: ${notification.source}`);
+            const lastAttempt = await NotificationService.markAsReadDirectly(notificationId, notification.source, member.id);
+            
+            if (lastAttempt) {
+              Logger.debug(LogCategory.NOTIFICATIONS, `Successfully marked ${notificationId} as read with direct method`);
+              setMarkedAsRead(true);
+              setNotification(prev => prev ? { ...prev, is_read: true } : prev);
+              fetchNotifications(true);
+            } else {
+              Logger.warn(LogCategory.NOTIFICATIONS, `Failed to mark ${notificationId} as read with all methods`);
+            }
           }
         }
       } catch (error) {

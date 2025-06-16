@@ -459,45 +459,60 @@ export const NotificationService = {
       log(`Marking notification as read: ${notificationId}, source: ${source || 'unknown'}, anggotaId: ${anggotaId || 'not provided'}`);
       
       if (!anggotaId) {
-        logError('Cannot mark notification as read: missing anggotaId');
+        log('Cannot mark notification as read: missing anggotaId');
         return false;
       }
       
-      // Use the dedicated RPC function to ensure transaction completion and proper read status
-      const { data, error } = await supabase.rpc('mark_notification_as_read', {
-        p_notification_id: notificationId,
-        p_source: source || null, // Send as null if source is undefined
-        p_anggota_id: anggotaId
-      });
+      // Skip RPC and use direct table updates which are more reliable
+      log('Using direct table updates for marking notification as read');
       
-      if (error) {
-        logError('Error calling mark_notification_as_read RPC', error);
+      // If source is not specified, try both sources
+      if (!source) {
+        log('Source not specified, trying both transaction and global sources');
         
-        // Fall back to direct table updates if RPC fails
-        log('Falling back to direct table updates');
-        return this.markAsReadDirectly(notificationId, source, anggotaId);
+        // Try transaction first
+        const transactionSuccess = await this.markAsReadDirectly(notificationId, 'transaction', anggotaId);
+        if (transactionSuccess) {
+          log(`Successfully marked transaction notification ${notificationId} as read`);
+          this.clearCache();
+          return true;
+        }
+        
+        // Then try global
+        const globalSuccess = await this.markAsReadDirectly(notificationId, 'global', anggotaId);
+        if (globalSuccess) {
+          log(`Successfully marked global notification ${notificationId} as read`);
+          this.clearCache();
+          return true;
+        }
+        
+        log(`Failed to mark notification ${notificationId} as read in both tables`);
+        return false;
       }
       
-      const success = data === true;
+      // If source is specified, try that source
+      const success = await this.markAsReadDirectly(notificationId, source, anggotaId);
       
       if (success) {
-        log(`Successfully marked notification ${notificationId} as read via RPC`);
-        // Clear cache to ensure fresh data on next fetch
+        log(`Successfully marked notification ${notificationId} as read directly`);
         this.clearCache();
       } else {
-        log(`Failed to mark notification ${notificationId} as read via RPC`);
+        log(`Failed to mark notification ${notificationId} as read directly`);
       }
       
       return success;
     } catch (error) {
-      logError('Error in markAsRead', error);
-      // Fallback to direct method as last resort
-      return this.markAsReadDirectly(notificationId, source, anggotaId);
+      log(`Error in markAsRead: ${error.message || error}`);
+      return false;
     }
   },
   
   /**
-   * Legacy direct method to mark a notification as read - used as fallback if RPC fails
+   * Direct method to mark a notification as read
+   * @param notificationId The ID of the notification to mark as read
+   * @param source Optional source type to specify which table to update
+   * @param anggotaId Optional member ID required for creating global notification read status
+   * @returns Promise<boolean> Whether the operation was successful
    */
   async markAsReadDirectly(
     notificationId: string, 
@@ -507,34 +522,14 @@ export const NotificationService = {
     try {
       log(`Using direct table updates to mark notification as read: ${notificationId}`);
       
-      // Try to first fetch the notification to see its actual data
-      if (anggotaId) {
-        try {
-          log(`Fetching notification details for ID: ${notificationId}`);
-          // Get the notification data first to determine the correct source
-          const { data: rpcResult } = await supabase.rpc('get_member_notifications', {
-            p_anggota_id: anggotaId,
-            p_limit: 50
-          });
-          
-          const foundNotification = rpcResult?.find(n => n.id === notificationId);
-          if (foundNotification) {
-            log(`Found notification through RPC: ${JSON.stringify({
-              id: foundNotification.id,
-              transaksi_id: foundNotification.transaksi_id,
-              source_type: foundNotification.source_type
-            })}`);
-            
-            // Update source based on what we found
-            if (foundNotification.transaksi_id) {
-              source = 'transaction';
-            } else {
-              source = 'global';
-            }
-          }
-        } catch (rpcError) {
-          log(`Error fetching notification via RPC: ${rpcError.message}`);        
-        }
+      if (!anggotaId) {
+        log('Cannot mark notification as read: missing anggotaId');
+        return false;
+      }
+      
+      // Skip RPC and directly check both tables if source is not specified
+      if (!source) {
+        log(`Source not specified, checking both tables for notification ${notificationId}`);
       }
       
       // Check transaction notifications
@@ -559,7 +554,7 @@ export const NotificationService = {
             .eq('id', notificationId);
           
           if (updateError) {
-            logError('Error marking transaction notification as read', updateError);
+            log(`Error marking transaction notification as read: ${updateError.message || updateError}`);
             return false;
           }
           
@@ -612,7 +607,7 @@ export const NotificationService = {
                 .eq('anggota_id', anggotaId);
               
               if (updateError) {
-                logError('Error updating global notification read status', updateError);
+                log(`Error updating global notification read status: ${updateError.message || updateError}`);
                 return false;
               }
               
@@ -630,7 +625,7 @@ export const NotificationService = {
                 });
               
               if (insertError) {
-                logError('Error creating global notification read status', insertError);
+                log(`Error creating global notification read status: ${insertError.message || insertError}`);
                 return false;
               }
               
@@ -661,7 +656,7 @@ export const NotificationService = {
       log(`Notification ${notificationId} not found in database tables.`);
       return false;
     } catch (error) {
-      logError('Error in markAsReadDirectly', error);
+      log(`Error in markAsReadDirectly: ${error.message || error}`);
       return false;
     }
   },
@@ -727,7 +722,7 @@ export const NotificationService = {
       
       return success;
     } catch (error) {
-      logError('Error in markAllAsRead', error);
+      log(`Error in markAllAsRead: ${error.message || error}`);
       return false;
     }
   }

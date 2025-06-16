@@ -84,6 +84,7 @@ export interface NotificationTypeInfo {
 }
 
 export const NOTIFICATION_TYPES: Record<string, NotificationTypeInfo> = {
+  // General notification types
   transaksi: {
     name: 'Transaksi',
     icon: 'cash-outline',
@@ -112,6 +113,30 @@ export const NOTIFICATION_TYPES: Record<string, NotificationTypeInfo> = {
     isPushEnabled: true,
     isGlobal: false
   },
+  
+  // Specific transaction types
+  tabungan_masuk: {
+    name: 'Tabungan Masuk',
+    icon: 'arrow-down-outline',
+    color: '#28a745', // Green for incoming funds
+    isPushEnabled: true,
+    isGlobal: false
+  },
+  tabungan_keluar: {
+    name: 'Tabungan Keluar',
+    icon: 'arrow-up-outline',
+    color: '#dc3545', // Red for outgoing funds
+    isPushEnabled: true,
+    isGlobal: false
+  },
+  pembiayaan_masuk: {
+    name: 'Pembiayaan Masuk',
+    icon: 'cash-outline',
+    color: '#007bff', // Blue for financing
+    isPushEnabled: true,
+    isGlobal: false
+  },
+  
   // Default fallback for any unrecognized types
   info: {
     name: 'Info',

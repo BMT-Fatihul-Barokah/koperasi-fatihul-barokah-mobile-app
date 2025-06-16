@@ -280,10 +280,10 @@ export default function SettingsScreen() {
           <Text style={styles.logoutText}>Keluar</Text>
         </TouchableOpacity>
         
-        {/* Footer with copyright */}
+        {/* Footer with copyright and credits */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>© 2025 Koperasi Fatihul Barokah</Text>
-          <Text style={styles.footerText}>Semua Hak Dilindungi</Text>
+          <Text style={styles.footerText}>© 2025 ALL RIGHTS RESERVED</Text>
+          <Text style={styles.footerText}>CODE BY ANDRE WIJAYA, IQBAL ISYA FATHURROHMAN, NOVANDRA ANUGRAH</Text>
         </View>
       </ScrollView>
       

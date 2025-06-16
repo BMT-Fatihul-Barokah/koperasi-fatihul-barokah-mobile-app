@@ -86,6 +86,77 @@ describe('NotificationService Read Status Tests', () => {
   });
   
   test('Global notification read status should be created if it does not exist', async () => {
-    // TODO: Implement this test to verify global notification read status handling
+    // Setup mocks for global notification check and insert
+    const mockGlobalCheckResponse = {
+      data: [], // No existing read status
+      error: null,
+    };
+    
+    const mockGlobalInsertResponse = {
+      data: [{ id: 'new-read-status-id' }],
+      error: null,
+    };
+    
+    // Mock the Supabase client methods
+    const mockFrom = jest.fn().mockReturnThis();
+    const mockSelect = jest.fn().mockReturnThis();
+    const mockEq = jest.fn().mockReturnThis();
+    const mockInsert = jest.fn().mockReturnThis();
+    
+    // Mock the actual responses
+    mockFrom.mockImplementation(() => ({
+      select: mockSelect,
+      insert: mockInsert,
+    }));
+    
+    mockSelect.mockImplementation(() => ({
+      eq: mockEq,
+    }));
+    
+    mockEq.mockResolvedValue(mockGlobalCheckResponse);
+    mockInsert.mockResolvedValue(mockGlobalInsertResponse);
+    
+    // Test the markAsReadDirectly function with global notification
+    const result = await NotificationService.markAsReadDirectly('global-notif-id', 'global', 'user-123');
+    
+    // Verify the expected behavior
+    expect(result).toBe(true);
+    expect(NotificationService.clearCache).toHaveBeenCalled();
+  });
+  
+  test('Should handle notification not found in either table', async () => {
+    // Setup mocks for failed checks in both tables
+    const mockTransactionCheckResponse = {
+      data: [], // No transaction notification found
+      error: null,
+    };
+    
+    const mockGlobalCheckResponse = {
+      data: [], // No global notification found
+      error: null,
+    };
+    
+    // Mock the Supabase client methods
+    const mockFrom = jest.fn().mockReturnThis();
+    const mockSelect = jest.fn().mockReturnThis();
+    const mockEq = jest.fn().mockReturnThis();
+    
+    // Mock the actual responses
+    mockFrom.mockImplementation(() => ({
+      select: mockSelect,
+    }));
+    
+    mockSelect.mockImplementation(() => ({
+      eq: mockEq,
+    }));
+    
+    mockEq.mockResolvedValue(mockTransactionCheckResponse);
+    mockEq.mockResolvedValueOnce(mockGlobalCheckResponse);
+    
+    // Test the markAsReadDirectly function with non-existent notification
+    const result = await NotificationService.markAsReadDirectly('non-existent-id');
+    
+    // Verify the expected behavior
+    expect(result).toBe(false);
   });
 });

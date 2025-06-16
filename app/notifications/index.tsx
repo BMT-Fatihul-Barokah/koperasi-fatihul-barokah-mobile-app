@@ -302,10 +302,11 @@ export default function NotificationsScreen() {
     } else if (activeFilter === 'unread') {
       return notifications.data.filter(item => !item.is_read);
     } else if (activeFilter === 'transaksi') {
-      // Filter by source field for transaction notifications
+      // Filter by source field or transaction-related jenis
+      const transactionTypes = ['transaksi', 'tabungan_masuk', 'tabungan_keluar', 'pembiayaan_masuk'];
       const filtered = notifications.data.filter(item => 
-        item.source === 'transaction' || // New field
-        item.jenis === 'transaksi'       // Legacy field
+        item.source === 'transaction' || // Source field
+        transactionTypes.includes(item.jenis) // Check against all transaction types
       );
       Logger.debug(LogCategory.NOTIFICATIONS, `Filtered ${filtered.length} transaction notifications`);
       return filtered;
