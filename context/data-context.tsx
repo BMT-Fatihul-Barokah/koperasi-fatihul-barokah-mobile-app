@@ -4,7 +4,8 @@ import { useAuth } from './auth-context';
 import { Anggota } from '../lib/database.types';
 import { LoanNotificationService } from '../services/loan-notification.service';
 import { Logger, LogCategory } from '../lib/logger';
-import { NotificationService, Notification as NotificationType } from '../services/notification.service';
+import { NotificationService } from '../services/notification.service';
+import { Notification as NotificationType } from '../lib/notification.types';
 
 interface Transaction {
   id: string;

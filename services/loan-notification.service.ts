@@ -70,17 +70,31 @@ export const LoanNotificationService = {
       const dueMonth = loanDueDate.getMonth();
       
       // Calculate number of months between start date and due date
-      const loanTermMonths = (dueYear - startYear) * 12 + (dueMonth - startMonth);
+      let loanTermMonths = (dueYear - startYear) * 12 + (dueMonth - startMonth);
       
-      Logger.debug('Loan', `Loan term calculated as ${loanTermMonths} months`, { loanId: loan.id });
+      // Handle short-term loans (less than one month)
+      if (loanTermMonths <= 0) {
+        loanTermMonths = 1; // Treat as a single payment loan
+        Logger.debug('Loan', `Short-term loan detected, treating as ${loanTermMonths} month term`, { loanId: loan.id });
+      } else {
+        Logger.debug('Loan', `Loan term calculated as ${loanTermMonths} months`, { loanId: loan.id });
+      }
       
       // Calculate all installment dates
       const installmentDates: Date[] = [];
-      for (let i = 1; i <= loanTermMonths; i++) {
-        const installmentDate = addMonths(loanStartDate, i);
-        // Ensure the installment date is on the same day of month as the start date
-        installmentDate.setDate(installmentDay);
-        installmentDates.push(installmentDate);
+      
+      // For short-term loans, use the due date directly
+      if (loanTermMonths === 1 && loanStartDate.getMonth() === loanDueDate.getMonth() && 
+          loanStartDate.getFullYear() === loanDueDate.getFullYear()) {
+        installmentDates.push(loanDueDate);
+      } else {
+        // For regular loans, calculate installment dates based on term
+        for (let i = 1; i <= loanTermMonths; i++) {
+          const installmentDate = addMonths(loanStartDate, i);
+          // Ensure the installment date is on the same day of month as the start date
+          installmentDate.setDate(installmentDay);
+          installmentDates.push(installmentDate);
+        }
       }
       
       Logger.debug('Loan', `Generated ${installmentDates.length} installment dates`, { loanId: loan.id });
@@ -210,7 +224,13 @@ export const LoanNotificationService = {
       const startMonth = loanStartDate.getMonth();
       const dueYear = loanDueDate.getFullYear();
       const dueMonth = loanDueDate.getMonth();
-      const loanTermMonths = (dueYear - startYear) * 12 + (dueMonth - startMonth);
+      let loanTermMonths = (dueYear - startYear) * 12 + (dueMonth - startMonth);
+      
+      // Handle short-term loans (less than one month)
+      if (loanTermMonths <= 0) {
+        loanTermMonths = 1; // Treat as a single payment loan
+        Logger.debug('Loan', `Short-term loan detected in notification creation, treating as ${loanTermMonths} month term`, { loanId: loan.id });
+      }
       
       // Calculate the installment amount based on the total payment and loan term
       const installmentAmount = Math.round(loan.total_pembayaran / loanTermMonths);
@@ -228,22 +248,23 @@ export const LoanNotificationService = {
       });
       
       // Create the notification
-      const success = await NotificationService.createNotification({
+      const result = await NotificationService.createNotification({
         anggota_id: loan.anggota_id,
         judul: title,
         pesan: `${message} (${formattedDate})`,
         jenis: 'jatuh_tempo',
         is_read: false,
-        data: notificationData
+        data: notificationData,
+        source: 'global' // Adding the required source property
       });
       
-      if (success) {
-        console.log(`Due date notification created successfully for loan ${loan.id}`);
+      if (result.success) {
+        console.log(`Due date notification created successfully for loan ${loan.id} with notification ID: ${result.id}`);
       } else {
         console.error(`Failed to create due date notification for loan ${loan.id}`);
       }
       
-      return success;
+      return result.success;
     } catch (error) {
       console.error('Error creating due date notification:', error);
       return false;
