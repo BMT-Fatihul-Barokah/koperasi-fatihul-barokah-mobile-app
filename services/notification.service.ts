@@ -267,27 +267,33 @@ export const NotificationService = {
       }));
       
       // Format global notifications
-      const formattedGlobalNotifications = (globalNotifications || []).map(item => ({
-        id: item.id,
-        judul: item.judul,
-        pesan: item.pesan,
-        jenis: item.jenis || 'pengumuman',
-        data: item.data || {},
-        is_read: readStatusMap.get(item.id) ?? false,
-        created_at: item.created_at,
-        updated_at: item.updated_at || item.created_at,
-        source: 'global' as const,
-        global_notifikasi_id: item.id,
-        anggota_id: anggotaId
-      }));
+      const formattedGlobalNotifications = (globalNotifications || []).map(item => {
+        // Log the jenis value for debugging
+        log(`Global notification ${item.id} has jenis: ${item.jenis || 'undefined'}`);
+        
+        return {
+          id: item.id,
+          judul: item.judul,
+          pesan: item.pesan,
+          // Keep the original jenis value without defaulting to 'pengumuman'
+          jenis: item.jenis,
+          data: item.data || {},
+          is_read: readStatusMap.get(item.id) ?? false,
+          created_at: item.created_at,
+          updated_at: item.updated_at || item.created_at,
+          source: 'global' as const,
+          global_notifikasi_id: item.id,
+          anggota_id: anggotaId
+        };
+      });
       
-      // Combine, sort by date (newest first), and limit the results
-      const allNotifications = [
-        ...formattedTransactionNotifications,
-        ...formattedGlobalNotifications
-      ]
-        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-        .slice(0, limit);
+    // Combine, sort by date (newest first), and limit the results
+    const allNotifications = [
+      ...formattedTransactionNotifications,
+      ...formattedGlobalNotifications
+    ]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, limit);
         
       // Store in cache
       notificationCache[cacheKey] = allNotifications;
