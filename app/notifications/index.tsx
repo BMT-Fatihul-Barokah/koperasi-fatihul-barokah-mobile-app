@@ -29,7 +29,7 @@ import { Notification } from "../../lib/notification.types";
 import { format, parseISO, formatDistanceToNow } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { StandardHeader } from "../../components/header/standard-header";
+import { DashboardHeader } from "../../components/header/dashboard-header";
 import { NotificationService } from "../../services/notification.service";
 import {
 	NOTIFICATION_TYPES,
@@ -554,13 +554,14 @@ export default function NotificationsScreen() {
 
 	return (
 		<SafeAreaView style={styles.container} edges={["bottom"]}>
-			<StandardHeader
+			<DashboardHeader
 				title="Notifikasi"
 				showBackButton={false}
 				rightIcon={{
 					name: "ellipsis-vertical",
 					onPress: toggleMenu,
 				}}
+				gradientColors={["#003D82", "#0066CC"]}
 			/>
 
 			{/* Options Menu Modal */}
