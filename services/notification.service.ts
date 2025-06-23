@@ -297,18 +297,147 @@ export const NotificationService = {
 				`Found ${transactionNotifications.length} transaction notifications`
 			);
 
-			// Fetch global notifications
-			const { data: globalNotifications, error: gnError } =
-				await supabase
-					.from("global_notifikasi")
-					.select("*")
-					.order("created_at", { ascending: false });
+			// Fetch global notifications with read status using a more robust approach
+			log("Fetching global notifications with read status");
 
-			if (gnError) {
-				logError(
-					"Error fetching global notifications",
-					gnError
+			// First, try using the database function (most reliable)
+			let globalNotifications = [];
+			let readStatusMap = new Map<string, boolean>();
+
+			try {
+				log(
+					"Attempting to fetch global notifications using database function"
 				);
+				const { data: functionResult, error: functionError } =
+					await supabase.rpc(
+						"get_member_global_notifications",
+						{
+							member_id: anggotaId,
+						}
+					);
+
+				if (functionError) {
+					logError(
+						"Error fetching global notifications via function",
+						functionError
+					);
+					throw functionError;
+				}
+
+				if (functionResult && functionResult.length > 0) {
+					log(
+						`Function returned ${functionResult.length} global notifications`
+					);
+					globalNotifications = functionResult;
+					// Extract read status from the function result
+					functionResult.forEach((item) => {
+						readStatusMap.set(item.id, item.is_read);
+					});
+				} else {
+					log("Function returned no global notifications");
+					globalNotifications = [];
+				}
+			} catch (functionError) {
+				log("Function approach failed, trying join query");
+
+				try {
+					const {
+						data: globalWithReadStatus,
+						error: globalError,
+					} = await supabase
+						.from("global_notifikasi")
+						.select(
+							`
+							id,
+							judul,
+							pesan,
+							jenis,
+							data,
+							created_at,
+							updated_at,
+							global_notifikasi_read!inner(is_read, anggota_id)
+						`
+						)
+						.eq(
+							"global_notifikasi_read.anggota_id",
+							anggotaId
+						)
+						.order("created_at", { ascending: false });
+
+					if (globalError) {
+						logError(
+							"Error fetching global notifications with join",
+							globalError
+						);
+						throw globalError;
+					}
+
+					if (globalWithReadStatus) {
+						globalNotifications = globalWithReadStatus;
+						// Extract read status from the joined data
+						globalNotifications.forEach((item) => {
+							if (
+								item.global_notifikasi_read &&
+								item.global_notifikasi_read
+									.length > 0
+							) {
+								readStatusMap.set(
+									item.id,
+									item
+										.global_notifikasi_read[0]
+										.is_read
+								);
+							}
+						});
+					}
+				} catch (joinError) {
+					// Fallback: Fetch global notifications and read status separately
+					log(
+						"Global notification join failed, falling back to separate queries"
+					);
+
+					const {
+						data: globalNotificationsData,
+						error: gnError,
+					} = await supabase
+						.from("global_notifikasi")
+						.select("*")
+						.order("created_at", { ascending: false });
+
+					if (gnError) {
+						logError(
+							"Error fetching global notifications (fallback)",
+							gnError
+						);
+						globalNotifications = [];
+					} else {
+						globalNotifications =
+							globalNotificationsData || [];
+					}
+
+					// Get read status for global notifications
+					const { data: readStatusData, error: rsError } =
+						await supabase
+							.from("global_notifikasi_read")
+							.select(
+								"global_notifikasi_id, is_read"
+							)
+							.eq("anggota_id", anggotaId);
+
+					if (rsError) {
+						logError(
+							"Error fetching notification read status (fallback)",
+							rsError
+						);
+					} else if (readStatusData) {
+						readStatusData.forEach((item) => {
+							readStatusMap.set(
+								item.global_notifikasi_id,
+								item.is_read
+							);
+						});
+					}
+				}
 			}
 
 			log(
@@ -316,31 +445,6 @@ export const NotificationService = {
 					globalNotifications?.length || 0
 				} global notifications`
 			);
-
-			// Get read status for global notifications
-			const { data: readStatusData, error: rsError } =
-				await supabase
-					.from("global_notifikasi_read")
-					.select("global_notifikasi_id, is_read")
-					.eq("anggota_id", anggotaId);
-
-			if (rsError) {
-				logError(
-					"Error fetching notification read status",
-					rsError
-				);
-			}
-
-			// Create read status map for quick lookup
-			const readStatusMap = new Map<string, boolean>();
-			if (readStatusData && readStatusData.length > 0) {
-				readStatusData.forEach((item) => {
-					readStatusMap.set(
-						item.global_notifikasi_id,
-						item.is_read
-					);
-				});
-			}
 
 			// Format transaction notifications
 			const formattedTransactionNotifications =
@@ -403,9 +507,23 @@ export const NotificationService = {
 				`Cached ${allNotifications.length} notifications for member ${anggotaId}`
 			);
 
+			// Log detailed breakdown
+			const typeBreakdown = {};
+			allNotifications.forEach((n) => {
+				typeBreakdown[n.jenis] =
+					(typeBreakdown[n.jenis] || 0) + 1;
+			});
+
 			log(
-				`Returning ${allNotifications.length} total notifications (${formattedTransactionNotifications.length} transaction, ${formattedGlobalNotifications.length} global)`
+				`Returning ${
+					allNotifications.length
+				} total notifications (${
+					formattedTransactionNotifications.length
+				} transaction, ${
+					formattedGlobalNotifications.length
+				} global). Types: ${JSON.stringify(typeBreakdown)}`
 			);
+
 			return allNotifications;
 		} catch (error) {
 			logError("Error in getNotifications", error);
@@ -429,42 +547,32 @@ export const NotificationService = {
 			const isGlobalType = ["pengumuman", "sistem"].includes(type);
 
 			if (isGlobalType) {
-				// Get global notifications of this type
-				const { data, error } = await supabase
-					.from("global_notifikasi")
-					.select(
-						`
-            id,
-            judul,
-            pesan,
-            jenis,
-            data,
-            created_at,
-            updated_at,
-            global_notifikasi_read!left(id, anggota_id, is_read)
-          `
-					)
-					.eq("jenis", type)
-					.order("created_at", { ascending: false })
-					.limit(limit);
-
-				if (error) {
-					logError(
-						`Error fetching ${type} notifications`,
-						error
+				// First try using the database function
+				try {
+					log(
+						`Fetching ${type} notifications using database function`
 					);
-					return [];
-				}
+					const { data, error } = await supabase.rpc(
+						"get_member_global_notifications",
+						{
+							member_id: anggotaId,
+						}
+					);
 
-				// Transform to match the Notification interface
-				return (data || []).map((item) => {
-					// Find read status for this member
-					const readStatus =
-						item.global_notifikasi_read.find(
-							(r) => r.anggota_id === anggotaId
+					if (error) {
+						logError(
+							`Error fetching ${type} notifications via function`,
+							error
 						);
+						throw error;
+					}
 
-					return {
+					// Filter by type and limit
+					const filteredData = (data || [])
+						.filter((item) => item.jenis === type)
+						.slice(0, limit);
+
+					return filteredData.map((item) => ({
 						id: item.id,
 						judul: item.judul,
 						pesan: item.pesan,
@@ -473,12 +581,70 @@ export const NotificationService = {
 						created_at: item.created_at,
 						updated_at:
 							item.updated_at || item.created_at,
-						is_read: readStatus?.is_read ?? false,
+						is_read: item.is_read ?? false,
 						source: "global",
 						global_notifikasi_id: item.id,
 						anggota_id: anggotaId,
-					};
-				});
+					}));
+				} catch (functionError) {
+					// Fallback to direct query
+					log(
+						`Function failed for ${type} notifications, using direct query`
+					);
+
+					// Get global notifications of this type
+					const { data, error } = await supabase
+						.from("global_notifikasi")
+						.select(
+							`
+			            id,
+			            judul,
+			            pesan,
+			            jenis,
+			            data,
+			            created_at,
+			            updated_at,
+			            global_notifikasi_read!left(id, anggota_id, is_read)
+			          `
+						)
+						.eq("jenis", type)
+						.order("created_at", { ascending: false })
+						.limit(limit);
+
+					if (error) {
+						logError(
+							`Error fetching ${type} notifications`,
+							error
+						);
+						return [];
+					}
+
+					// Transform to match the Notification interface
+					return (data || []).map((item) => {
+						// Find read status for this member
+						const readStatus =
+							item.global_notifikasi_read.find(
+								(r) =>
+									r.anggota_id === anggotaId
+							);
+
+						return {
+							id: item.id,
+							judul: item.judul,
+							pesan: item.pesan,
+							jenis: item.jenis,
+							data: item.data || {},
+							created_at: item.created_at,
+							updated_at:
+								item.updated_at ||
+								item.created_at,
+							is_read: readStatus?.is_read ?? false,
+							source: "global",
+							global_notifikasi_id: item.id,
+							anggota_id: anggotaId,
+						};
+					});
+				}
 			} else {
 				// Get transaction notifications of this type
 				const { data, error } = await supabase
@@ -1035,6 +1201,170 @@ export const NotificationService = {
 		} catch (error) {
 			log(`Error in markAllAsRead: ${error.message || error}`);
 			return false;
+		}
+	},
+
+	/**
+	 * Test method to verify global notification fetching
+	 * @param anggotaId Member ID to test with
+	 */
+	async testGlobalNotificationFetch(anggotaId: string): Promise<void> {
+		try {
+			log(
+				`Testing global notification fetch for member: ${anggotaId}`
+			);
+
+			// Test 1: Database function approach
+			log("=== Test 1: Database Function ===");
+			try {
+				const { data: functionResult, error: functionError } =
+					await supabase.rpc(
+						"get_member_global_notifications",
+						{
+							member_id: anggotaId,
+						}
+					);
+
+				if (functionError) {
+					logError("Function error", functionError);
+				} else {
+					log(
+						`Function success: ${
+							functionResult?.length || 0
+						} notifications`
+					);
+					if (functionResult && functionResult.length > 0) {
+						const typeCount = {};
+						functionResult.forEach((n) => {
+							typeCount[n.jenis] =
+								(typeCount[n.jenis] || 0) + 1;
+						});
+						log("Function result types:", typeCount);
+					}
+				}
+			} catch (error) {
+				logError("Function exception", error);
+			}
+
+			// Test 2: Direct global query
+			log("=== Test 2: Direct Global Query ===");
+			try {
+				const { data: directGlobal, error: directError } =
+					await supabase
+						.from("global_notifikasi")
+						.select("*")
+						.order("created_at", { ascending: false });
+
+				if (directError) {
+					logError(
+						"Direct global query error",
+						directError
+					);
+				} else {
+					log(
+						`Direct global query success: ${
+							directGlobal?.length || 0
+						} notifications`
+					);
+				}
+			} catch (error) {
+				logError("Direct global query exception", error);
+			}
+
+			// Test 3: Read status query
+			log("=== Test 3: Read Status Query ===");
+			try {
+				const { data: readStatus, error: readError } =
+					await supabase
+						.from("global_notifikasi_read")
+						.select("*")
+						.eq("anggota_id", anggotaId);
+
+				if (readError) {
+					logError("Read status query error", readError);
+				} else {
+					log(
+						`Read status query success: ${
+							readStatus?.length || 0
+						} entries`
+					);
+				}
+			} catch (error) {
+				logError("Read status query exception", error);
+			}
+
+			// Test 4: Joined query
+			log("=== Test 4: Joined Query ===");
+			try {
+				const { data: joinedData, error: joinError } =
+					await supabase
+						.from("global_notifikasi")
+						.select(
+							`
+						id,
+						judul,
+						pesan,
+						jenis,
+						data,
+						created_at,
+						updated_at,
+						global_notifikasi_read!inner(is_read, anggota_id)
+					`
+						)
+						.eq(
+							"global_notifikasi_read.anggota_id",
+							anggotaId
+						)
+						.order("created_at", { ascending: false });
+
+				if (joinError) {
+					logError("Joined query error", joinError);
+				} else {
+					log(
+						`Joined query success: ${
+							joinedData?.length || 0
+						} notifications`
+					);
+				}
+			} catch (error) {
+				logError("Joined query exception", error);
+			}
+
+			// Test 5: Full notification fetch
+			log("=== Test 5: Full Notification Fetch ===");
+			try {
+				const allNotifications = await this.getNotifications(
+					anggotaId,
+					50,
+					true
+				);
+				log(
+					`Full fetch success: ${allNotifications.length} total notifications`
+				);
+
+				const typeCount = {};
+				const sourceCount = {};
+				allNotifications.forEach((n) => {
+					typeCount[n.jenis] =
+						(typeCount[n.jenis] || 0) + 1;
+					sourceCount[n.source] =
+						(sourceCount[n.source] || 0) + 1;
+				});
+
+				log("Full fetch breakdown - Types:", typeCount);
+				log("Full fetch breakdown - Sources:", sourceCount);
+
+				// Specifically check for sistem and pengumuman
+				const sistemCount = typeCount["sistem"] || 0;
+				const pengumumanCount = typeCount["pengumuman"] || 0;
+				log(
+					`Sistem notifications: ${sistemCount}, Pengumuman notifications: ${pengumumanCount}`
+				);
+			} catch (error) {
+				logError("Full fetch exception", error);
+			}
+		} catch (error) {
+			logError("Error in testGlobalNotificationFetch", error);
 		}
 	},
 };
