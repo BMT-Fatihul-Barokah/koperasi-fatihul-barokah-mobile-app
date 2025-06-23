@@ -1,162 +1,355 @@
-import { NotificationService } from '../services/notification.service';
-
-// Mock the cache clearing to verify it's called
-jest.mock('../services/notification.service', () => {
-  const originalModule = jest.requireActual('../services/notification.service');
-  return {
-    ...originalModule,
-    NotificationService: {
-      ...originalModule.NotificationService,
-      clearCache: jest.fn(),
-    },
-  };
-});
+/**
+ * Test file for notification read status functionality
+ */
 
 // Mock Supabase
-jest.mock('@supabase/supabase-js', () => {
-  return {
-    createClient: jest.fn(() => ({
-      from: jest.fn().mockReturnThis(),
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockReturnThis(),
-      update: jest.fn().mockReturnThis(),
-      insert: jest.fn().mockReturnThis(),
-      in: jest.fn().mockReturnThis(),
-      rpc: jest.fn().mockReturnThis(),
-      then: jest.fn().mockImplementation(callback => {
-        callback({ data: [], error: null });
-        return { catch: jest.fn() };
-      }),
-    })),
-  };
-});
+const mockSupabase = {
+	from: jest.fn(() => ({
+		select: jest.fn(() => ({
+			eq: jest.fn(() => ({
+				single: jest.fn(() =>
+					Promise.resolve({
+						data: { id: "test-id", is_read: false },
+						error: null,
+					})
+				),
+				limit: jest.fn(() =>
+					Promise.resolve({
+						data: [{ id: "test-id", is_read: false }],
+						error: null,
+					})
+				),
+			})),
+		})),
+		update: jest.fn(() => ({
+			eq: jest.fn(() => Promise.resolve({ error: null })),
+		})),
+		insert: jest.fn(() => Promise.resolve({ error: null })),
+	})),
+};
 
-describe('NotificationService Read Status Tests', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-  
-  test('markAsRead should clear cache after successful update', async () => {
-    // Setup mocks for a successful transaction notification update
-    const mockSupabaseResponse = {
-      data: [{ id: '123', transaksi_id: '456' }],
-      error: null,
-    };
-    
-    const mockUpdateResponse = {
-      error: null,
-    };
-    
-    // Mock the Supabase client methods
-    const mockFrom = jest.fn().mockReturnThis();
-    const mockSelect = jest.fn().mockReturnThis();
-    const mockEq = jest.fn().mockReturnThis();
-    const mockLimit = jest.fn().mockReturnThis();
-    const mockUpdate = jest.fn().mockReturnThis();
-    
-    // Mock the actual responses
-    mockFrom.mockImplementation(() => ({
-      select: mockSelect,
-      update: mockUpdate,
-    }));
-    
-    mockSelect.mockImplementation(() => ({
-      eq: mockEq,
-      limit: mockLimit,
-    }));
-    
-    mockEq.mockImplementation(() => ({
-      limit: mockLimit,
-    }));
-    
-    mockLimit.mockResolvedValue(mockSupabaseResponse);
-    mockUpdate.mockImplementation(() => ({
-      eq: mockEq,
-    }));
-    
-    mockEq.mockResolvedValue(mockUpdateResponse);
-    
-    // Test the markAsRead function
-    const result = await NotificationService.markAsRead('123', 'transaction', 'user-123');
-    
-    // Verify the expected behavior
-    expect(result).toBe(true);
-    expect(NotificationService.clearCache).toHaveBeenCalled();
-  });
-  
-  test('Global notification read status should be created if it does not exist', async () => {
-    // Setup mocks for global notification check and insert
-    const mockGlobalCheckResponse = {
-      data: [], // No existing read status
-      error: null,
-    };
-    
-    const mockGlobalInsertResponse = {
-      data: [{ id: 'new-read-status-id' }],
-      error: null,
-    };
-    
-    // Mock the Supabase client methods
-    const mockFrom = jest.fn().mockReturnThis();
-    const mockSelect = jest.fn().mockReturnThis();
-    const mockEq = jest.fn().mockReturnThis();
-    const mockInsert = jest.fn().mockReturnThis();
-    
-    // Mock the actual responses
-    mockFrom.mockImplementation(() => ({
-      select: mockSelect,
-      insert: mockInsert,
-    }));
-    
-    mockSelect.mockImplementation(() => ({
-      eq: mockEq,
-    }));
-    
-    mockEq.mockResolvedValue(mockGlobalCheckResponse);
-    mockInsert.mockResolvedValue(mockGlobalInsertResponse);
-    
-    // Test the markAsReadDirectly function with global notification
-    const result = await NotificationService.markAsReadDirectly('global-notif-id', 'global', 'user-123');
-    
-    // Verify the expected behavior
-    expect(result).toBe(true);
-    expect(NotificationService.clearCache).toHaveBeenCalled();
-  });
-  
-  test('Should handle notification not found in either table', async () => {
-    // Setup mocks for failed checks in both tables
-    const mockTransactionCheckResponse = {
-      data: [], // No transaction notification found
-      error: null,
-    };
-    
-    const mockGlobalCheckResponse = {
-      data: [], // No global notification found
-      error: null,
-    };
-    
-    // Mock the Supabase client methods
-    const mockFrom = jest.fn().mockReturnThis();
-    const mockSelect = jest.fn().mockReturnThis();
-    const mockEq = jest.fn().mockReturnThis();
-    
-    // Mock the actual responses
-    mockFrom.mockImplementation(() => ({
-      select: mockSelect,
-    }));
-    
-    mockSelect.mockImplementation(() => ({
-      eq: mockEq,
-    }));
-    
-    mockEq.mockResolvedValue(mockTransactionCheckResponse);
-    mockEq.mockResolvedValueOnce(mockGlobalCheckResponse);
-    
-    // Test the markAsReadDirectly function with non-existent notification
-    const result = await NotificationService.markAsReadDirectly('non-existent-id');
-    
-    // Verify the expected behavior
-    expect(result).toBe(false);
-  });
+// Mock the supabase import
+jest.mock("../lib/supabase", () => ({
+	supabase: mockSupabase,
+}));
+
+// Mock logger
+jest.mock("../lib/logger", () => ({
+	Logger: {
+		info: jest.fn(),
+		debug: jest.fn(),
+		error: jest.fn(),
+		warn: jest.fn(),
+	},
+}));
+
+const { NotificationService } = require("../services/notification.service");
+
+describe("NotificationService - markAsRead functionality", () => {
+	beforeEach(() => {
+		jest.clearAllMocks();
+		NotificationService.clearCache();
+	});
+
+	describe("markAsRead for transaction notifications", () => {
+		it("should successfully mark a transaction notification as read", async () => {
+			// Mock transaction notification exists
+			mockSupabase.from.mockReturnValueOnce({
+				select: jest.fn(() => ({
+					eq: jest.fn(() => ({
+						single: jest.fn(() =>
+							Promise.resolve({
+								data: {
+									id: "test-notif-id",
+									transaksi_id:
+										"test-trans-id",
+									is_read: false,
+								},
+								error: null,
+							})
+						),
+					})),
+				})),
+			});
+
+			// Mock successful update
+			mockSupabase.from.mockReturnValueOnce({
+				update: jest.fn(() => ({
+					eq: jest.fn(() =>
+						Promise.resolve({ error: null })
+					),
+				})),
+			});
+
+			const result = await NotificationService.markAsRead(
+				"test-notif-id",
+				"transaction",
+				"test-member-id"
+			);
+
+			expect(result).toBe(true);
+			expect(mockSupabase.from).toHaveBeenCalledWith(
+				"transaksi_notifikasi"
+			);
+		});
+
+		it("should fail gracefully when transaction notification does not exist", async () => {
+			// Mock notification not found
+			mockSupabase.from.mockReturnValueOnce({
+				select: jest.fn(() => ({
+					eq: jest.fn(() => ({
+						single: jest.fn(() =>
+							Promise.resolve({
+								data: null,
+								error: { code: "PGRST116" },
+							})
+						),
+					})),
+				})),
+			});
+
+			const result = await NotificationService.markAsRead(
+				"non-existent-id",
+				"transaction",
+				"test-member-id"
+			);
+
+			expect(result).toBe(false);
+		});
+	});
+
+	describe("markAsRead for global notifications", () => {
+		it("should successfully mark a global notification as read by updating existing record", async () => {
+			// Mock global notification exists
+			mockSupabase.from.mockReturnValueOnce({
+				select: jest.fn(() => ({
+					eq: jest.fn(() => ({
+						single: jest.fn(() =>
+							Promise.resolve({
+								data: { id: "test-global-id" },
+								error: null,
+							})
+						),
+					})),
+				})),
+			});
+
+			// Mock read status exists
+			mockSupabase.from.mockReturnValueOnce({
+				select: jest.fn(() => ({
+					eq: jest.fn(() => ({
+						single: jest.fn(() =>
+							Promise.resolve({
+								data: {
+									id: "read-status-id",
+									is_read: false,
+								},
+								error: null,
+							})
+						),
+					})),
+				})),
+			});
+
+			// Mock successful update
+			mockSupabase.from.mockReturnValueOnce({
+				update: jest.fn(() => ({
+					eq: jest.fn(() =>
+						Promise.resolve({ error: null })
+					),
+				})),
+			});
+
+			const result = await NotificationService.markAsRead(
+				"test-global-id",
+				"global",
+				"test-member-id"
+			);
+
+			expect(result).toBe(true);
+		});
+
+		it("should successfully mark a global notification as read by creating new record", async () => {
+			// Mock global notification exists
+			mockSupabase.from.mockReturnValueOnce({
+				select: jest.fn(() => ({
+					eq: jest.fn(() => ({
+						single: jest.fn(() =>
+							Promise.resolve({
+								data: { id: "test-global-id" },
+								error: null,
+							})
+						),
+					})),
+				})),
+			});
+
+			// Mock read status does not exist
+			mockSupabase.from.mockReturnValueOnce({
+				select: jest.fn(() => ({
+					eq: jest.fn(() => ({
+						single: jest.fn(() =>
+							Promise.resolve({
+								data: null,
+								error: { code: "PGRST116" },
+							})
+						),
+					})),
+				})),
+			});
+
+			// Mock successful insert
+			mockSupabase.from.mockReturnValueOnce({
+				insert: jest.fn(() => Promise.resolve({ error: null })),
+			});
+
+			const result = await NotificationService.markAsRead(
+				"test-global-id",
+				"global",
+				"test-member-id"
+			);
+
+			expect(result).toBe(true);
+		});
+	});
+
+	describe("markAsRead auto-detection", () => {
+		it("should auto-detect transaction notification when source is not specified", async () => {
+			// Mock transaction notification exists
+			mockSupabase.from.mockReturnValueOnce({
+				select: jest.fn(() => ({
+					eq: jest.fn(() => ({
+						single: jest.fn(() =>
+							Promise.resolve({
+								data: {
+									id: "test-notif-id",
+									transaksi_id:
+										"test-trans-id",
+									is_read: false,
+								},
+								error: null,
+							})
+						),
+					})),
+				})),
+			});
+
+			// Mock successful update
+			mockSupabase.from.mockReturnValueOnce({
+				update: jest.fn(() => ({
+					eq: jest.fn(() =>
+						Promise.resolve({ error: null })
+					),
+				})),
+			});
+
+			const result = await NotificationService.markAsRead(
+				"test-notif-id",
+				undefined,
+				"test-member-id"
+			);
+
+			expect(result).toBe(true);
+		});
+
+		it("should fall back to global when transaction notification not found", async () => {
+			// Mock transaction notification not found
+			mockSupabase.from.mockReturnValueOnce({
+				select: jest.fn(() => ({
+					eq: jest.fn(() => ({
+						single: jest.fn(() =>
+							Promise.resolve({
+								data: null,
+								error: { code: "PGRST116" },
+							})
+						),
+					})),
+				})),
+			});
+
+			// Mock global notification exists
+			mockSupabase.from.mockReturnValueOnce({
+				select: jest.fn(() => ({
+					eq: jest.fn(() => ({
+						single: jest.fn(() =>
+							Promise.resolve({
+								data: { id: "test-global-id" },
+								error: null,
+							})
+						),
+					})),
+				})),
+			});
+
+			// Mock read status exists
+			mockSupabase.from.mockReturnValueOnce({
+				select: jest.fn(() => ({
+					eq: jest.fn(() => ({
+						single: jest.fn(() =>
+							Promise.resolve({
+								data: {
+									id: "read-status-id",
+									is_read: false,
+								},
+								error: null,
+							})
+						),
+					})),
+				})),
+			});
+
+			// Mock successful update
+			mockSupabase.from.mockReturnValueOnce({
+				update: jest.fn(() => ({
+					eq: jest.fn(() =>
+						Promise.resolve({ error: null })
+					),
+				})),
+			});
+
+			const result = await NotificationService.markAsRead(
+				"test-global-id",
+				undefined,
+				"test-member-id"
+			);
+
+			expect(result).toBe(true);
+		});
+	});
+
+	describe("error handling", () => {
+		it("should return false when anggotaId is not provided", async () => {
+			const result = await NotificationService.markAsRead(
+				"test-id",
+				"transaction",
+				""
+			);
+			expect(result).toBe(false);
+		});
+
+		it("should handle database errors gracefully", async () => {
+			// Mock database error
+			mockSupabase.from.mockReturnValueOnce({
+				select: jest.fn(() => ({
+					eq: jest.fn(() => ({
+						single: jest.fn(() =>
+							Promise.resolve({
+								data: null,
+								error: {
+									message: "Database connection error",
+								},
+							})
+						),
+					})),
+				})),
+			});
+
+			const result = await NotificationService.markAsRead(
+				"test-id",
+				"transaction",
+				"test-member-id"
+			);
+			expect(result).toBe(false);
+		});
+	});
 });
