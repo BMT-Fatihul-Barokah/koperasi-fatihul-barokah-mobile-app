@@ -8,7 +8,6 @@ import React, {
 import { supabase } from "../lib/supabase";
 import { useAuth } from "./auth-context";
 import { Anggota } from "../lib/database.types";
-import { LoanNotificationService } from "../services/loan-notification.service";
 import { Logger, LogCategory } from "../lib/logger";
 import { NotificationService } from "../services/notification.service";
 import { Notification as NotificationType } from "../lib/notification.types";
@@ -88,50 +87,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 		}
 	}, [isAuthenticated]);
 
-	// In-memory cache for the current session
-	const [sessionFlags, setSessionFlags] = useState<Record<string, boolean>>(
-		{}
-	);
-
-	// Check for loan installments when the app loads - but only once per session
-	useEffect(() => {
-		if (isAuthenticated && member?.id) {
-			// Use a session flag to prevent multiple checks
-			const loanCheckKey = `loan_check_${member.id}`;
-
-			// Check if we've already done this in the current session
-			if (!sessionFlags[loanCheckKey]) {
-				Logger.info("Data", "Checking loan installments", {
-					memberId: member.id,
-				});
-
-				// Check loan installments for the member
-				LoanNotificationService.checkMemberLoanInstallments(
-					member.id
-				)
-					.then(() => {
-						Logger.debug(
-							"Data",
-							"Loan installment check completed"
-						);
-						// Set flag to prevent repeated checks in this session
-						setSessionFlags((prev) => ({
-							...prev,
-							[loanCheckKey]: true,
-						}));
-						// Refresh notifications after checking loan installments
-						fetchNotifications(true);
-					})
-					.catch((error) => {
-						Logger.error(
-							"Data",
-							"Error checking loan installments",
-							error
-						);
-					});
-			}
-		}
-	}, [isAuthenticated, member?.id, sessionFlags]);
+	// Note: Loan installment notifications are now handled by the web app admin
+	// The mobile app only fetches and displays notifications
 
 	// Fetch transactions
 	const fetchTransactions = useCallback(

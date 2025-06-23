@@ -6,10 +6,12 @@ import {
 	StyleSheet,
 	Alert,
 	TextInput,
+	ScrollView,
 } from "react-native";
 import { NotificationService } from "../../services/notification.service";
 import { useAuth } from "../../context/auth-context";
 import { Logger, LogCategory } from "../../lib/logger";
+import { Notification } from "../../lib/notification.types";
 
 /**
  * Debug component for testing notification read status functionality
@@ -19,6 +21,8 @@ export function NotificationDebug() {
 	const { member } = useAuth();
 	const [notificationId, setNotificationId] = useState("");
 	const [testResults, setTestResults] = useState<string[]>([]);
+	const [debugResults, setDebugResults] = useState<string>("");
+	const [loading, setLoading] = useState(false);
 
 	// Only show in development mode
 	if (!__DEV__) {
@@ -124,6 +128,113 @@ export function NotificationDebug() {
 		}
 	};
 
+	const testJatuhTempoNotifications = async () => {
+		if (!member?.id) {
+			setDebugResults("No member ID available");
+			return;
+		}
+
+		setLoading(true);
+		try {
+			console.log(
+				"[NotificationDebug] Testing jatuh tempo notifications for member:",
+				member.id
+			);
+
+			// Test fetching jatuh_tempo notifications specifically
+			const jatuhTempoNotifications =
+				await NotificationService.getNotificationsByType(
+					member.id,
+					"jatuh_tempo"
+				);
+
+			const result = {
+				memberID: member.id,
+				jatuhTempoCount: jatuhTempoNotifications.length,
+				notifications: jatuhTempoNotifications.map((n) => ({
+					id: n.id,
+					judul: n.judul,
+					jenis: n.jenis,
+					is_read: n.is_read,
+					created_at: n.created_at,
+					source: n.source,
+				})),
+			};
+
+			setDebugResults(JSON.stringify(result, null, 2));
+			console.log(
+				"[NotificationDebug] Jatuh tempo test results:",
+				result
+			);
+		} catch (error) {
+			console.error(
+				"[NotificationDebug] Error testing jatuh tempo notifications:",
+				error
+			);
+			setDebugResults(`Error: ${error.message}`);
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	const testAllNotifications = async () => {
+		if (!member?.id) {
+			setDebugResults("No member ID available");
+			return;
+		}
+
+		setLoading(true);
+		try {
+			console.log(
+				"[NotificationDebug] Testing all notifications for member:",
+				member.id
+			);
+
+			// Test fetching all notifications
+			const allNotifications =
+				await NotificationService.getNotifications(member.id);
+
+			const notificationsByType = allNotifications.reduce(
+				(acc, notification) => {
+					acc[notification.jenis] =
+						(acc[notification.jenis] || 0) + 1;
+					return acc;
+				},
+				{} as Record<string, number>
+			);
+
+			const result = {
+				memberID: member.id,
+				totalCount: allNotifications.length,
+				byType: notificationsByType,
+				jatuhTempoNotifications: allNotifications
+					.filter((n) => n.jenis === "jatuh_tempo")
+					.map((n) => ({
+						id: n.id,
+						judul: n.judul,
+						jenis: n.jenis,
+						is_read: n.is_read,
+						created_at: n.created_at,
+						source: n.source,
+					})),
+			};
+
+			setDebugResults(JSON.stringify(result, null, 2));
+			console.log(
+				"[NotificationDebug] All notifications test results:",
+				result
+			);
+		} catch (error) {
+			console.error(
+				"[NotificationDebug] Error testing all notifications:",
+				error
+			);
+			setDebugResults(`Error: ${error.message}`);
+		} finally {
+			setLoading(false);
+		}
+	};
+
 	return (
 		<View style={styles.container}>
 			<Text style={styles.title}>🐛 Notification Debug Tool</Text>
@@ -183,6 +294,30 @@ export function NotificationDebug() {
 				</TouchableOpacity>
 			</View>
 
+			<View style={styles.buttonContainer}>
+				<TouchableOpacity
+					style={[styles.button, styles.primaryButton]}
+					onPress={testJatuhTempoNotifications}
+					disabled={loading}
+				>
+					<Text style={styles.buttonText}>
+						Test Jatuh Tempo Notifications
+					</Text>
+				</TouchableOpacity>
+
+				<TouchableOpacity
+					style={[styles.button, styles.secondaryButton]}
+					onPress={testAllNotifications}
+					disabled={loading}
+				>
+					<Text style={styles.buttonText}>
+						Test All Notifications
+					</Text>
+				</TouchableOpacity>
+			</View>
+
+			{loading && <Text style={styles.loading}>Testing...</Text>}
+
 			<View style={styles.resultsContainer}>
 				<Text style={styles.resultsTitle}>Test Results:</Text>
 				{testResults.map((result, index) => (
@@ -191,6 +326,11 @@ export function NotificationDebug() {
 					</Text>
 				))}
 			</View>
+
+			<ScrollView style={styles.resultsContainer}>
+				<Text style={styles.resultsTitle}>Results:</Text>
+				<Text style={styles.resultsText}>{debugResults}</Text>
+			</ScrollView>
 		</View>
 	);
 }
@@ -255,6 +395,17 @@ const styles = StyleSheet.create({
 		fontSize: 12,
 		fontWeight: "500",
 	},
+	primaryButton: {
+		backgroundColor: "#007bff",
+	},
+	secondaryButton: {
+		backgroundColor: "#6c757d",
+	},
+	loading: {
+		textAlign: "center",
+		fontStyle: "italic",
+		marginVertical: 8,
+	},
 	resultsContainer: {
 		marginTop: 16,
 		padding: 8,
@@ -272,5 +423,10 @@ const styles = StyleSheet.create({
 		fontSize: 11,
 		color: "#666",
 		marginBottom: 2,
+	},
+	resultsText: {
+		fontFamily: "monospace",
+		fontSize: 12,
+		lineHeight: 16,
 	},
 });

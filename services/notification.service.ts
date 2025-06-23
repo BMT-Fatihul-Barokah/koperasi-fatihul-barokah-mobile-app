@@ -1,13 +1,8 @@
 import { supabase } from "../lib/supabase";
 import {
 	Notification,
-	GlobalNotification,
-	GlobalNotificationRead,
-	TransactionNotification,
-	parseNotificationData,
 	NotificationTypeInfo,
 	NOTIFICATION_TYPES,
-	TransactionNotificationData,
 } from "../lib/notification.types";
 
 // Logger for better debugging
@@ -32,172 +27,6 @@ export const NotificationService = {
 	clearCache(): void {
 		notificationCache = {};
 		log("Notification cache cleared");
-	},
-
-	/**
-	 * Create a notification
-	 * @param notification The notification to create
-	 * @returns Promise<{success: boolean, id?: string}> indicating success or failure and the created notification ID
-	 */
-	async createNotification(
-		notification: Omit<Notification, "id" | "created_at" | "updated_at">
-	): Promise<{ success: boolean; id?: string }> {
-		try {
-			log("Creating notification", notification);
-
-			// Determine if this is a global notification or transaction notification
-			const isGlobal =
-				notification.source === "global" ||
-				["pengumuman", "sistem"].includes(notification.jenis);
-
-			const timestamp = new Date().toISOString();
-
-			if (isGlobal) {
-				// Create global notification
-				const { data: globalData, error: globalError } =
-					await supabase
-						.from("global_notifikasi")
-						.insert({
-							judul: notification.judul,
-							pesan: notification.pesan,
-							jenis: notification.jenis,
-							data: notification.data || {},
-							created_at: timestamp,
-							updated_at: timestamp,
-						})
-						.select("id")
-						.single();
-
-				if (globalError || !globalData) {
-					logError(
-						"Error creating global notification",
-						globalError
-					);
-					return { success: false };
-				}
-
-				log(
-					`Created global notification with ID: ${globalData.id}`
-				);
-
-				// If anggota_id is provided, create read status for that member
-				if (notification.anggota_id) {
-					// Create read status for a single member
-					const { error: readError } = await supabase
-						.from("global_notifikasi_read")
-						.insert({
-							global_notifikasi_id: globalData.id,
-							anggota_id: notification.anggota_id,
-							is_read:
-								notification.is_read ?? false,
-							created_at: timestamp,
-							updated_at: timestamp,
-						});
-
-					if (readError) {
-						logError(
-							"Error creating notification read status",
-							readError
-						);
-						// Continue despite error, the notification was still created
-					} else {
-						log(
-							`Created read status for member ${notification.anggota_id}`
-						);
-					}
-				} else if (
-					notification.anggota_ids &&
-					Array.isArray(notification.anggota_ids)
-				) {
-					// Create read status for multiple members if anggota_ids array is provided
-					const readStatusEntries =
-						notification.anggota_ids.map(
-							(anggotaId) => ({
-								global_notifikasi_id:
-									globalData.id,
-								anggota_id: anggotaId,
-								is_read:
-									notification.is_read ??
-									false,
-								created_at: timestamp,
-								updated_at: timestamp,
-							})
-						);
-
-					const { error: batchReadError } = await supabase
-						.from("global_notifikasi_read")
-						.insert(readStatusEntries);
-
-					if (batchReadError) {
-						logError(
-							"Error creating batch notification read statuses",
-							batchReadError
-						);
-						// Continue despite error, the notification was still created
-					} else {
-						log(
-							`Created read status for ${readStatusEntries.length} members`
-						);
-					}
-				}
-
-				return { success: true, id: globalData.id };
-			} else {
-				// Create transaction notification
-				let transaksiId = notification.transaksi_id;
-
-				// If transaksi_id is in the data object, extract it
-				if (!transaksiId && notification.data) {
-					const data =
-						typeof notification.data === "string"
-							? parseNotificationData<TransactionNotificationData>(
-									notification.data
-							  )
-							: (notification.data as TransactionNotificationData);
-
-					transaksiId = data?.transaksi_id;
-				}
-
-				if (!transaksiId) {
-					logError(
-						"Transaction ID is required for transaction notifications",
-						{ notification }
-					);
-					return { success: false };
-				}
-
-				const { data: transactionData, error } = await supabase
-					.from("transaksi_notifikasi")
-					.insert({
-						judul: notification.judul,
-						pesan: notification.pesan,
-						jenis: notification.jenis,
-						data: notification.data || {},
-						is_read: notification.is_read ?? false,
-						transaksi_id: transaksiId,
-						created_at: timestamp,
-						updated_at: timestamp,
-					})
-					.select("id")
-					.single();
-
-				if (error) {
-					logError(
-						"Error creating transaction notification",
-						error
-					);
-					return { success: false };
-				}
-
-				log(
-					`Created transaction notification with ID: ${transactionData?.id}`
-				);
-				return { success: true, id: transactionData?.id };
-			}
-		} catch (error) {
-			logError("Error in createNotification", error);
-			return { success: false };
-		}
 	},
 
 	/**
@@ -296,6 +125,36 @@ export const NotificationService = {
 			log(
 				`Found ${transactionNotifications.length} transaction notifications`
 			);
+
+			// Fetch standalone jatuh_tempo notifications (those without transaksi_id)
+			log("Fetching standalone jatuh_tempo notifications");
+			let jatuhTempoNotifications = [];
+			try {
+				const { data: jatuhTempoData, error: jatuhTempoError } =
+					await supabase
+						.from("transaksi_notifikasi")
+						.select("*")
+						.eq("jenis", "jatuh_tempo")
+						.order("created_at", { ascending: false })
+						.limit(limit);
+
+				if (jatuhTempoError) {
+					logError(
+						"Error fetching jatuh_tempo notifications",
+						jatuhTempoError
+					);
+				} else {
+					jatuhTempoNotifications = jatuhTempoData || [];
+					log(
+						`Found ${jatuhTempoNotifications.length} jatuh_tempo notifications`
+					);
+				}
+			} catch (jatuhTempoFetchError) {
+				logError(
+					"Exception fetching jatuh_tempo notifications",
+					jatuhTempoFetchError
+				);
+			}
 
 			// Fetch global notifications with read status using a more robust approach
 			log("Fetching global notifications with read status");
@@ -462,6 +321,22 @@ export const NotificationService = {
 					anggota_id: anggotaId,
 				}));
 
+			// Format jatuh_tempo notifications
+			const formattedJatuhTempoNotifications =
+				jatuhTempoNotifications.map((item) => ({
+					id: item.id,
+					judul: item.judul,
+					pesan: item.pesan,
+					jenis: item.jenis,
+					data: item.data || {},
+					is_read: item.is_read ?? false,
+					created_at: item.created_at,
+					updated_at: item.updated_at || item.created_at,
+					source: "transaction" as const,
+					transaksi_id: item.transaksi_id,
+					anggota_id: anggotaId,
+				}));
+
 			// Format global notifications
 			const formattedGlobalNotifications = (
 				globalNotifications || []
@@ -492,6 +367,7 @@ export const NotificationService = {
 			// Combine, sort by date (newest first), and limit the results
 			const allNotifications = [
 				...formattedTransactionNotifications,
+				...formattedJatuhTempoNotifications,
 				...formattedGlobalNotifications,
 			]
 				.sort(
@@ -520,6 +396,8 @@ export const NotificationService = {
 				} total notifications (${
 					formattedTransactionNotifications.length
 				} transaction, ${
+					formattedJatuhTempoNotifications.length
+				} jatuh_tempo, ${
 					formattedGlobalNotifications.length
 				} global). Types: ${JSON.stringify(typeBreakdown)}`
 			);

@@ -24,7 +24,6 @@ import { router, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../../context/auth-context";
 import { useData } from "../../context/data-context";
-import { JatuhTempoNotifications } from "../../components/jatuh-tempo-notifications";
 // Import Notification type from our custom types file
 import { Notification } from "../../lib/notification.types";
 import { format, parseISO, formatDistanceToNow } from "date-fns";
@@ -794,10 +793,7 @@ export default function NotificationsScreen() {
 			</View>
 
 			{/* Main content */}
-			{activeFilter === "jatuh_tempo" ? (
-				// Show the dedicated JatuhTempoNotifications component when jatuh_tempo filter is active
-				<JatuhTempoNotifications />
-			) : notifications.isLoading ? (
+			{notifications.isLoading ? (
 				<View style={styles.loadingContainer}>
 					<ActivityIndicator size="large" color="#007BFF" />
 					<Text style={styles.loadingText}>
