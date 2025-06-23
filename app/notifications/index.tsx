@@ -526,21 +526,6 @@ export default function NotificationsScreen() {
 						<Text style={styles.notificationTime}>
 							{formatRelativeTime(item.created_at)}
 						</Text>
-
-						{/* Debug read status in dev mode */}
-						{__DEV__ && (
-							<Text
-								style={{
-									fontSize: 10,
-									color: "gray",
-								}}
-							>
-								ID: {item.id.substring(0, 8)}...
-								| Read: {String(isRead)} |
-								Source:{" "}
-								{item.source || "unknown"}
-							</Text>
-						)}
 					</View>
 				</TouchableOpacity>
 			);
@@ -608,48 +593,6 @@ export default function NotificationsScreen() {
 									]}
 								>
 									Tandai semua sudah dibaca
-								</Text>
-							</TouchableOpacity>
-						)}
-
-						{/* Debug option in development mode */}
-						{__DEV__ && (
-							<TouchableOpacity
-								style={styles.menuItem}
-								onPress={async () => {
-									if (member?.id) {
-										Logger.info(
-											LogCategory.NOTIFICATIONS,
-											"Manual debug test triggered"
-										);
-										await checkNotificationsDirectly(
-											member.id
-										);
-										await fetchNotifications(
-											true
-										);
-									}
-									setMenuVisible(false);
-								}}
-							>
-								<Ionicons
-									name="bug-outline"
-									size={20}
-									color={
-										isDark
-											? "#e0e0e0"
-											: "#ff6b6b"
-									}
-									style={styles.menuIcon}
-								/>
-								<Text
-									style={[
-										styles.menuText,
-										isDark &&
-											styles.menuTextDark,
-									]}
-								>
-									Debug Notifications
 								</Text>
 							</TouchableOpacity>
 						)}

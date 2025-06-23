@@ -41,7 +41,7 @@ export default function SettingsScreen() {
 	);
 
 	// Get app version
-	const appVersion = Constants.expoConfig?.version || "0.9.0";
+	const appVersion = Constants.expoConfig?.version || "1.0.0";
 	const buildNumber =
 		Constants.expoConfig?.ios?.buildNumber ||
 		Constants.expoConfig?.android?.versionCode ||
