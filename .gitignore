@@ -41,3 +41,44 @@ app-example
 
 # Expo Application Services config with sensitive keys
 eas.json
+
+# IDE and Editor files
+.idea/
+.vscode/
+.windsurf/
+.windsurfrules
+*.swp
+*.swo
+*~
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Build artifacts and temporary files
+*.tmp
+*.temp
+*.log
+*.pid
+*.seed
+*.pid.lock
+
+# Credentials and sensitive files
+eas-credentials.json
+google-services.json
+GoogleService-Info.plist
+
+# Development and context files
+context.md
+*.context
+*.notes
+
+# Auto-generated files
+declarations.d.ts
+‎declarations.d.ts
+
+# Suspicious or temporary files
+okhttp3.*
+*.internal.*
+*.AsyncCall

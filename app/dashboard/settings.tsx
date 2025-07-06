@@ -22,6 +22,7 @@ import * as Linking from "expo-linking";
 import * as Application from "expo-application";
 import * as Device from "expo-device";
 import Constants from "expo-constants";
+import { env } from "../../lib/env";
 
 export default function SettingsScreen() {
 	const { logout } = useAuth();
@@ -94,18 +95,16 @@ export default function SettingsScreen() {
 
 	const handleContactSupport = () => {
 		Linking.openURL(
-			"mailto:support@koperasifatihulbarokah.id?subject=Bantuan%20Aplikasi%20Mobile"
+			`mailto:${env.SUPPORT_EMAIL}?subject=Bantuan%20Aplikasi%20Mobile`
 		);
 	};
 
 	const handleOpenPrivacyPolicy = () => {
-		Linking.openURL("https://koperasifatihulbarokah.id/privacy-policy");
+		Linking.openURL(`${env.WEBSITE_URL}/privacy-policy`);
 	};
 
 	const handleOpenTermsOfService = () => {
-		Linking.openURL(
-			"https://koperasifatihulbarokah.id/terms-of-service"
-		);
+		Linking.openURL(`${env.WEBSITE_URL}/terms-of-service`);
 	};
 
 	const handleToggleNotifications = (value: boolean) => {
