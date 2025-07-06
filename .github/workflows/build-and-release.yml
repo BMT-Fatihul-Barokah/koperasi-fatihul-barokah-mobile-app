@@ -1,0 +1,94 @@
+name: Build and Release Android APK
+
+on:
+      push:
+            tags:
+                  - "v*"
+      workflow_dispatch:
+            inputs:
+                  version:
+                        description: "Version tag (e.g., v1.0.0)"
+                        required: true
+                        default: "v1.0.0"
+
+jobs:
+      build:
+            runs-on: ubuntu-latest
+
+            steps:
+                  - name: Checkout repository
+                    uses: actions/checkout@v4
+
+                  - name: Setup Node.js
+                    uses: actions/setup-node@v4
+                    with:
+                          node-version: "18"
+                          cache: "npm"
+
+                  - name: Setup Java
+                    uses: actions/setup-java@v4
+                    with:
+                          distribution: "temurin"
+                          java-version: "17"
+
+                  - name: Setup Android SDK
+                    uses: android-actions/setup-android@v3
+
+                  - name: Install dependencies
+                    run: npm ci
+
+                  - name: Install Expo CLI
+                    run: npm install -g @expo/cli@latest
+
+                  - name: Create .env file
+                    run: |
+                          echo "NEXT_PUBLIC_SUPABASE_URL=https://vszhxeamcxgqtwyaxhlu.supabase.co" >> .env
+                          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzemh4ZWFtY3hncXR3eWF4aGx1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg4NDQ0ODYsImV4cCI6MjA2NDQyMDQ4Nn0.x6Nj5UAHLA2nsNfvK4P8opRkB0U3--ZFt7Dc3Dj-q94" >> .env
+
+                  - name: Prebuild Android
+                    run: npx expo prebuild --platform android --clean
+
+                  - name: Build Android APK
+                    run: |
+                          cd android
+                          ./gradlew assembleRelease
+
+                  - name: Get version
+                    id: get_version
+                    run: |
+                          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+                            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+                          else
+                            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+                          fi
+
+                  - name: Create Release
+                    id: create_release
+                    uses: actions/create-release@v1
+                    env:
+                          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                    with:
+                          tag_name: ${{ steps.get_version.outputs.version }}
+                          release_name: Koperasi Fatihul Barokah ${{ steps.get_version.outputs.version }}
+                          body: |
+                                ## Changes in this Release
+                                - Production build of Koperasi Fatihul Barokah mobile app
+                                - Built with Expo SDK 52
+                                - Android APK ready for installation
+
+                                ## Installation
+                                1. Download the APK file below
+                                2. Enable "Install from unknown sources" in your Android settings
+                                3. Install the APK on your device
+                          draft: false
+                          prerelease: false
+
+                  - name: Upload APK to Release
+                    uses: actions/upload-release-asset@v1
+                    env:
+                          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                    with:
+                          upload_url: ${{ steps.create_release.outputs.upload_url }}
+                          asset_path: android/app/build/outputs/apk/release/app-release.apk
+                          asset_name: koperasi-fatihul-barokah-${{ steps.get_version.outputs.version }}.apk
+                          asset_content_type: application/vnd.android.package-archive

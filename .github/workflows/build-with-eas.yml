@@ -1,0 +1,92 @@
+name: Build with EAS and Release
+
+on:
+      workflow_dispatch:
+            inputs:
+                  version:
+                        description: "Version tag (e.g., v1.0.1)"
+                        required: true
+                        default: "v1.0.1"
+                  build_profile:
+                        description: "EAS build profile"
+                        required: true
+                        default: "production"
+                        type: choice
+                        options:
+                              - production
+                              - preview
+
+jobs:
+      build:
+            runs-on: ubuntu-latest
+
+            steps:
+                  - name: Checkout repository
+                    uses: actions/checkout@v4
+
+                  - name: Setup Node.js
+                    uses: actions/setup-node@v4
+                    with:
+                          node-version: "18"
+                          cache: "npm"
+
+                  - name: Install dependencies
+                    run: npm ci
+
+                  - name: Install EAS CLI
+                    run: npm install -g eas-cli@latest
+
+                  - name: Install Expo CLI
+                    run: npm install -g @expo/cli@latest
+
+                  - name: EAS Login
+                    run: eas login --non-interactive
+                    env:
+                          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+                  - name: Build with EAS
+                    run: eas build --platform android --profile ${{ github.event.inputs.build_profile }} --non-interactive --wait
+                    env:
+                          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+                  - name: Download APK
+                    run: |
+                          # Get the latest build URL
+                          BUILD_URL=$(eas build:list --platform android --limit 1 --json | jq -r '.[0].artifacts.buildUrl')
+                          echo "Build URL: $BUILD_URL"
+
+                          # Download the APK
+                          curl -L -o koperasi-fatihul-barokah-${{ github.event.inputs.version }}.apk "$BUILD_URL"
+                    env:
+                          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+                  - name: Create Release
+                    id: create_release
+                    uses: actions/create-release@v1
+                    env:
+                          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                    with:
+                          tag_name: ${{ github.event.inputs.version }}
+                          release_name: Koperasi Fatihul Barokah ${{ github.event.inputs.version }}
+                          body: |
+                                ## Changes in this Release
+                                - Production build of Koperasi Fatihul Barokah mobile app
+                                - Built with EAS Build (${{ github.event.inputs.build_profile }} profile)
+                                - Android APK ready for installation
+
+                                ## Installation
+                                1. Download the APK file below
+                                2. Enable "Install from unknown sources" in your Android settings
+                                3. Install the APK on your device
+                          draft: false
+                          prerelease: false
+
+                  - name: Upload APK to Release
+                    uses: actions/upload-release-asset@v1
+                    env:
+                          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                    with:
+                          upload_url: ${{ steps.create_release.outputs.upload_url }}
+                          asset_path: koperasi-fatihul-barokah-${{ github.event.inputs.version }}.apk
+                          asset_name: koperasi-fatihul-barokah-${{ github.event.inputs.version }}.apk
+                          asset_content_type: application/vnd.android.package-archive
